@@ -3,283 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manager Service - Pré-visualização</title>
-    <!-- Importação do Tailwind CSS -->
+    <title>Manager Service - Dashboard Kanban</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Fontes e Estilos Personalizados -->
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; overflow: hidden; }
-        
-        /* Personalização da Barra de Rolagem */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        /* Efeitos do Kanban Drag and Drop */
-        .kanban-col { min-height: 400px; transition: background-color 0.2s ease, border 0.2s ease; border: 2px solid transparent; }
-        .kanban-col.drag-over { background-color: #eef2ff; border: 2px dashed #8b5cf6; border-radius: 0.5rem; }
-        .kanban-card { cursor: grab; transition: transform 0.1s ease, box-shadow 0.1s ease; }
-        .kanban-card:active { cursor: grabbing; }
-        .kanban-card.dragging { opacity: 0.6; transform: scale(0.95) rotate(2deg); border: 2px dashed #8b5cf6; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-
-        /* Controle de Telas (Single Page Application) */
-        .view-section { display: none; flex-direction: column; height: 100%; }
-        .view-section.active { display: flex; }
-    </style>
+    <!-- Script do Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="flex h-screen text-sm">
+<body class="bg-gray-100 flex h-screen overflow-hidden text-sm">
 
-    <!-- MENU LATERAL -->
-    <aside class="w-64 bg-white shadow-md flex flex-col z-20 relative">
-        <div class="p-4 border-b flex items-center justify-center gap-2">
-            <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">⚙️</div>
-            <h1 class="font-bold text-lg text-purple-600 tracking-tight">MANAGER SERVICE</h1>
+    <!-- Menu Lateral -->
+    <aside class="w-64 bg-white shadow-md flex flex-col">
+        <div class="p-4 border-b flex items-center justify-center">
+            <h1 class="font-bold text-lg text-purple-600">MANAGER SERVICE</h1>
         </div>
-        <nav class="flex-1 overflow-y-auto p-4 space-y-2" id="main-menu">
-            <button data-target="view-kanban" class="menu-btn w-full text-left p-3 rounded-lg bg-purple-100 text-purple-700 font-semibold transition">Painel (Kanban)</button>
-            <button data-target="view-maquinas" class="menu-btn w-full text-left p-3 rounded-lg text-gray-600 hover:bg-gray-50 transition">Máquinas e Ativos</button>
-            <button data-target="view-vazio" class="menu-btn w-full text-left p-3 rounded-lg text-gray-600 hover:bg-gray-50 transition">Solicitações</button>
-            <button data-target="view-vazio" class="menu-btn w-full text-left p-3 rounded-lg text-gray-600 hover:bg-gray-50 transition">Relatórios</button>
+        <nav class="flex-1 overflow-y-auto p-4 space-y-2">
+            <a href="index.html" class="block p-2 rounded bg-purple-100 text-purple-700 font-semibold">Painel (Kanban)</a>
+            <a href="maquinas.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Máquinas</a>
+            <a href="solicitacoes.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Solicitações</a>
+            <a href="cadastros.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Cadastros Base</a>
+            <a href="relatorios.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Relatórios</a>
+            <a href="usuarios.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Usuários / Perfis</a>
         </nav>
         <div class="p-4 border-t">
-            <button onclick="alert('Simulação de Logout')" class="text-red-500 hover:bg-red-50 w-full text-left p-2 rounded transition flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                Sair do Sistema
-            </button>
+            <a href="login.html" class="text-red-500 hover:underline">Sair</a>
         </div>
     </aside>
 
-    <!-- ÁREA PRINCIPAL -->
-    <main class="flex-1 flex flex-col h-full bg-gray-100">
-        
-        <!-- CABEÇALHO GERAL -->
-        <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10 relative">
-            <h2 id="page-title" class="text-xl font-semibold text-gray-800">Ordens de Serviço</h2>
-            <div class="flex items-center gap-4">
-                <span class="text-gray-500 hidden md:block">Bem-vindo, <strong>Líder de Manutenção</strong></span>
-                <button class="bg-purple-600 text-white px-5 py-2.5 rounded-lg shadow-sm hover:bg-purple-700 transition font-medium">
-                    + Nova O.S.
-                </button>
-            </div>
+    <!-- Área Principal (Quadro Kanban) -->
+    <main class="flex-1 flex flex-col h-full">
+        <!-- Cabeçalho -->
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-800">Ordens de Serviço</h2>
+            <button class="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition">
+                + Nova O.S.
+            </button>
         </header>
 
-        <!-- TELA 1: KANBAN (Ativa por padrão) -->
-        <div id="view-kanban" class="view-section active p-6 overflow-x-auto">
-            <div class="flex space-x-4 h-full min-w-max items-start">
+        <!-- Colunas do Kanban -->
+        <div class="flex-1 p-6 overflow-x-auto">
+            <div class="flex space-x-4 h-full min-w-max">
                 
-                <!-- Coluna: ABERTA -->
-                <div class="w-80 bg-gray-50 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
-                    <div class="p-4 border-b border-gray-200 bg-white rounded-t-xl flex justify-between items-center">
-                        <span class="font-bold text-gray-700">Aberto</span> 
-                        <span class="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full font-bold count-badge">2</span>
+                <!-- Coluna: Aberta -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
+                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-gray-700">
+                        Aberto (2)
                     </div>
-                    <div class="p-3 flex-1 space-y-3 kanban-col overflow-y-auto" data-status="aberta">
-                        
-                        <!-- Card 1 -->
-                        <div class="kanban-card bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500 select-none" draggable="true">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-bold text-gray-400">OS: 118369</span>
-                                <span class="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase font-bold">Alta Prioridade</span>
-                            </div>
-                            <div class="font-bold text-gray-800 text-base mb-1">CM-034 - DAF XF FTT 530</div>
-                            <div class="text-xs text-gray-500 mb-3">Corretiva por Inspeção • Motor</div>
-                            <div class="flex justify-between items-center text-xs text-gray-400">
-                                <span>Criado há 7 min</span>
-                                <span class="bg-gray-100 px-2 py-1 rounded">Mecânica</span>
-                            </div>
+                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-aberta">
+                        <!-- Card de Exemplo -->
+                        <div class="bg-white p-3 rounded shadow-sm border-l-4 border-green-500 cursor-move">
+                            <div class="text-xs text-gray-500 mb-1">O.S: 118369</div>
+                            <div class="font-bold text-gray-800">CM-034 - DAF XF FTT 530</div>
+                            <div class="text-sm text-gray-600 mt-2">Corretiva por Inspeção</div>
                         </div>
-
-                        <!-- Card 2 -->
-                        <div class="kanban-card bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500 select-none" draggable="true">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-bold text-gray-400">OS: 118370</span>
-                                <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase font-bold">Normal</span>
-                            </div>
-                            <div class="font-bold text-gray-800 text-base mb-1">VG-001 - Vagão Misturador</div>
-                            <div class="text-xs text-gray-500 mb-3">Preventiva • Lubrificação Geral</div>
-                            <div class="flex justify-between items-center text-xs text-gray-400">
-                                <span>Criado há 2 horas</span>
-                                <span class="bg-gray-100 px-2 py-1 rounded">Geral</span>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
 
-                <!-- Coluna: EM ANDAMENTO -->
-                <div class="w-80 bg-gray-50 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
-                    <div class="p-4 border-b border-gray-200 bg-white rounded-t-xl flex justify-between items-center">
-                        <span class="font-bold text-blue-700">Em Andamento</span> 
-                        <span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-bold count-badge">1</span>
+                <!-- Coluna: Em Andamento -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
+                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-blue-700">
+                        Em Andamento (1)
                     </div>
-                    <div class="p-3 flex-1 space-y-3 kanban-col overflow-y-auto" data-status="em_andamento">
-                        
-                        <!-- Card 3 -->
-                        <div class="kanban-card bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500 select-none" draggable="true">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-bold text-gray-400">OS: 118365</span>
-                                <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase font-bold">Normal</span>
-                            </div>
-                            <div class="font-bold text-gray-800 text-base mb-1">PR-012 - Prensa Hidráulica</div>
-                            <div class="text-xs text-gray-500 mb-3">Corretiva • Vazamento de Óleo</div>
-                            <div class="flex justify-between items-center text-xs text-gray-400 border-t pt-2 mt-2">
-                                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Em execução</div>
-                                <strong>João Silva</strong>
-                            </div>
-                        </div>
-
+                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-andamento">
+                        <!-- Card virá do Supabase -->
                     </div>
                 </div>
 
-                <!-- Coluna: AGUARDANDO PEÇA -->
-                <div class="w-80 bg-gray-50 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
-                    <div class="p-4 border-b border-gray-200 bg-white rounded-t-xl flex justify-between items-center">
-                        <span class="font-bold text-orange-600">Aguardando Peça</span> 
-                        <span class="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full font-bold count-badge">0</span>
+                <!-- Coluna: Aguardando Peça -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
+                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-orange-600">
+                        Aguardando Peça (0)
                     </div>
-                    <div class="p-3 flex-1 space-y-3 kanban-col overflow-y-auto" data-status="aguardando_peca"></div>
+                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-aguardando">
+                    </div>
                 </div>
 
-                <!-- Coluna: CONCLUÍDA -->
-                <div class="w-80 bg-gray-50 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
-                    <div class="p-4 border-b border-gray-200 bg-white rounded-t-xl flex justify-between items-center">
-                        <span class="font-bold text-gray-500">Concluída</span> 
-                        <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full font-bold count-badge">0</span>
+                <!-- Coluna: Concluída -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
+                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-gray-500">
+                        Concluída (0)
                     </div>
-                    <div class="p-3 flex-1 space-y-3 kanban-col overflow-y-auto" data-status="concluida"></div>
+                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-concluida">
+                    </div>
                 </div>
 
             </div>
         </div>
-
-        <!-- TELA 2: MÁQUINAS -->
-        <div id="view-maquinas" class="view-section p-6 overflow-y-auto">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="font-bold text-lg text-gray-800">Equipamentos Cadastrados</h3>
-                    <input type="text" placeholder="Buscar máquina..." class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
-                </div>
-                
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                            <th class="p-4 border-b font-medium rounded-tl-lg">Código / Tag</th>
-                            <th class="p-4 border-b font-medium">Nome do Equipamento</th>
-                            <th class="p-4 border-b font-medium">Última Manutenção</th>
-                            <th class="p-4 border-b font-medium">Status</th>
-                            <th class="p-4 border-b font-medium text-center rounded-tr-lg">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-sm">
-                        <tr class="hover:bg-gray-50 border-b border-gray-100 transition">
-                            <td class="p-4 font-bold text-gray-700">CM-034</td>
-                            <td class="p-4 text-gray-600">DAF XF FTT 530</td>
-                            <td class="p-4 text-gray-500">24/10/2026</td>
-                            <td class="p-4"><span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">Ativa</span></td>
-                            <td class="p-4 text-center">
-                                <button class="text-purple-600 hover:text-purple-800 font-semibold text-xs border border-purple-200 px-3 py-1 rounded hover:bg-purple-50 transition">Ver Prontuário</button>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-gray-50 border-b border-gray-100 transition">
-                            <td class="p-4 font-bold text-gray-700">VG-001</td>
-                            <td class="p-4 text-gray-600">Vagão Misturador e Distribuidor</td>
-                            <td class="p-4 text-gray-500">01/10/2026</td>
-                            <td class="p-4"><span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">Parada</span></td>
-                            <td class="p-4 text-center">
-                                <button class="text-purple-600 hover:text-purple-800 font-semibold text-xs border border-purple-200 px-3 py-1 rounded hover:bg-purple-50 transition">Ver Prontuário</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- TELA 3: VAZIA (Exemplo para outras abas) -->
-        <div id="view-vazio" class="view-section p-6 overflow-y-auto">
-            <div class="bg-white border-2 border-dashed border-gray-300 rounded-xl h-64 flex flex-col items-center justify-center text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                <p>Módulo em desenvolvimento.</p>
-            </div>
-        </div>
-
     </main>
 
-    <!-- SCRIPTS DE INTERAÇÃO -->
+    <!-- Script de Inicialização da Base de Dados -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            
-            // --- 1. LÓGICA DE NAVEGAÇÃO ENTRE AS TELAS ---
-            const menuBtns = document.querySelectorAll('.menu-btn');
-            const viewSections = document.querySelectorAll('.view-section');
-            const pageTitle = document.getElementById('page-title');
-
-            menuBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // Atualiza estilo do menu lateral
-                    menuBtns.forEach(b => {
-                        b.classList.remove('bg-purple-100', 'text-purple-700', 'font-semibold');
-                        b.classList.add('text-gray-600');
-                    });
-                    btn.classList.remove('text-gray-600');
-                    btn.classList.add('bg-purple-100', 'text-purple-700', 'font-semibold');
-
-                    // Atualiza o Título no Cabeçalho
-                    pageTitle.innerText = btn.innerText;
-
-                    // Esconde todas as seções e mostra a selecionada
-                    const targetId = btn.getAttribute('data-target');
-                    viewSections.forEach(section => {
-                        section.classList.remove('active');
-                    });
-                    document.getElementById(targetId).classList.add('active');
-                });
-            });
-
-            // --- 2. LÓGICA DO ARRASTAR E SOLTAR (DRAG AND DROP) ---
-            const cards = document.querySelectorAll('.kanban-card');
-            const columns = document.querySelectorAll('.kanban-col');
-
-            // Atualiza contadores nas colunas
-            function updateCounters() {
-                columns.forEach(col => {
-                    const count = col.querySelectorAll('.kanban-card').length;
-                    col.parentElement.querySelector('.count-badge').innerText = count;
-                });
-            }
-
-            cards.forEach(card => {
-                card.addEventListener('dragstart', () => {
-                    card.classList.add('dragging');
-                });
-                card.addEventListener('dragend', () => {
-                    card.classList.remove('dragging');
-                    updateCounters();
-                });
-            });
-
-            columns.forEach(col => {
-                col.addEventListener('dragover', (e) => {
-                    e.preventDefault(); // Permite soltar
-                    col.classList.add('drag-over');
-                    const draggingCard = document.querySelector('.dragging');
-                    if (draggingCard) {
-                        col.appendChild(draggingCard); // Move visualmente o cartão para a nova coluna
-                    }
-                });
-                col.addEventListener('dragleave', () => {
-                    col.classList.remove('drag-over');
-                });
-                col.addEventListener('drop', (e) => {
-                    col.classList.remove('drag-over');
-                    // Aqui ficaria o código para gravar a alteração no Supabase
-                    console.log('O.S movida para:', col.getAttribute('data-status'));
-                });
-            });
-            
-        });
+        // A lógica de conexão com o Supabase e o Drag and Drop será inserida aqui
+        console.log("Interface Kanban carregada.");
     </script>
 </body>
 </html>
