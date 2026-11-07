@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f3f4f6;
+}
+
+/* Personalização da Barra de Rolagem */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Efeitos do Kanban Drag and Drop */
+.kanban-col {
+    min-height: 300px;
+    transition: background-color 0.2s ease;
+}
+.kanban-col.drag-over {
+    background-color: #eef2ff; /* Cor de fundo ao arrastar por cima */
+    border: 2px dashed #8b5cf6;
+}
+.kanban-card {
+    cursor: grab;
+    transition: transform 0.1s ease;
+}
+.kanban-card:active {
+    cursor: grabbing;
+}
+.kanban-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    border: 2px dashed #8b5cf6;
+}
