@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Máquinas - Manager Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Biblioteca geradora de QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="flex h-screen overflow-hidden text-sm">
+
+    <!-- Copie exatamente o mesmo bloco <aside> do index.html aqui -->
+    <aside class="w-64 bg-white shadow-md flex flex-col z-10">
+        <!-- ... (Mesmo menu lateral) ... -->
+        <nav class="flex-1 overflow-y-auto p-4 space-y-2">
+            <a href="index.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Painel (Kanban)</a>
+            <a href="maquinas.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Máquinas</a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full bg-gray-100">
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-800">Gestão de Máquinas</h2>
+            <button class="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition">
+                + Nova Máquina
+            </button>
+        </header>
+
+        <div class="p-6 overflow-y-auto">
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <h3 class="font-bold text-lg mb-4">Lista de Equipamentos</h3>
+                
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600">
+                            <th class="p-3 border-b">Tag/Código</th>
+                            <th class="p-3 border-b">Nome do Equipamento</th>
+                            <th class="p-3 border-b">Status</th>
+                            <th class="p-3 border-b text-center">Ações (QR Code)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3 border-b font-semibold">CM-034</td>
+                            <td class="p-3 border-b">DAF XF FTT 530</td>
+                            <td class="p-3 border-b"><span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">Ativa</span></td>
+                            <td class="p-3 border-b text-center">
+                                <button class="text-purple-600 hover:underline">Ver QR</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
