@@ -3,96 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manager Service - Dashboard Kanban</title>
+    <title>Kanban - Manager Service</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Script do Supabase -->
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-100 flex h-screen overflow-hidden text-sm">
+<body class="flex h-screen overflow-hidden text-sm">
 
-    <!-- Menu Lateral -->
-    <aside class="w-64 bg-white shadow-md flex flex-col">
+    <!-- Menu Lateral Compartilhado -->
+    <aside class="w-64 bg-white shadow-md flex flex-col z-10">
         <div class="p-4 border-b flex items-center justify-center">
             <h1 class="font-bold text-lg text-purple-600">MANAGER SERVICE</h1>
         </div>
         <nav class="flex-1 overflow-y-auto p-4 space-y-2">
-            <a href="index.html" class="block p-2 rounded bg-purple-100 text-purple-700 font-semibold">Painel (Kanban)</a>
+            <a href="index.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Painel (Kanban)</a>
             <a href="maquinas.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Máquinas</a>
-            <a href="solicitacoes.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Solicitações</a>
-            <a href="cadastros.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Cadastros Base</a>
-            <a href="relatorios.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Relatórios</a>
-            <a href="usuarios.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Usuários / Perfis</a>
+            <a href="cadastros.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Cadastros</a>
+            <a href="relatorio.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Relatórios</a>
+            <a href="usuarios.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Usuários</a>
+            <a href="configuracao.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Configurações</a>
         </nav>
         <div class="p-4 border-t">
-            <a href="login.html" class="text-red-500 hover:underline">Sair</a>
+            <button onclick="fazerLogout()" class="text-red-500 hover:underline flex items-center gap-2">
+                Sair do Sistema
+            </button>
         </div>
     </aside>
 
-    <!-- Área Principal (Quadro Kanban) -->
-    <main class="flex-1 flex flex-col h-full">
-        <!-- Cabeçalho -->
+    <main class="flex-1 flex flex-col h-full bg-gray-100">
         <header class="bg-white shadow-sm p-4 flex justify-between items-center">
             <h2 class="text-xl font-semibold text-gray-800">Ordens de Serviço</h2>
             <button class="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition">
-                + Nova O.S.
+                + Nova Ordem
             </button>
         </header>
 
-        <!-- Colunas do Kanban -->
+        <!-- Área do Kanban -->
         <div class="flex-1 p-6 overflow-x-auto">
-            <div class="flex space-x-4 h-full min-w-max">
+            <div class="flex space-x-4 h-full min-w-max items-start">
                 
-                <!-- Coluna: Aberta -->
-                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-gray-700">
-                        Aberto (2)
+                <!-- Coluna: ABERTA -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border flex flex-col">
+                    <div class="p-3 border-b bg-gray-100 rounded-t-lg font-bold text-gray-700 flex justify-between">
+                        <span>Aberto</span> <span class="bg-gray-200 px-2 rounded-full">1</span>
                     </div>
-                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-aberta">
-                        <!-- Card de Exemplo -->
-                        <div class="bg-white p-3 rounded shadow-sm border-l-4 border-green-500 cursor-move">
-                            <div class="text-xs text-gray-500 mb-1">O.S: 118369</div>
+                    <!-- Área soltável (droppable) -->
+                    <div class="p-3 flex-1 space-y-3 kanban-col" data-status="aberta">
+                        <!-- Card (Draggable) -->
+                        <div class="kanban-card bg-white p-3 rounded shadow-sm border-l-4 border-green-500" draggable="true">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-bold text-gray-500">OS: 118369</span>
+                                <span class="text-xs bg-green-100 text-green-700 px-1 rounded">Prioridade</span>
+                            </div>
                             <div class="font-bold text-gray-800">CM-034 - DAF XF FTT 530</div>
-                            <div class="text-sm text-gray-600 mt-2">Corretiva por Inspeção</div>
+                            <div class="text-sm text-gray-600 mt-1">Corretiva por Inspeção</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Coluna: Em Andamento -->
-                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-blue-700">
-                        Em Andamento (1)
+                <!-- Coluna: EM ANDAMENTO -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border flex flex-col">
+                    <div class="p-3 border-b bg-gray-100 rounded-t-lg font-bold text-blue-700 flex justify-between">
+                        <span>Em Andamento</span> <span class="bg-blue-100 px-2 rounded-full">0</span>
                     </div>
-                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-andamento">
-                        <!-- Card virá do Supabase -->
-                    </div>
+                    <div class="p-3 flex-1 space-y-3 kanban-col" data-status="em_andamento"></div>
                 </div>
 
-                <!-- Coluna: Aguardando Peça -->
-                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-orange-600">
-                        Aguardando Peça (0)
+                <!-- Coluna: AGUARDANDO PEÇA -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border flex flex-col">
+                    <div class="p-3 border-b bg-gray-100 rounded-t-lg font-bold text-orange-600 flex justify-between">
+                        <span>Aguardando Peça</span> <span class="bg-orange-100 px-2 rounded-full">0</span>
                     </div>
-                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-aguardando">
-                    </div>
+                    <div class="p-3 flex-1 space-y-3 kanban-col" data-status="aguardando_peca"></div>
                 </div>
 
-                <!-- Coluna: Concluída -->
-                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-                    <div class="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg font-bold text-gray-500">
-                        Concluída (0)
+                <!-- Coluna: CONCLUÍDA -->
+                <div class="w-80 bg-gray-50 rounded-lg shadow-sm border flex flex-col">
+                    <div class="p-3 border-b bg-gray-100 rounded-t-lg font-bold text-gray-500 flex justify-between">
+                        <span>Concluída</span> <span class="bg-gray-200 px-2 rounded-full">0</span>
                     </div>
-                    <div class="p-3 flex-1 overflow-y-auto space-y-3" id="col-concluida">
-                    </div>
+                    <div class="p-3 flex-1 space-y-3 kanban-col" data-status="concluida"></div>
                 </div>
 
             </div>
         </div>
     </main>
 
-    <!-- Script de Inicialização da Base de Dados -->
-    <script>
-        // A lógica de conexão com o Supabase e o Drag and Drop será inserida aqui
-        console.log("Interface Kanban carregada.");
-    </script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js"></script>
+    <script src="kanban.js"></script>
 </body>
 </html>
