@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página Interna - Manager Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="flex h-screen overflow-hidden text-sm">
+
+    <aside class="w-64 bg-white shadow-md flex flex-col z-10">
+        <div class="p-4 border-b flex items-center justify-center">
+            <h1 class="font-bold text-lg text-purple-600">MANAGER SERVICE</h1>
+        </div>
+        <nav class="flex-1 overflow-y-auto p-4 space-y-2">
+            <a href="index.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Painel (Kanban)</a>
+            <a href="maquinas.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Máquinas</a>
+            <a href="cadastros.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Cadastros</a>
+            <a href="relatorio.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Relatórios</a>
+            <a href="usuarios.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Usuários</a>
+            <a href="configuracao.html" class="block p-2 rounded text-gray-600 hover:bg-gray-50">Configurações</a>
+        </nav>
+        <div class="p-4 border-t">
+            <button onclick="fazerLogout()" class="text-red-500 hover:underline">Sair do Sistema</button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full bg-gray-100">
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-800">Título da Página</h2>
+        </header>
+
+        <!-- Conteúdo específico de cada página entra aqui -->
+        <div class="p-6 overflow-y-auto">
+            <div class="bg-white p-6 rounded-lg shadow-sm border min-h-[400px] flex items-center justify-center text-gray-400">
+                O conteúdo desta seção será construído aqui.
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
