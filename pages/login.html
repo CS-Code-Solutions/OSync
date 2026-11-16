@@ -6,7 +6,11 @@
     <title>OSync | Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SDKs Firebase Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body class="min-h-screen flex flex-col justify-between bg-[#0B1120] text-white">
@@ -24,6 +28,7 @@
                 <p class="text-xs uppercase tracking-widest text-slate-400">Gestão de Ordens de Serviço</p>
             </div>
 
+            <!-- FORMULÁRIO DE LOGIN -->
             <form id="login-form" class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">E-mail de Acesso</label>
@@ -50,19 +55,66 @@
                     <span>Acessar Sistema</span>
                     <i data-lucide="log-in" class="w-4 h-4"></i>
                 </button>
+
+                <div class="text-center pt-2">
+                    <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-400 hover:text-[#00E5B0] transition">
+                        Primeiro acesso? Criar conta Admin e Empresa
+                    </button>
+                </div>
+            </form>
+
+            <!-- FORMULÁRIO DE PRIMEIRO ACESSO (CRIAR EMPRESA + ADMIN) -->
+            <form id="register-form" class="hidden space-y-3.5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nome da Empresa *</label>
+                    <input type="text" id="reg-empresa" required placeholder="Ex: Indústria Metalúrgica X"
+                        class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Seu Nome (Admin) *</label>
+                    <input type="text" id="reg-nome" required placeholder="Ex: Cristian Severo"
+                        class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">E-mail *</label>
+                    <input type="email" id="reg-email" required placeholder="admin@empresa.com"
+                        class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Senha (mín. 6 caracteres) *</label>
+                    <input type="password" id="reg-senha" required minlength="6" placeholder="••••••••"
+                        class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                </div>
+
+                <div id="reg-error" class="hidden text-xs text-rose-400 bg-rose-950/60 border border-rose-800 p-3 rounded-lg"></div>
+
+                <button type="submit" id="btn-register"
+                    class="w-full bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold py-3 rounded-xl transition">
+                    Criar Conta e Iniciar OSync
+                </button>
+                <div class="text-center pt-1">
+                    <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-400 hover:text-white">
+                        Voltar para o Login
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- Rodapé Oficial -->
     <footer class="py-4 text-center text-xs text-slate-400 border-t border-slate-800/80">
         © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
     </footer>
 
-    <script src="../js/supabase-config.js"></script>
+    <script src="../js/firebase-config.js"></script>
     <script>
         lucide.createIcons();
 
+        function alternarModoCadastro() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('register-form').classList.toggle('hidden');
+        }
+
+        // Login
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-login');
@@ -74,16 +126,73 @@
             btn.innerHTML = '<span>Entrando...</span>';
             errorBox.classList.add('hidden');
 
-            const { error } = await db.auth.signInWithPassword({ email, password });
-
-            if (error) {
-                errorBox.textContent = 'E-mail ou senha incorretos.';
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                window.location.href = '../index.html';
+            } catch (err) {
+                errorBox.textContent = 'E-mail ou senha inválidos.';
                 errorBox.classList.remove('hidden');
                 btn.disabled = false;
                 btn.innerHTML = '<span>Acessar Sistema</span><i data-lucide="log-in" class="w-4 h-4"></i>';
                 lucide.createIcons();
-            } else {
+            }
+        });
+
+        // Criar Empresa + Usuário Admin automaticamente no Firestore
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-register');
+            const errorBox = document.getElementById('reg-error');
+            btn.disabled = true;
+            btn.textContent = 'Criando estrutura...';
+            errorBox.classList.add('hidden');
+
+            try {
+                const empresaNome = document.getElementById('reg-empresa').value.trim();
+                const nome = document.getElementById('reg-nome').value.trim();
+                const email = document.getElementById('reg-email').value.trim();
+                const senha = document.getElementById('reg-senha').value;
+
+                // 1. Cria usuário no Firebase Auth
+                const cred = await auth.createUserWithEmailAndPassword(email, senha);
+                const uid = cred.user.uid;
+
+                // 2. Cria a Empresa no Firestore
+                const empresaRef = await db.collection('empresas').add({
+                    nome: empresaNome,
+                    plano: 'Pro',
+                    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 3. Salva o perfil do Admin vinculado à empresa
+                await db.collection('usuarios').doc(uid).set({
+                    empresaId: empresaRef.id,
+                    nome: nome,
+                    email: email,
+                    perfil: 'Admin',
+                    setor: 'Gestão',
+                    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 4. Cria 3 colunas padrão iniciais para o Kanban já começar pronto
+                const batch = db.batch();
+                const colunasPadrao = [
+                    { titulo: 'Aberta', ordem: 1, corTopo: '#00E5B0' },
+                    { titulo: 'Em Andamento', ordem: 2, corTopo: '#1D4ED8' },
+                    { titulo: 'Concluída', ordem: 3, corTopo: '#10B981' }
+                ];
+                colunasPadrao.forEach(c => {
+                    const ref = db.collection('kanban_colunas').doc();
+                    batch.set(ref, { ...c, empresaId: empresaRef.id });
+                });
+                await batch.commit();
+
                 window.location.href = '../index.html';
+            } catch (err) {
+                errorBox.textContent = 'Erro ao criar conta: ' + err.message;
+                errorBox.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Criar Conta e Iniciar OSync';
             }
         });
     </script>
