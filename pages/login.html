@@ -6,7 +6,6 @@
     <title>OSync | Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- SDKs Firebase Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -25,7 +24,7 @@
                     </div>
                     <span class="text-3xl font-extrabold tracking-tight text-white">OS<span class="text-[#00E5B0]">ync</span></span>
                 </div>
-                <p class="text-xs uppercase tracking-widest text-slate-400">Gestão de Manutenção</p>
+                <p class="text-xs uppercase tracking-widest text-slate-400">Gestão de Ordens de Serviço</p>
             </div>
 
             <!-- FORMULÁRIO DE LOGIN -->
@@ -49,6 +48,7 @@
                 </div>
 
                 <div id="login-error" class="hidden text-xs text-rose-400 bg-rose-950/60 border border-rose-800 p-3 rounded-lg"></div>
+                <div id="login-success" class="hidden text-xs text-[#00E5B0] bg-emerald-950/60 border border-[#00E5B0]/40 p-3 rounded-lg"></div>
 
                 <button type="submit" id="btn-login"
                     class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/25 transition flex items-center justify-center gap-2 mt-2">
@@ -58,30 +58,52 @@
 
                 <div class="text-center pt-2">
                     <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-400 hover:text-[#00E5B0] transition">
-                        Primeiro acesso? Criar conta Admin e Empresa
+                        Não tem acesso? Solicitar cadastro ao Gestor
                     </button>
                 </div>
             </form>
 
-            <!-- FORMULÁRIO DE PRIMEIRO ACESSO (CRIAR EMPRESA + ADMIN) -->
+            <!-- FORMULÁRIO DE SOLICITAÇÃO DE ACESSO (AGUARDA LIBERAÇÃO DO GESTOR) -->
             <form id="register-form" class="hidden space-y-3.5">
+                <div class="bg-[#0B1120] border border-slate-700/80 p-3 rounded-xl text-xs text-slate-300">
+                    Preencha seus dados abaixo. Seu acesso ficará <strong>pendente</strong> até a aprovação do gestor da empresa.
+                </div>
+
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nome da Empresa *</label>
-                    <input type="text" id="reg-empresa" required placeholder="Ex: Indústria Metalúrgica X"
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Código da Empresa *</label>
+                    <input type="text" id="reg-empresa-id" required placeholder="Cole o código fornecido pelo gestor"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
+
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Seu Nome (Admin) *</label>
-                    <input type="text" id="reg-nome" required placeholder="Ex: Cristian Severo"
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Seu Nome Completo *</label>
+                    <input type="text" id="reg-nome" required placeholder="Ex: João Silva"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Função *</label>
+                        <select id="reg-perfil" class="w-full px-3 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                            <option value="Manutentor">Manutentor</option>
+                            <option value="Lideranca">Liderança</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Setor / Área *</label>
+                        <input type="text" id="reg-setor" required placeholder="Ex: Mecânica"
+                            class="w-full px-3 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                    </div>
+                </div>
+
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">E-mail *</label>
-                    <input type="email" id="reg-email" required placeholder="admin@empresa.com"
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Seu E-mail *</label>
+                    <input type="email" id="reg-email" required placeholder="seu.email@empresa.com"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
+
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Senha (mín. 6 caracteres) *</label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Crie uma Senha (mín. 6 dígitos) *</label>
                     <input type="password" id="reg-senha" required minlength="6" placeholder="••••••••"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
@@ -90,7 +112,7 @@
 
                 <button type="submit" id="btn-register"
                     class="w-full bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold py-3 rounded-xl transition">
-                    Criar Conta e Iniciar OSync
+                    Enviar Solicitação de Acesso
                 </button>
                 <div class="text-center pt-1">
                     <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-400 hover:text-white">
@@ -112,6 +134,9 @@
         function alternarModoCadastro() {
             document.getElementById('login-form').classList.toggle('hidden');
             document.getElementById('register-form').classList.toggle('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('login-success').classList.add('hidden');
+            document.getElementById('reg-error').classList.add('hidden');
         }
 
         // Login
@@ -123,14 +148,32 @@
             const password = document.getElementById('password').value;
 
             btn.disabled = true;
-            btn.innerHTML = '<span>Entrando...</span>';
+            btn.innerHTML = '<span>Verificando...</span>';
             errorBox.classList.add('hidden');
 
             try {
-                await auth.signInWithEmailAndPassword(email, password);
+                const cred = await auth.signInWithEmailAndPassword(email, password);
+                const doc = await db.collection('usuarios').doc(cred.user.uid).get();
+
+                if (!doc.exists) {
+                    await auth.signOut();
+                    throw new Error('Cadastro não encontrado ou excluído pelo gestor.');
+                }
+
+                const dados = doc.data();
+                if (dados.statusAcesso === 'pendente') {
+                    await auth.signOut();
+                    throw new Error('Sua solicitação ainda está aguardando aprovação do gestor.');
+                }
+
+                if (dados.ativo === false) {
+                    await auth.signOut();
+                    throw new Error('Seu acesso foi desativado pelo administrador.');
+                }
+
                 window.location.href = '../index.html';
             } catch (err) {
-                errorBox.textContent = 'E-mail ou senha inválidos.';
+                errorBox.textContent = err.message.includes('auth/') ? 'E-mail ou senha inválidos.' : err.message;
                 errorBox.classList.remove('hidden');
                 btn.disabled = false;
                 btn.innerHTML = '<span>Acessar Sistema</span><i data-lucide="log-in" class="w-4 h-4"></i>';
@@ -138,61 +181,61 @@
             }
         });
 
-        // Criar Empresa + Usuário Admin automaticamente no Firestore
+        // Enviar Solicitação de Cadastro (NÃO libera login automático)
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-register');
             const errorBox = document.getElementById('reg-error');
             btn.disabled = true;
-            btn.textContent = 'Criando estrutura...';
+            btn.textContent = 'Enviando solicitação...';
             errorBox.classList.add('hidden');
 
             try {
-                const empresaNome = document.getElementById('reg-empresa').value.trim();
+                const empresaId = document.getElementById('reg-empresa-id').value.trim();
                 const nome = document.getElementById('reg-nome').value.trim();
+                const perfil = document.getElementById('reg-perfil').value;
+                const setor = document.getElementById('reg-setor').value.trim();
                 const email = document.getElementById('reg-email').value.trim();
                 const senha = document.getElementById('reg-senha').value;
 
-                // 1. Cria usuário no Firebase Auth
+                // 1. Verifica se o Código da Empresa existe
+                const empresaDoc = await db.collection('empresas').doc(empresaId).get();
+                if (!empresaDoc.exists) {
+                    throw new Error('Código da Empresa inválido. Solicite o código correto ao gestor.');
+                }
+
+                // 2. Cria credencial no Auth
                 const cred = await auth.createUserWithEmailAndPassword(email, senha);
                 const uid = cred.user.uid;
 
-                // 2. Cria a Empresa no Firestore
-                const empresaRef = await db.collection('empresas').add({
-                    nome: empresaNome,
-                    plano: 'Pro',
-                    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                // 3. Salva o perfil do Admin vinculado à empresa
+                // 3. Registra no Firestore como PENDENTE e INATIVO
                 await db.collection('usuarios').doc(uid).set({
-                    empresaId: empresaRef.id,
+                    empresaId: empresaId,
                     nome: nome,
                     email: email,
-                    perfil: 'Admin',
-                    setor: 'Gestão',
+                    perfil: perfil,
+                    setor: setor,
+                    ativo: false,
+                    statusAcesso: 'pendente',
                     criadoEm: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // 4. Cria 3 colunas padrão iniciais para o Kanban já começar pronto
-                const batch = db.batch();
-                const colunasPadrao = [
-                    { titulo: 'Aberta', ordem: 1, corTopo: '#00E5B0' },
-                    { titulo: 'Em Andamento', ordem: 2, corTopo: '#1D4ED8' },
-                    { titulo: 'Concluída', ordem: 3, corTopo: '#10B981' }
-                ];
-                colunasPadrao.forEach(c => {
-                    const ref = db.collection('kanban_colunas').doc();
-                    batch.set(ref, { ...c, empresaId: empresaRef.id });
-                });
-                await batch.commit();
+                // 4. Desloga imediatamente para impedir entrada automática
+                await auth.signOut();
 
-                window.location.href = '../index.html';
+                e.target.reset();
+                alternarModoCadastro();
+
+                const successBox = document.getElementById('login-success');
+                successBox.textContent = 'Solicitação enviada! Aguarde o gestor liberar seu acesso para entrar.';
+                successBox.classList.remove('hidden');
+
             } catch (err) {
-                errorBox.textContent = 'Erro ao criar conta: ' + err.message;
+                errorBox.textContent = err.message;
                 errorBox.classList.remove('hidden');
+            } finally {
                 btn.disabled = false;
-                btn.textContent = 'Criar Conta e Iniciar OSync';
+                btn.textContent = 'Enviar Solicitação de Acesso';
             }
         });
     </script>
