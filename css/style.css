@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --navy-dark: #0B1120;      /* Fundo Header e Footer */
+    --navy-surface: #131C31;   /* Hover e Cards Escuros */
+    --cyan-accent: #00E5B0;    /* Linha inferior do Header e Destaques */
+    --blue-primary: #1D4ED8;   /* Botão Ativo */
+    --bg-light: #F1F5F9;       /* Fundo das Telas */
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-light);
+    color: #0F172A;
+    margin: 0;
+}
+
+/* Barra Superior e Inferior Escuras */
+.osync-navbar {
+    background-color: var(--navy-dark);
+    border-bottom: 2px solid var(--cyan-accent);
+}
+
+.osync-bottom-nav {
+    background-color: var(--navy-dark);
+    border-top: 2px solid var(--cyan-accent);
+}
+
+/* Botões do Menu Superior (Desktop) */
+.nav-btn {
+    color: #94A3B8;
+    transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+    color: #FFFFFF;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.nav-btn.active {
+    background-color: var(--blue-primary);
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+/* Botões do Menu Inferior (Mobile) */
+.mobile-nav-btn {
+    color: #94A3B8;
+    transition: all 0.2s ease;
+}
+
+.mobile-nav-btn.active {
+    background-color: rgba(0, 229, 176, 0.12);
+    color: var(--cyan-accent);
+    border-radius: 0.75rem;
+}
+
+/* Menu Cascata (Dropdown) */
+.dropdown:hover .dropdown-menu,
+.dropdown.open .dropdown-menu {
+    display: block;
+    animation: dropFade 0.15s ease-out;
+}
+
+@keyframes dropFade {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cards Estilo NexOS (Borda Lateral Azul + Sombra Suave) */
+.osync-card {
+    background: #FFFFFF;
+    border-radius: 0.75rem;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid var(--blue-primary);
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.osync-card:hover {
+    box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
+}
+
+/* Kanban Arrasta e Solta */
+.kanban-col-body {
+    min-height: calc(100vh - 250px);
+    transition: background-color 0.2s ease;
+}
+
+.kanban-col-body.drag-over {
+    background-color: #E0F2FE;
+    outline: 2px dashed var(--blue-primary);
+    border-radius: 0.75rem;
+}
+
+.kanban-card { cursor: grab; }
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { opacity: 0.5; transform: rotate(1.5deg) scale(0.98); }
