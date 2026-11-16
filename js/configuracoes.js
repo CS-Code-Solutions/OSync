@@ -1,4 +1,5 @@
 async function initConfiguracoes() {
+    carregarSolicitacoesAcesso();
     carregarColunasConfig();
     carregarTiposConfig();
     carregarSetoresConfig();
@@ -52,6 +53,76 @@ async function initConfiguracoes() {
     });
 }
 
+// ==========================================
+// CÓDIGO DA EMPRESA E APROVAÇÕES PENDENTES
+// ==========================================
+function copiarCodigoEmpresa() {
+    const input = document.getElementById('config-codigo-empresa');
+    if (!input) return;
+    input.select();
+    navigator.clipboard.writeText(input.value);
+    alert('Código da empresa copiado!');
+}
+
+async function carregarSolicitacoesAcesso() {
+    const inputCodigo = document.getElementById('config-codigo-empresa');
+    if (inputCodigo && usuarioAtual?.empresaId) {
+        inputCodigo.value = usuarioAtual.empresaId;
+    }
+
+    const lista = document.getElementById('lista-acessos-pendentes');
+    const badge = document.getElementById('badge-qtd-pendentes');
+    if (!lista) return;
+
+    const snap = await db.collection('usuarios')
+        .where('empresaId', '==', usuarioAtual.empresaId)
+        .where('statusAcesso', '==', 'pendente')
+        .get();
+
+    const pendentes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (badge) badge.textContent = pendentes.length;
+
+    if (pendentes.length === 0) {
+        lista.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Nenhuma solicitação de cadastro pendente.</p>';
+        return;
+    }
+
+    lista.innerHTML = pendentes.map(u => `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl text-xs">
+            <div>
+                <div class="font-bold text-slate-900 text-sm">${u.nome} <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700 ml-1">${u.perfil}</span></div>
+                <div class="text-slate-600 mt-0.5">${u.email} • Setor: <strong>${u.setor}</strong></div>
+            </div>
+            <div class="flex items-center gap-2 self-end sm:self-center">
+                <button onclick="aprovarAcessoUsuario('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 transition">
+                    <i data-lucide="check" class="w-3.5 h-3.5"></i> Liberar
+                </button>
+                <button onclick="recusarAcessoUsuario('${u.id}', '${u.nome}')" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white font-bold rounded-lg flex items-center gap-1 transition">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i> Recusar
+                </button>
+            </div>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function aprovarAcessoUsuario(userId) {
+    await db.collection('usuarios').doc(userId).update({
+        ativo: true,
+        statusAcesso: 'aprovado'
+    });
+    carregarSolicitacoesAcesso();
+}
+
+async function recusarAcessoUsuario(userId, nome) {
+    if (!confirm(`Recusar e excluir o pedido de "${nome}"?`)) return;
+    await db.collection('usuarios').doc(userId).delete();
+    carregarSolicitacoesAcesso();
+}
+
+// ==========================================
+// COLUNAS DO KANBAN, TIPOS E SETORES
+// ==========================================
 async function carregarColunasConfig() {
     const lista = document.getElementById('lista-colunas');
     if (!lista) return;
