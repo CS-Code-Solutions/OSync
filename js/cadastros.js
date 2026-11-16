@@ -179,48 +179,129 @@ function imprimirEtiquetaQR() {
 // ==========================================
 // MÓDULO 2: MANUTENTORES E LIDERANÇA
 // ==========================================
+let cacheUsuariosPerfil = [];
+
 async function initUsuariosCadastro(perfil) {
     perfilAtualCadastro = perfil;
     await carregarUsuariosPorPerfil(perfil);
     document.getElementById('form-novo-usuario')?.addEventListener('submit', salvarNovoUsuario);
 }
 
+function verificarOutraEspecialidade() {
+    const select = document.getElementById('user-setor-select');
+    const grupoOutro = document.getElementById('grupo-user-setor-outro');
+    const inputOutro = document.getElementById('user-setor-outro');
+    if (!select || !grupoOutro) return;
+
+    if (select.value === 'Outra') {
+        grupoOutro.classList.remove('hidden');
+        inputOutro.required = true;
+        inputOutro.focus();
+    } else {
+        grupoOutro.classList.add('hidden');
+        inputOutro.required = false;
+        inputOutro.value = '';
+    }
+}
+
 async function carregarUsuariosPorPerfil(perfil) {
     const grid = document.getElementById('lista-usuarios-perfil');
     if (!grid) return;
 
-    const { data } = await db
-        .from('usuarios')
-        .select('*')
-        .eq('perfil', perfil)
-        .order('nome', { ascending: true });
+    const snap = await db.collection('usuarios')
+        .where('empresaId', '==', usuarioAtual.empresaId)
+        .where('perfil', '==', perfil)
+        .get();
 
-    if (!data || data.length === 0) {
-        grid.innerHTML = `<div class="col-span-full bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">Nenhum registro encontrado nesta categoria.</div>`;
+    cacheUsuariosPerfil = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+
+    if (cacheUsuariosPerfil.length === 0) {
+        grid.innerHTML = `<div class="col-span-full bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">Nenhum registro cadastrado ainda.</div>`;
         return;
     }
 
-    grid.innerHTML = data.map(u => `
-        <div class="osync-card p-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-[#0B1120] text-[#00E5B0] font-bold flex items-center justify-center text-sm">
+    grid.innerHTML = cacheUsuariosPerfil.map(u => `
+        <div class="osync-card p-4 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-11 h-11 shrink-0 rounded-full bg-[#0B1120] text-[#00E5B0] font-bold flex items-center justify-center text-sm border border-slate-700">
                     ${u.nome.substring(0, 2).toUpperCase()}
                 </div>
-                <div>
-                    <h4 class="font-bold text-slate-900 text-sm">${u.nome}</h4>
-                    <p class="text-xs text-slate-500">${u.email}</p>
-                    <span class="inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                        Setor: ${u.setor || 'Geral'}
+                <div class="min-w-0">
+                    <h4 class="font-bold text-slate-900 text-sm truncate">${u.nome}</h4>
+                    <p class="text-xs text-slate-500 truncate">${u.email}</p>
+                    <span class="inline-flex items-center gap-1 mt-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        <i data-lucide="wrench" class="w-3 h-3"></i> ${u.setor || 'Geral'}
                     </span>
                 </div>
             </div>
+
+            <!-- Botões Editar e Excluir -->
+            <div class="flex items-center gap-1 shrink-0">
+                <button onclick="abrirModalEditarUsuario('${u.id}')" title="Editar" class="p-2 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                </button>
+                <button onclick="excluirUsuarioPerfil('${u.id}', '${u.nome}')" title="Excluir" class="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
         </div>
     `).join('');
+
+    lucide.createIcons();
 }
 
 function abrirModalNovoUsuario(perfil) {
+    document.getElementById('form-novo-usuario').reset();
+    document.getElementById('user-edit-id').value = '';
     document.getElementById('user-perfil-alvo').value = perfil;
     document.getElementById('modal-usuario-titulo').textContent = perfil === 'Manutentor' ? 'Cadastrar Manutentor' : 'Cadastrar Líder de Setor';
+    document.getElementById('btn-salvar-usuario').textContent = 'Criar Acesso';
+
+    // Exibe campos de E-mail e Senha na criação
+    document.getElementById('grupo-user-email').classList.remove('hidden');
+    document.getElementById('grupo-user-senha').classList.remove('hidden');
+    document.getElementById('user-email').required = true;
+    document.getElementById('user-senha').required = true;
+
+    verificarOutraEspecialidade();
+    document.getElementById('modal-novo-usuario').classList.remove('hidden');
+}
+
+function abrirModalEditarUsuario(userId) {
+    const u = cacheUsuariosPerfil.find(item => item.id === userId);
+    if (!u) return;
+
+    document.getElementById('user-edit-id').value = u.id;
+    document.getElementById('user-perfil-alvo').value = u.perfil;
+    document.getElementById('user-nome').value = u.nome;
+    document.getElementById('modal-usuario-titulo').textContent = 'Editar Cadastro';
+    document.getElementById('btn-salvar-usuario').textContent = 'Salvar Alterações';
+
+    // Esconde E-mail e Senha na edição (edita apenas nome e especialidade/setor)
+    document.getElementById('grupo-user-email').classList.add('hidden');
+    document.getElementById('grupo-user-senha').classList.add('hidden');
+    document.getElementById('user-email').required = false;
+    document.getElementById('user-senha').required = false;
+
+    const select = document.getElementById('user-setor-select');
+    const inputOutro = document.getElementById('user-setor-outro');
+
+    if (select) {
+        const opcoesPadrao = ['Mecânica', 'Elétrica', 'Predial'];
+        if (opcoesPadrao.includes(u.setor)) {
+            select.value = u.setor;
+            verificarOutraEspecialidade();
+        } else {
+            select.value = 'Outra';
+            verificarOutraEspecialidade();
+            inputOutro.value = u.setor || '';
+        }
+    } else if (document.getElementById('user-setor')) {
+        document.getElementById('user-setor').value = u.setor || '';
+    }
+
     document.getElementById('modal-novo-usuario').classList.remove('hidden');
 }
 
@@ -232,11 +313,77 @@ async function salvarNovoUsuario(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-salvar-usuario');
     btn.disabled = true;
-    btn.textContent = 'Criando...';
 
+    const editId = document.getElementById('user-edit-id').value;
     const nome = document.getElementById('user-nome').value.trim();
+    const perfil = document.getElementById('user-perfil-alvo').value;
+
+    // Captura especialidade/setor (do select ou do input direto na Liderança)
+    let setor = '';
+    const selectSetor = document.getElementById('user-setor-select');
+    if (selectSetor) {
+        setor = selectSetor.value === 'Outra'
+            ? document.getElementById('user-setor-outro').value.trim()
+            : selectSetor.value;
+    } else {
+        setor = document.getElementById('user-setor').value.trim();
+    }
+
+    // MODO EDIÇÃO
+    if (editId) {
+        btn.textContent = 'Salvando...';
+        try {
+            await db.collection('usuarios').doc(editId).update({ nome, setor });
+            fecharModalNovoUsuario();
+            carregarUsuariosPorPerfil(perfil);
+        } catch (err) {
+            alert('Erro ao atualizar: ' + err.message);
+        }
+        btn.disabled = false;
+        return;
+    }
+
+    // MODO CRIAÇÃO
+    btn.textContent = 'Criando...';
     const email = document.getElementById('user-email').value.trim();
     const password = document.getElementById('user-senha').value;
+
+    const appSecundario = firebase.apps.find(a => a.name === 'SecondaryApp') || firebase.initializeApp(firebaseConfig, 'SecondaryApp');
+
+    try {
+        const cred = await appSecundario.auth().createUserWithEmailAndPassword(email, password);
+        await appSecundario.auth().signOut();
+
+        await db.collection('usuarios').doc(cred.user.uid).set({
+            empresaId: usuarioAtual.empresaId,
+            nome,
+            email,
+            perfil,
+            setor,
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        fecharModalNovoUsuario();
+        e.target.reset();
+        carregarUsuariosPorPerfil(perfil);
+    } catch (err) {
+        alert('Erro ao criar acesso: ' + err.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Criar Acesso';
+}
+
+async function excluirUsuarioPerfil(userId, nome) {
+    if (!confirm(`Deseja realmente excluir "${nome}" da equipe?`)) return;
+    try {
+        await db.collection('usuarios').doc(userId).delete();
+        carregarUsuariosPorPerfil(perfilAtualCadastro);
+    } catch (err) {
+        alert('Erro ao excluir: ' + err.message);
+    }
+}
+
     const setor = document.getElementById('user-setor').value.trim();
     const perfil = document.getElementById('user-perfil-alvo').value;
 
