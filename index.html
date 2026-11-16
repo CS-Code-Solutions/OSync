@@ -1,1 +1,143 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSync | Gestão de Manutenção</title>
+    <!-- Anti-FOUC: Esconde até validar autenticação -->
+    <style>body.auth-loading { opacity: 0; }</style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-loading min-h-screen flex flex-col justify-between pb-16 md:pb-0">
+
+    <!-- CABEÇALHO SUPERIOR (Desktop e Mobile) -->
+    <header class="osync-navbar sticky top-0 z-40 px-4 h-16 flex items-center justify-between shadow-lg">
+        
+        <!-- Esquerda: Logo + Menu Desktop -->
+        <div class="flex items-center gap-6">
+            <!-- Logo -->
+            <a href="#" onclick="navegarPara('os')" class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-[#00E5B0] flex items-center justify-center text-[#0B1120]">
+                    <i data-lucide="refresh-cw" class="w-5 h-5 stroke-[2.5]"></i>
+                </div>
+                <span class="text-xl font-extrabold tracking-tight text-white">OS<span class="text-[#00E5B0]">ync</span></span>
+            </a>
+
+            <!-- Navegação Desktop -->
+            <nav class="hidden md:flex items-center gap-1.5" id="desktop-nav">
+                <button onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="kanban" class="w-4 h-4"></i>
+                    <span>O.S.</span>
+                </button>
+
+                <!-- Dropdown Cadastros -->
+                <div class="relative dropdown">
+                    <button id="btn-menu-cadastros" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i>
+                        <span>Cadastros</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
+                    </button>
+                    <div class="dropdown-menu hidden absolute left-0 mt-1 w-52 bg-[#131C31] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+                        <button onclick="navegarPara('cad-manutentores')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="wrench" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Manutentores</span>
+                        </button>
+                        <button onclick="navegarPara('cad-lideranca')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="user-check" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Liderança</span>
+                        </button>
+                        <button onclick="navegarPara('cad-ativos')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Ativos (Máquinas)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>Configurações</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Direita: Status Nuvem + Usuário + Botão Sair -->
+        <div class="flex items-center gap-3">
+            <!-- Indicador Online/Offline -->
+            <div id="cloud-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-[#00E5B0] border border-[#00E5B0]/30">
+                <span id="cloud-dot" class="w-2 h-2 rounded-full bg-[#00E5B0] animate-pulse"></span>
+                <span id="cloud-label">Online</span>
+            </div>
+
+            <!-- Nome do Usuário -->
+            <div class="hidden sm:flex flex-col text-right">
+                <span id="header-user-name" class="text-xs font-semibold text-white">Carregando...</span>
+                <span id="header-user-role" class="text-[10px] text-slate-400">Admin</span>
+            </div>
+
+            <!-- Botão Power (Sair) estilo NexOS -->
+            <button onclick="sairDoSistema()" title="Sair do Sistema" class="p-2 rounded-lg text-rose-500 hover:bg-rose-500/10 transition">
+                <i data-lucide="power" class="w-5 h-5 stroke-[2.2]"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ÁREA DINÂMICA ONDE AS TELAS DE pages/ SÃO CARREGADAS -->
+    <main id="app-content" class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+        <!-- O conteúdo é injetado pelo js/router.js -->
+    </main>
+
+    <!-- RODAPÉ DESKTOP OFICIAL -->
+    <footer class="hidden md:block bg-[#0B1120] text-slate-400 text-xs py-3.5 text-center border-t border-slate-800">
+        © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
+    </footer>
+
+    <!-- MENU INFERIOR MOBILE (Estilo NexOS) -->
+    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
+        <button onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-3">
+            <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[11px] font-medium">O.S.</span>
+        </button>
+
+        <!-- Submenu Mobile para Cadastros -->
+        <button onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
+            <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[11px] font-medium">Cadastros</span>
+        </button>
+
+        <button onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
+            <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[11px] font-medium">Config</span>
+        </button>
+    </nav>
+
+    <!-- MODAL GAVETA MOBILE PARA SUB-BOTÕES DE CADASTROS -->
+    <div id="mobile-cadastros-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
+        <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-2">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-700">
+                <span class="text-sm font-bold text-white">Selecione o Cadastro</span>
+                <button onclick="fecharMenuCadastrosMobile()" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <button onclick="navegarPara('cad-manutentores'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
+                <i data-lucide="wrench" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span class="font-medium">Manutentores</span>
+            </button>
+            <button onclick="navegarPara('cad-lideranca'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
+                <i data-lucide="user-check" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span class="font-medium">Liderança</span>
+            </button>
+            <button onclick="navegarPara('cad-ativos'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
+                <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span class="font-medium">Ativos (Máquinas)</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/router.js"></script>
+</body>
+</html>
