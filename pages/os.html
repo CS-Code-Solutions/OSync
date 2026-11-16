@@ -1,0 +1,101 @@
+<div class="space-y-5">
+    <!-- Topo: Título e Botão Nova O.S. (Estilo NexOS) -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Ordens de Serviço</h1>
+            <p class="text-sm text-slate-500">Arraste os cartões entre as colunas para atualizar o status em tempo real.</p>
+        </div>
+        <button onclick="abrirModalNovaOS()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <span>+ Nova Ordem</span>
+        </button>
+    </div>
+
+    <!-- Barra de Filtros -->
+    <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-3">
+        <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" id="filtro-busca-os" oninput="filtrarCardsOS()" placeholder="Pesquisar por nº O.S., ativo, tag ou descrição..."
+                class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:border-blue-600 outline-none">
+        </div>
+        <select id="filtro-prioridade-os" onchange="filtrarCardsOS()" class="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-blue-600">
+            <option value="">Todas Prioridades</option>
+            <option value="Urgente">Urgente</option>
+            <option value="Alta">Alta</option>
+            <option value="Normal">Normal</option>
+            <option value="Baixa">Baixa</option>
+        </select>
+        <select id="filtro-manutentor-os" onchange="filtrarCardsOS()" class="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-blue-600">
+            <option value="">Todos Manutentores</option>
+        </select>
+    </div>
+
+    <!-- Quadro Kanban Dinâmico -->
+    <div id="kanban-board" class="flex gap-4 overflow-x-auto pb-4 items-start">
+        <!-- As colunas e cards são renderizados pelo js/os-kanban.js -->
+    </div>
+</div>
+
+<!-- MODAL: NOVA ORDEM DE SERVIÇO -->
+<div id="modal-nova-os" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="file-plus" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span>Abrir Nova Ordem de Serviço</span>
+            </h3>
+            <button onclick="fecharModalNovaOS()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-nova-os" class="p-6 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Ativo / Máquina *</label>
+                    <select id="os-ativo" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Manutenção *</label>
+                    <select id="os-tipo" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600"></select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Setor Executante</label>
+                    <select id="os-setor" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Manutentor Responsável</label>
+                    <select id="os-manutentor" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600"></select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Prioridade *</label>
+                    <select id="os-prioridade" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                        <option value="Normal">Normal</option>
+                        <option value="Baixa">Baixa</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Urgente">Urgente</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Coluna Inicial *</label>
+                    <select id="os-coluna" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600"></select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Descrição do Problema / Serviço *</label>
+                <textarea id="os-descricao" rows="3" required placeholder="Descreva os detalhes da falha ou serviço a executar..."
+                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="fecharModalNovaOS()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button type="submit" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Criar O.S.</button>
+            </div>
+        </form>
+    </div>
+</div>
