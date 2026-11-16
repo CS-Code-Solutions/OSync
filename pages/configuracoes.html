@@ -41,7 +41,7 @@
     <!-- Grid de 3 Blocos de Configuração -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- BLOCO 1: COLUNAS DO KANBAN -->
+          <!-- BLOCO 1: COLUNAS DO KANBAN -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
             <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
                 <i data-lucide="columns" class="w-5 h-5 text-blue-600"></i>
@@ -49,15 +49,20 @@
             </div>
 
             <form id="form-add-coluna" class="space-y-3 mb-4">
-                <div class="flex gap-2">
-                    <input type="text" id="col-titulo" required placeholder="Ex: Aguardando Peça"
-                        class="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
-                    <input type="number" id="col-ordem" required value="1" min="1" title="Ordem"
-                        class="w-16 px-2 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-center focus:border-blue-600 outline-none">
+                <input type="text" id="col-titulo" required placeholder="Ex: Aguardando Peça"
+                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
+                
+                <div class="flex items-center gap-2">
+                    <div class="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5">
+                        <span class="text-xs font-semibold text-slate-500">Ordem:</span>
+                        <input type="number" id="col-ordem" required value="1" min="1" title="Ordem da coluna"
+                            class="w-full bg-transparent text-sm font-bold text-slate-800 text-center outline-none">
+                    </div>
                     <input type="color" id="col-cor" value="#1D4ED8" title="Cor de destaque"
-                        class="w-10 h-9 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer">
+                        class="w-11 h-10 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer shrink-0">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
                     <i data-lucide="plus" class="w-4 h-4"></i> Adicionar Coluna
                 </button>
             </form>
@@ -66,6 +71,7 @@
                 <!-- Preenchido via JS -->
             </div>
         </div>
+
 
         <!-- BLOCO 2: TIPOS DE MANUTENÇÃO -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
