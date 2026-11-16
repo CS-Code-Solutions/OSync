@@ -1,33 +1,47 @@
 let usuarioAtual = null;
+let unsubscribePerfilAtual = null;
 
 auth.onAuthStateChanged(async (user) => {
     if (!user) {
+        if (unsubscribePerfilAtual) unsubscribePerfilAtual();
         window.location.href = 'pages/login.html';
         return;
     }
 
-    try {
-        const doc = await db.collection('usuarios').doc(user.uid).get();
-        usuarioAtual = doc.exists
-            ? { id: doc.id, ...doc.data() }
-            : { id: user.uid, nome: user.email.split('@')[0], perfil: 'Admin', empresaId: 'default' };
-    } catch (err) {
-        console.warn('Aviso ao buscar perfil no Firestore:', err.message);
-        usuarioAtual = { id: user.uid, nome: user.email.split('@')[0], perfil: 'Admin', empresaId: 'default' };
-    }
+    // Monitora o perfil em tempo real: se o Admin excluir ou desativar, o usuário é expulso na hora
+    if (unsubscribePerfilAtual) unsubscribePerfilAtual();
 
-    document.getElementById('header-user-name').textContent = usuarioAtual.nome;
-    document.getElementById('header-user-role').textContent = usuarioAtual.perfil;
+    unsubscribePerfilAtual = db.collection('usuarios').doc(user.uid).onSnapshot(async (doc) => {
+        if (!doc.exists || doc.data().ativo === false) {
+            alert('Seu acesso foi revogado ou desativado pelo administrador.');
+            await auth.signOut();
+            window.location.href = 'pages/login.html';
+            return;
+        }
 
-    atualizarStatusNuvem(true);
-    document.body.classList.remove('auth-loading');
+        const primeiraCarga = !usuarioAtual;
+        usuarioAtual = { id: doc.id, ...doc.data() };
 
-    if (typeof navegarPara === 'function') {
-        navegarPara('os');
-    }
+        document.getElementById('header-user-name').textContent = usuarioAtual.nome;
+        document.getElementById('header-user-role').textContent = usuarioAtual.perfil;
+
+        if (primeiraCarga) {
+            atualizarStatusNuvem(true);
+            document.body.classList.remove('auth-loading');
+
+            if (typeof navegarPara === 'function') {
+                navegarPara('os');
+            }
+        }
+    }, async (err) => {
+        console.error('Erro ao validar permissão:', err);
+        await auth.signOut();
+        window.location.href = 'pages/login.html';
+    });
 });
 
 async function sairDoSistema() {
+    if (unsubscribePerfilAtual) unsubscribePerfilAtual();
     await auth.signOut();
     window.location.href = 'pages/login.html';
 }
