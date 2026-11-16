@@ -24,6 +24,7 @@ async function navegarPara(pagina) {
         if (pagina === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
         if (pagina === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
         if (pagina === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
+if (pagina === 'saas-empresas' && typeof initSaaSEmpresas === 'function') initSaaSEmpresas();
 
     } catch (err) {
         container.innerHTML = `<div class="p-8 text-center text-slate-500">Tela <b>${pagina}.html</b> em construção.</div>`;
