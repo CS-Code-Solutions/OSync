@@ -1,0 +1,61 @@
+<div class="space-y-6">
+    <!-- Cabeçalho Master -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <span class="text-[11px] font-extrabold uppercase tracking-widest text-[#00B88D]">Painel Master SaaS</span>
+            <h1 class="text-2xl font-bold text-slate-900">Empresas Clientes (Tenants)</h1>
+            <p class="text-sm text-slate-500">Crie novas empresas, gere códigos de convite e gerencie planos/acessos.</p>
+        </div>
+        <button onclick="abrirModalNovaEmpresaSaaS()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+            <i data-lucide="building-2" class="w-5 h-5"></i>
+            <span>+ Nova Empresa Cliente</span>
+        </button>
+    </div>
+
+    <!-- Grid de Empresas -->
+    <div id="lista-empresas-saas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Preenchido via js/saas-master.js -->
+    </div>
+</div>
+
+<!-- MODAL: CRIAR NOVA EMPRESA -->
+<div id="modal-nova-empresa-saas" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="building-2" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span>Cadastrar Nova Empresa</span>
+            </h3>
+            <button onclick="fecharModalNovaEmpresaSaaS()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-nova-empresa-saas" class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Razão Social / Nome Fantasia *</label>
+                <input type="text" id="saas-emp-nome" required placeholder="Ex: Metalúrgica Gaúcha Ltda"
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">CNPJ (Opcional)</label>
+                    <input type="text" id="saas-emp-cnpj" placeholder="00.000.000/0001-00"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Plano Contratado</label>
+                    <select id="saas-emp-plano" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                        <option value="Starter">Starter</option>
+                        <option value="Pro" selected>Pro</option>
+                        <option value="Enterprise">Enterprise</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="fecharModalNovaEmpresaSaaS()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" id="btn-salvar-empresa-saas" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">Criar Empresa</button>
+            </div>
+        </form>
+    </div>
+</div>
