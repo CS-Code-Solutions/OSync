@@ -41,7 +41,7 @@
     <!-- Grid de 3 Blocos de Configuração -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-          <!-- BLOCO 1: COLUNAS DO KANBAN -->
+                  <!-- BLOCO 1: COLUNAS DO KANBAN -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
             <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
                 <i data-lucide="columns" class="w-5 h-5 text-blue-600"></i>
@@ -49,28 +49,31 @@
             </div>
 
             <form id="form-add-coluna" class="space-y-3 mb-4">
-                <input type="text" id="col-titulo" required placeholder="Ex: Aguardando Peça"
-                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
-                
-                <div class="flex items-center gap-2">
-                    <div class="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5">
-                        <span class="text-xs font-semibold text-slate-500">Ordem:</span>
-                        <input type="number" id="col-ordem" required value="1" min="1" title="Ordem da coluna"
-                            class="w-full bg-transparent text-sm font-bold text-slate-800 text-center outline-none">
-                    </div>
+                <input type="hidden" id="col-edit-id" value="">
+                <div class="flex items-center gap-1.5">
+                    <input type="text" id="col-titulo" required placeholder="Ex: Aguardando Peça"
+                        class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
+                    <input type="number" id="col-ordem" required value="1" min="1" title="Posição"
+                        class="w-12 shrink-0 px-1 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-center focus:border-blue-600 outline-none">
                     <input type="color" id="col-cor" value="#1D4ED8" title="Cor de destaque"
-                        class="w-11 h-10 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer shrink-0">
+                        class="w-10 h-10 shrink-0 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer">
                 </div>
-
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
-                    <i data-lucide="plus" class="w-4 h-4"></i> Adicionar Coluna
-                </button>
+                <div class="flex gap-2">
+                    <button type="submit" id="btn-salvar-coluna" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Adicionar Coluna</span>
+                    </button>
+                    <button type="button" id="btn-cancelar-edit-coluna" onclick="cancelarEdicaoColuna()" class="hidden px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-lg text-xs transition">
+                        Cancelar
+                    </button>
+                </div>
             </form>
 
             <div id="lista-colunas" class="space-y-2 flex-1 overflow-y-auto max-h-72">
                 <!-- Preenchido via JS -->
             </div>
         </div>
+
 
 
         <!-- BLOCO 2: TIPOS DE MANUTENÇÃO -->
