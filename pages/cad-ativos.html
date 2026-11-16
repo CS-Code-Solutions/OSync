@@ -1,0 +1,134 @@
+<div class="space-y-6">
+    <!-- Cabeçalho da Página -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Ativos & Equipamentos</h1>
+            <p class="text-sm text-slate-500">Cadastro de máquinas, geração de QR Code e histórico técnico.</p>
+        </div>
+        <button onclick="abrirModalNovoAtivo()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+            <i data-lucide="cpu" class="w-5 h-5"></i>
+            <span>+ Máquina</span>
+        </button>
+    </div>
+
+    <!-- Barra de Pesquisa -->
+    <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200">
+        <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" id="busca-ativos" oninput="filtrarAtivos()" placeholder="Pesquisar por tag, nome da máquina, fabricante ou setor..."
+                class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:border-blue-600 outline-none">
+        </div>
+    </div>
+
+    <!-- Lista de Máquinas (Estilo Cards NexOS) -->
+    <div id="lista-ativos" class="space-y-3">
+        <!-- Preenchido via js/cadastros.js -->
+    </div>
+</div>
+
+<!-- MODAL: NOVO ATIVO / MÁQUINA -->
+<div id="modal-novo-ativo" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span>Cadastrar Novo Ativo</span>
+            </h3>
+            <button onclick="fecharModalNovoAtivo()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-novo-ativo" class="p-6 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Código / Tag *</label>
+                    <input type="text" id="ativo-tag" required placeholder="Ex: CM-034"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm uppercase outline-none focus:border-blue-600">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nome da Máquina *</label>
+                    <input type="text" id="ativo-nome" required placeholder="Ex: Centro de Usinagem CNC"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Fabricante</label>
+                    <input type="text" id="ativo-fabricante" placeholder="Ex: Romi / Biesse"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Modelo</label>
+                    <input type="text" id="ativo-modelo" placeholder="Ex: D800"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Setor / Linha</label>
+                    <input type="text" id="ativo-setor" placeholder="Ex: Usinagem / Produção"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Status Inicial</label>
+                    <select id="ativo-status" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                        <option value="Operacional">Operacional</option>
+                        <option value="Manutencao">Em Manutenção</option>
+                        <option value="Parada">Parada</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="fecharModalNovoAtivo()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button type="submit" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Salvar Máquina</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: PRONTUÁRIO E QR CODE DA MÁQUINA -->
+<div id="modal-prontuario-ativo" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <div>
+                <span id="prontuario-tag" class="text-xs font-bold text-[#00E5B0] uppercase tracking-wider">TAG</span>
+                <h3 id="prontuario-nome" class="text-lg font-bold text-white">Nome do Equipamento</h3>
+            </div>
+            <button onclick="fecharProntuarioAtivo()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="p-6 overflow-y-auto space-y-6">
+            <!-- Bloco Superior: Dados + QR Code -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="space-y-1.5 text-sm text-slate-700 w-full">
+                    <p><strong>Setor:</strong> <span id="prontuario-setor">-</span></p>
+                    <p><strong>Fabricante / Modelo:</strong> <span id="prontuario-fab-mod">-</span></p>
+                    <p><strong>Status Atual:</strong> <span id="prontuario-status" class="font-bold">-</span></p>
+                    <div class="pt-2">
+                        <button onclick="imprimirEtiquetaQR()" class="bg-[#0B1120] hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg inline-flex items-center gap-2 transition">
+                            <i data-lucide="printer" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Imprimir Etiqueta QR Code</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="area-impressao-qr" class="flex flex-col items-center bg-white p-3 rounded-xl border border-slate-200 shadow-xs shrink-0">
+                    <div id="qrcode-container"></div>
+                    <span id="qrcode-label" class="text-[11px] font-extrabold text-slate-800 mt-1.5"></span>
+                </div>
+            </div>
+
+            <!-- Histórico de Manutenções da Máquina -->
+            <div>
+                <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                    <i data-lucide="history" class="w-4 h-4 text-blue-600"></i>
+                    <span>Histórico de Manutenções Realizadas</span>
+                </h4>
+                <div id="prontuario-historico-os" class="space-y-2.5">
+                    <!-- Carregado via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
