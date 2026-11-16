@@ -1,25 +1,37 @@
+let cacheColunasConfig = [];
+
 async function initConfiguracoes() {
     carregarSolicitacoesAcesso();
     carregarColunasConfig();
     carregarTiposConfig();
     carregarSetoresConfig();
 
-    // Adicionar Coluna
+    // Adicionar ou Editar Coluna
     document.getElementById('form-add-coluna')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const editId = document.getElementById('col-edit-id').value;
         const titulo = document.getElementById('col-titulo').value.trim();
         const ordem = parseInt(document.getElementById('col-ordem').value) || 1;
         const corTopo = document.getElementById('col-cor').value;
 
-        await db.collection('kanban_colunas').add({
-            empresaId: usuarioAtual.empresaId,
-            titulo,
-            ordem,
-            corTopo
-        });
+        if (editId) {
+            await db.collection('kanban_colunas').doc(editId).update({
+                titulo,
+                ordem,
+                corTopo
+            });
+            cancelarEdicaoColuna();
+        } else {
+            await db.collection('kanban_colunas').add({
+                empresaId: usuarioAtual.empresaId,
+                titulo,
+                ordem,
+                corTopo
+            });
+            e.target.reset();
+        }
 
-        e.target.reset();
-        carregarColunasConfig();
+        await carregarColunasConfig();
     });
 
     // Adicionar Tipo de Manutenção
@@ -121,7 +133,7 @@ async function recusarAcessoUsuario(userId, nome) {
 }
 
 // ==========================================
-// COLUNAS DO KANBAN, TIPOS E SETORES
+// COLUNAS DO KANBAN (ORDEM AUTOMÁTICA, SETAS E EDIÇÃO)
 // ==========================================
 async function carregarColunasConfig() {
     const lista = document.getElementById('lista-colunas');
@@ -131,25 +143,124 @@ async function carregarColunasConfig() {
         .where('empresaId', '==', usuarioAtual.empresaId)
         .get();
 
-    const colunas = snap.docs
+    cacheColunasConfig = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.ordem - b.ordem);
 
-    lista.innerHTML = colunas.map(col => `
-        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-            <div class="flex items-center gap-2.5">
-                <span class="w-3 h-3 rounded-full" style="background-color: ${col.corTopo}"></span>
-                <span class="text-xs font-bold text-slate-400">#${col.ordem}</span>
-                <span class="text-sm font-medium text-slate-700">${col.titulo}</span>
+    // Define automaticamente o próximo número disponível no input de ordem
+    const inputOrdem = document.getElementById('col-ordem');
+    const editId = document.getElementById('col-edit-id')?.value;
+    if (inputOrdem && !editId) {
+        const maiorOrdem = cacheColunasConfig.reduce((max, c) => Math.max(max, Number(c.ordem) || 0), 0);
+        inputOrdem.value = maiorOrdem + 1;
+    }
+
+    lista.innerHTML = cacheColunasConfig.map((col, idx) => `
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${col.corTopo}"></span>
+                <span class="text-xs font-bold text-slate-400 shrink-0">#${col.ordem}</span>
+                <span class="text-sm font-medium text-slate-700 truncate">${col.titulo}</span>
             </div>
-            <button onclick="deletarItemConfig('kanban_colunas', '${col.id}', carregarColunasConfig)" class="text-slate-400 hover:text-rose-600 p-1">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
+            
+            <div class="flex items-center gap-0.5 shrink-0">
+                <button type="button" onclick="moverColunaConfig(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Mover para cima"
+                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 disabled:pointer-events-none transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="moverColunaConfig(${idx}, 1)" ${idx === cacheColunasConfig.length - 1 ? 'disabled' : ''} title="Mover para baixo"
+                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 disabled:pointer-events-none transition">
+                    <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="prepararEdicaoColuna('${col.id}')" title="Editar coluna"
+                    class="p-1.5 rounded text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="excluirColunaConfig('${col.id}')" title="Excluir coluna"
+                    class="p-1.5 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
         </div>
     `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhuma coluna cadastrada.</p>';
+    
     lucide.createIcons();
 }
 
+async function moverColunaConfig(indexAtual, direcao) {
+    const novoIndex = indexAtual + direcao;
+    if (novoIndex < 0 || novoIndex >= cacheColunasConfig.length) return;
+
+    // Troca a posição dos itens na lista
+    const listaReordenada = [...cacheColunasConfig];
+    const [itemMovido] = listaReordenada.splice(indexAtual, 1);
+    listaReordenada.splice(novoIndex, 0, itemMovido);
+
+    // Atualiza a numeração sequencial (1, 2, 3...) no Firestore em lote
+    const batch = db.batch();
+    listaReordenada.forEach((col, i) => {
+        const ref = db.collection('kanban_colunas').doc(col.id);
+        batch.update(ref, { ordem: i + 1 });
+    });
+
+    await batch.commit();
+    await carregarColunasConfig();
+}
+
+function prepararEdicaoColuna(colId) {
+    const col = cacheColunasConfig.find(c => c.id === colId);
+    if (!col) return;
+
+    document.getElementById('col-edit-id').value = col.id;
+    document.getElementById('col-titulo').value = col.titulo;
+    document.getElementById('col-ordem').value = col.ordem;
+    document.getElementById('col-cor').value = col.corTopo || '#1D4ED8';
+
+    const btnSalvar = document.getElementById('btn-salvar-coluna');
+    btnSalvar.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>Salvar Alteração</span>';
+    btnSalvar.className = 'flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5';
+
+    document.getElementById('btn-cancelar-edit-coluna').classList.remove('hidden');
+    document.getElementById('col-titulo').focus();
+    lucide.createIcons();
+}
+
+function cancelarEdicaoColuna() {
+    document.getElementById('col-edit-id').value = '';
+    document.getElementById('form-add-coluna').reset();
+
+    const btnSalvar = document.getElementById('btn-salvar-coluna');
+    btnSalvar.innerHTML = '<i data-lucide="plus" class="w-4 h-4"></i><span>Adicionar Coluna</span>';
+    btnSalvar.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5';
+
+    document.getElementById('btn-cancelar-edit-coluna').classList.add('hidden');
+
+    const maiorOrdem = cacheColunasConfig.reduce((max, c) => Math.max(max, Number(c.ordem) || 0), 0);
+    document.getElementById('col-ordem').value = maiorOrdem + 1;
+    lucide.createIcons();
+}
+
+async function excluirColunaConfig(colId) {
+    if (!confirm('Deseja excluir esta coluna?')) return;
+    await db.collection('kanban_colunas').doc(colId).delete();
+
+    // Reordena automaticamente as restantes para não ficar buraco na numeração
+    const restantes = cacheColunasConfig.filter(c => c.id !== colId);
+    const batch = db.batch();
+    restantes.forEach((col, i) => {
+        batch.update(db.collection('kanban_colunas').doc(col.id), { ordem: i + 1 });
+    });
+    await batch.commit();
+
+    if (document.getElementById('col-edit-id').value === colId) {
+        cancelarEdicaoColuna();
+    }
+    await carregarColunasConfig();
+}
+
+// ==========================================
+// TIPOS DE MANUTENÇÃO E SETORES EXECUTANTES
+// ==========================================
 async function carregarTiposConfig() {
     const lista = document.getElementById('lista-tipos');
     if (!lista) return;
