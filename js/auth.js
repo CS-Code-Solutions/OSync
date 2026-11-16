@@ -24,6 +24,9 @@ auth.onAuthStateChanged(async (user) => {
 
         document.getElementById('header-user-name').textContent = usuarioAtual.nome;
         document.getElementById('header-user-role').textContent = usuarioAtual.perfil;
+if (usuarioAtual.perfil === 'SuperAdmin') {
+    document.getElementById('btn-menu-saas')?.classList.remove('hidden');
+}
 
         if (primeiraCarga) {
             atualizarStatusNuvem(true);
