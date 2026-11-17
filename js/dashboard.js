@@ -9,7 +9,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
     {
         id: 'kpis_principais',
         titulo: 'Cartões de Resumo (KPIs)',
-        descricao: 'O.S. em aberto, máquinas paradas, disponibilidade, chamados e custo total.',
+        descricao: 'O.S. em aberto, máquinas paradas agora, disponibilidade, chamados e custo total.',
         categoria: 'Indicadores',
         ativo: true,
         ordem: 1
@@ -130,7 +130,6 @@ async function carregarPreferenciasLayoutDashboard() {
         if (doc.exists && Array.isArray(doc.data().widgets)) {
             const salvos = doc.data().widgets;
             layoutWidgetsAtual = CATALOGO_WIDGETS_DASHBOARD.map(padrao => {
-                // Migra preferência caso o usuário tivesse o ID antigo 'grafico_horas_paradas_mensais'
                 const encontrado = salvos.find(s =>
                     s.id === padrao.id ||
                     (padrao.id === 'grafico_maquinas_paradas_periodo' && s.id === 'grafico_horas_paradas_mensais')
@@ -272,12 +271,23 @@ function construirHTML_KPIs(ordens) {
     const concluidas = ordens.filter(o => o.encerrada).length;
     const custoTotal = ordens.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
 
-    // Conta quantas máquinas distintas estiveram paradas no período e o total acumulado
-    const ordensParadas = ordens.filter(osTeveParadaDash);
-    const maquinasUnicasParadas = new Set(
-        ordensParadas.map(o => o.ativoId || `${o.ativoTag}-${o.ativoNome}`)
-    ).size;
-    const totalMinutosParados = ordensParadas.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
+    // Máquinas que ESTÃO paradas agora (status 'Parada' no cadastro de ativos OU O.S. de máquina parada ainda em aberto)
+    const idsMaquinasParadasAgora = new Set();
+    cacheDashAtivos.forEach(a => {
+        if (a.status === 'Parada') {
+            idsMaquinasParadasAgora.add(a.id);
+        }
+    });
+    cacheDashOrdens.forEach(o => {
+        if (!o.encerrada && (o.maquinaParada === true || o.condicaoMaquina === 'Maquina parada')) {
+            idsMaquinasParadasAgora.add(o.ativoId || `${o.ativoTag}-${o.ativoNome}`);
+        }
+    });
+    const qtdMaquinasParadasAgora = idsMaquinasParadasAgora.size;
+
+    // Resumo histórico de paradas dentro do período selecionado
+    const ordensParadasPeriodo = ordens.filter(osTeveParadaDash);
+    const totalMinutosParados = ordensParadasPeriodo.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
 
     const totalMaquinas = cacheDashAtivos.length;
     const operacionais = cacheDashAtivos.filter(a => a.status === 'Operacional').length;
@@ -296,16 +306,18 @@ function construirHTML_KPIs(ordens) {
             <p class="text-[11px] text-slate-500 mt-1"><strong>${abertas}</strong> em aberto • <strong>${concluidas}</strong> concluídas</p>
         </div>
 
-        <div class="osync-card p-5 border-l-4 border-l-rose-600">
+        <div class="osync-card p-5 border-l-4 ${qtdMaquinasParadasAgora > 0 ? 'border-l-rose-600' : 'border-l-emerald-500'}">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase text-slate-400">Máquinas Paradas</span>
-                <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-600"></i>
+                <i data-lucide="alert-octagon" class="w-4 h-4 ${qtdMaquinasParadasAgora > 0 ? 'text-rose-600' : 'text-emerald-600'}"></i>
             </div>
-            <div class="text-2xl font-extrabold text-rose-600 mt-1.5">
-                ${maquinasUnicasParadas} <span class="text-sm font-bold text-slate-600">${maquinasUnicasParadas === 1 ? 'máquina' : 'máquinas'}</span>
+            <div class="text-2xl font-extrabold ${qtdMaquinasParadasAgora > 0 ? 'text-rose-600' : 'text-emerald-700'} mt-1.5">
+                ${qtdMaquinasParadasAgora} <span class="text-sm font-bold text-slate-600">${qtdMaquinasParadasAgora === 1 ? 'máquina' : 'máquinas'}</span>
             </div>
             <p class="text-[11px] text-slate-500 mt-1">
-                <strong>${ordensParadas.length}</strong> ${ordensParadas.length === 1 ? 'parada' : 'paradas'}${totalMinutosParados > 0 ? ` • <strong>${formatarHorasParadasDash(totalMinutosParados)}</strong> totais` : ''}
+                ${ordensParadasPeriodo.length > 0
+                    ? `<strong>${ordensParadasPeriodo.length}</strong> ${ordensParadasPeriodo.length === 1 ? 'parada' : 'paradas'} no período${totalMinutosParados > 0 ? ` • <strong>${formatarHorasParadasDash(totalMinutosParados)}</strong>` : ''}`
+                    : 'Nenhuma parada registrada no período'}
             </p>
         </div>
 
@@ -434,7 +446,6 @@ function montarGraficoMaquinasParadasPeriodo() {
     const anoAtual = hoje.getFullYear();
     const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
 
-    // Filtra O.S. dentro do intervalo selecionado no widget (Semana = últimos 7 dias, Mês = mês atual, Ano = ano atual)
     const ordensNoIntervalo = cacheDashOrdens.filter(os => {
         if (!osTeveParadaDash(os)) return false;
         if (!os.dataISO) return false;
@@ -453,7 +464,6 @@ function montarGraficoMaquinasParadasPeriodo() {
         return true;
     });
 
-    // Agrupa APENAS as máquinas que tiveram parada no período
     const mapaMaquinas = {};
     ordensNoIntervalo.forEach(os => {
         const chave = `${os.ativoTag || 'TAG'} - ${os.ativoNome || 'Máquina'}`;
