@@ -13,7 +13,7 @@ async function initConfiguracoes() {
         const editId = document.getElementById('col-edit-id').value;
         const titulo = document.getElementById('col-titulo').value.trim();
         const ordem = parseInt(document.getElementById('col-ordem').value) || 1;
-        const corTopo = document.getElementById('col-cor').value;
+        const corTopo = sanitizarCorHex(document.getElementById('col-cor').value, '#1D4ED8');
 
         if (editId) {
             await db.collection('kanban_colunas').doc(editId).update({
@@ -38,7 +38,7 @@ async function initConfiguracoes() {
     document.getElementById('form-add-tipo')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const nome = document.getElementById('tipo-nome').value.trim();
-        const cor = document.getElementById('tipo-cor').value;
+        const cor = sanitizarCorHex(document.getElementById('tipo-cor').value, '#1D4ED8');
 
         await db.collection('tipos_manutencao').add({
             empresaId: usuarioAtual.empresaId,
@@ -85,7 +85,6 @@ async function initConfiguracoes() {
 async function garantirTiposESetoresPadrao() {
     if (!usuarioAtual?.empresaId) return;
 
-    // 1. Tipos de Manutenção Obrigatórios
     const tiposPadrao = [
         { nome: 'Corretiva', cor: '#EF4444' },
         { nome: 'Preventiva', cor: '#3B82F6' },
@@ -108,7 +107,6 @@ async function garantirTiposESetoresPadrao() {
         }
     }
 
-    // 2. Setores Executantes Obrigatórios
     const setoresPadrao = ['Mecânica', 'Elétrica'];
 
     for (const nomeSetor of setoresPadrao) {
@@ -160,22 +158,25 @@ async function carregarSolicitacoesAcesso() {
         return;
     }
 
-    lista.innerHTML = pendentes.map(u => `
+    lista.innerHTML = pendentes.map(u => {
+        const uIdSeguro = escaparHTML(u.id);
+        const uNomeSeguro = escaparHTML(u.nome);
+        return `
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl text-xs">
             <div>
-                <div class="font-bold text-slate-900 text-sm">${u.nome} <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700 ml-1">${u.perfil}</span></div>
-                <div class="text-slate-600 mt-0.5">${u.email} • Setor: <strong>${u.setor}</strong></div>
+                <div class="font-bold text-slate-900 text-sm">${uNomeSeguro} <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700 ml-1">${escaparHTML(u.perfil)}</span></div>
+                <div class="text-slate-600 mt-0.5">${escaparHTML(u.email)} • Setor: <strong>${escaparHTML(u.setor)}</strong></div>
             </div>
             <div class="flex items-center gap-2 self-end sm:self-center">
-                <button onclick="aprovarAcessoUsuario('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 transition">
+                <button onclick="aprovarAcessoUsuario('${uIdSeguro}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 transition">
                     <i data-lucide="check" class="w-3.5 h-3.5"></i> Liberar
                 </button>
-                <button onclick="recusarAcessoUsuario('${u.id}', '${u.nome}')" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white font-bold rounded-lg flex items-center gap-1 transition">
+                <button data-nome="${uNomeSeguro}" onclick="recusarAcessoUsuario('${uIdSeguro}', this.getAttribute('data-nome'))" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white font-bold rounded-lg flex items-center gap-1 transition">
                     <i data-lucide="x" class="w-3.5 h-3.5"></i> Recusar
                 </button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
     lucide.createIcons();
 }
 
@@ -190,7 +191,7 @@ async function aprovarAcessoUsuario(userId) {
 
 async function recusarAcessoUsuario(userId, nome) {
     const confirmado = await confirmarAcaoOSync(
-        `Recusar e excluir o pedido de cadastro de <strong>"${nome}"</strong>?`,
+        `Recusar e excluir o pedido de cadastro de <strong>"${escaparHTML(nome)}"</strong>?`,
         { titulo: 'Recusar Solicitação', textoConfirmar: 'Recusar e Excluir' }
     );
     if (!confirmado) return;
@@ -222,12 +223,15 @@ async function carregarColunasConfig() {
         inputOrdem.value = maiorOrdem + 1;
     }
 
-    lista.innerHTML = cacheColunasConfig.map((col, idx) => `
+    lista.innerHTML = cacheColunasConfig.map((col, idx) => {
+        const corCol = sanitizarCorHex(col.corTopo, '#1D4ED8');
+        const colIdSeguro = escaparHTML(col.id);
+        return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200 gap-2">
             <div class="flex items-center gap-2 min-w-0">
-                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${col.corTopo}"></span>
-                <span class="text-xs font-bold text-slate-400 shrink-0">#${col.ordem}</span>
-                <span class="text-sm font-medium text-slate-700 truncate">${col.titulo}</span>
+                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${corCol}"></span>
+                <span class="text-xs font-bold text-slate-400 shrink-0">#${Number(col.ordem) || 0}</span>
+                <span class="text-sm font-medium text-slate-700 truncate">${escaparHTML(col.titulo)}</span>
             </div>
             
             <div class="flex items-center gap-0.5 shrink-0">
@@ -239,17 +243,17 @@ async function carregarColunasConfig() {
                     class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 transition">
                     <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
                 </button>
-                <button type="button" onclick="prepararEdicaoColuna('${col.id}')" title="Editar coluna"
+                <button type="button" onclick="prepararEdicaoColuna('${colIdSeguro}')" title="Editar coluna"
                     class="p-1.5 rounded text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                 </button>
-                <button type="button" onclick="excluirColunaConfig('${col.id}')" title="Excluir coluna"
+                <button type="button" onclick="excluirColunaConfig('${colIdSeguro}')" title="Excluir coluna"
                     class="p-1.5 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
             </div>
-        </div>
-    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhuma coluna cadastrada.</p>';
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhuma coluna cadastrada.</p>';
     
     lucide.createIcons();
 }
@@ -279,7 +283,7 @@ function prepararEdicaoColuna(colId) {
     document.getElementById('col-edit-id').value = col.id;
     document.getElementById('col-titulo').value = col.titulo;
     document.getElementById('col-ordem').value = col.ordem;
-    document.getElementById('col-cor').value = col.corTopo || '#1D4ED8';
+    document.getElementById('col-cor').value = sanitizarCorHex(col.corTopo, '#1D4ED8');
 
     const btnSalvar = document.getElementById('btn-salvar-coluna');
     btnSalvar.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>Salvar Alteração</span>';
@@ -346,14 +350,16 @@ async function carregarTiposConfig() {
 
     lista.innerHTML = tipos.map(t => {
         const ehFixo = tiposFixos.includes(t.nome);
+        const corTipo = sanitizarCorHex(t.cor, '#1D4ED8');
+        const tIdSeguro = escaparHTML(t.id);
         return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
             <div class="flex items-center gap-2.5">
-                <span class="w-3 h-3 rounded-full" style="background-color: ${t.cor}"></span>
-                <span class="text-sm font-medium text-slate-700">${t.nome} ${ehFixo ? '<span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1 font-bold">Fixo</span>' : ''}</span>
+                <span class="w-3 h-3 rounded-full" style="background-color: ${corTipo}"></span>
+                <span class="text-sm font-medium text-slate-700">${escaparHTML(t.nome)} ${ehFixo ? '<span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1 font-bold">Fixo</span>' : ''}</span>
             </div>
             ${!ehFixo ? `
-            <button onclick="deletarItemConfig('tipos_manutencao', '${t.id}', carregarTiposConfig)" class="text-slate-400 hover:text-rose-600 p-1">
+            <button onclick="deletarItemConfig('tipos_manutencao', '${tIdSeguro}', carregarTiposConfig)" class="text-slate-400 hover:text-rose-600 p-1">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>` : `<span class="text-[11px] text-slate-400 italic pr-1">Sistema</span>`}
         </div>`;
@@ -377,14 +383,15 @@ async function carregarSetoresConfig() {
 
     lista.innerHTML = setores.map(s => {
         const ehFixo = setoresFixos.includes(s.nome);
+        const sIdSeguro = escaparHTML(s.id);
         return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
             <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-slate-700">${s.nome}</span>
+                <span class="text-sm font-medium text-slate-700">${escaparHTML(s.nome)}</span>
                 ${ehFixo ? '<span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">Fixo</span>' : ''}
             </div>
             ${!ehFixo ? `
-            <button onclick="deletarItemConfig('setores_executantes', '${s.id}', carregarSetoresConfig)" class="text-slate-400 hover:text-rose-600 p-1">
+            <button onclick="deletarItemConfig('setores_executantes', '${sIdSeguro}', carregarSetoresConfig)" class="text-slate-400 hover:text-rose-600 p-1">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>` : `<span class="text-[11px] text-slate-400 italic pr-1">Sistema</span>`}
         </div>`;
@@ -404,17 +411,19 @@ async function carregarCentrosCustoConfig() {
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || ''));
 
-    lista.innerHTML = centros.map(cc => `
+    lista.innerHTML = centros.map(cc => {
+        const ccIdSeguro = escaparHTML(cc.id);
+        return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
             <div class="flex items-center gap-2 min-w-0">
-                <span class="text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">${cc.codigo}</span>
-                <span class="text-sm font-medium text-slate-700 truncate">${cc.nome}</span>
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">${escaparHTML(cc.codigo)}</span>
+                <span class="text-sm font-medium text-slate-700 truncate">${escaparHTML(cc.nome)}</span>
             </div>
-            <button onclick="deletarItemConfig('centros_custo', '${cc.id}', carregarCentrosCustoConfig)" class="text-slate-400 hover:text-rose-600 p-1">
+            <button onclick="deletarItemConfig('centros_custo', '${ccIdSeguro}', carregarCentrosCustoConfig)" class="text-slate-400 hover:text-rose-600 p-1">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
-        </div>
-    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum centro de custo cadastrado.</p>';
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum centro de custo cadastrado.</p>';
     lucide.createIcons();
 }
 
