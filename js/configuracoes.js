@@ -1,7 +1,7 @@
 let cacheColunasConfig = [];
 
 async function initConfiguracoes() {
-    await garantirTipoManutencaoExternaFixo();
+    await garantirTiposESetoresPadrao();
     carregarSolicitacoesAcesso();
     carregarColunasConfig();
     carregarTiposConfig();
@@ -79,19 +79,50 @@ async function initConfiguracoes() {
     });
 }
 
-async function garantirTipoManutencaoExternaFixo() {
+// ==========================================
+// GARANTIR TIPOS E SETORES FIXOS PADRÃO
+// ==========================================
+async function garantirTiposESetoresPadrao() {
     if (!usuarioAtual?.empresaId) return;
-    const snap = await db.collection('tipos_manutencao')
-        .where('empresaId', '==', usuarioAtual.empresaId)
-        .where('nome', '==', 'Manutenção Externa')
-        .get();
 
-    if (snap.empty) {
-        await db.collection('tipos_manutencao').add({
-            empresaId: usuarioAtual.empresaId,
-            nome: 'Manutenção Externa',
-            cor: '#8B5CF6'
-        });
+    // 1. Tipos de Manutenção Obrigatórios
+    const tiposPadrao = [
+        { nome: 'Corretiva', cor: '#EF4444' },
+        { nome: 'Preventiva', cor: '#3B82F6' },
+        { nome: 'Programada', cor: '#10B981' },
+        { nome: 'Manutenção Externa', cor: '#8B5CF6' }
+    ];
+
+    for (const tipo of tiposPadrao) {
+        const snap = await db.collection('tipos_manutencao')
+            .where('empresaId', '==', usuarioAtual.empresaId)
+            .where('nome', '==', tipo.nome)
+            .get();
+
+        if (snap.empty) {
+            await db.collection('tipos_manutencao').add({
+                empresaId: usuarioAtual.empresaId,
+                nome: tipo.nome,
+                cor: tipo.cor
+            });
+        }
+    }
+
+    // 2. Setores Executantes Obrigatórios
+    const setoresPadrao = ['Mecânica', 'Elétrica'];
+
+    for (const nomeSetor of setoresPadrao) {
+        const snap = await db.collection('setores_executantes')
+            .where('empresaId', '==', usuarioAtual.empresaId)
+            .where('nome', '==', nomeSetor)
+            .get();
+
+        if (snap.empty) {
+            await db.collection('setores_executantes').add({
+                empresaId: usuarioAtual.empresaId,
+                nome: nomeSetor
+            });
+        }
     }
 }
 
@@ -311,13 +342,15 @@ async function carregarTiposConfig() {
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.nome.localeCompare(b.nome));
 
+    const tiposFixos = ['Corretiva', 'Preventiva', 'Programada', 'Manutenção Externa'];
+
     lista.innerHTML = tipos.map(t => {
-        const ehFixo = t.nome === 'Manutenção Externa';
+        const ehFixo = tiposFixos.includes(t.nome);
         return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
             <div class="flex items-center gap-2.5">
                 <span class="w-3 h-3 rounded-full" style="background-color: ${t.cor}"></span>
-                <span class="text-sm font-medium text-slate-700">${t.nome} ${ehFixo ? '<span class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded ml-1 font-bold">Fixo</span>' : ''}</span>
+                <span class="text-sm font-medium text-slate-700">${t.nome} ${ehFixo ? '<span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1 font-bold">Fixo</span>' : ''}</span>
             </div>
             ${!ehFixo ? `
             <button onclick="deletarItemConfig('tipos_manutencao', '${t.id}', carregarTiposConfig)" class="text-slate-400 hover:text-rose-600 p-1">
@@ -340,14 +373,22 @@ async function carregarSetoresConfig() {
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.nome.localeCompare(b.nome));
 
-    lista.innerHTML = setores.map(s => `
+    const setoresFixos = ['Mecânica', 'Elétrica'];
+
+    lista.innerHTML = setores.map(s => {
+        const ehFixo = setoresFixos.includes(s.nome);
+        return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-            <span class="text-sm font-medium text-slate-700">${s.nome}</span>
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-slate-700">${s.nome}</span>
+                ${ehFixo ? '<span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">Fixo</span>' : ''}
+            </div>
+            ${!ehFixo ? `
             <button onclick="deletarItemConfig('setores_executantes', '${s.id}', carregarSetoresConfig)" class="text-slate-400 hover:text-rose-600 p-1">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-        </div>
-    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum setor cadastrado.</p>';
+            </button>` : `<span class="text-[11px] text-slate-400 italic pr-1">Sistema</span>`}
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum setor cadastrado.</p>';
     lucide.createIcons();
 }
 
