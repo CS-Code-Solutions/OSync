@@ -115,11 +115,11 @@ function renderizarCardsCentrosCusto(lista) {
         <div class="osync-card p-5 flex flex-col justify-between gap-4 hover:shadow-md transition">
             <div>
                 <div class="flex items-center justify-between gap-2 mb-1">
-                    <span class="text-xs font-extrabold px-2.5 py-0.5 rounded bg-slate-900 text-[#00E5B0]">${cc.codigoTag}</span>
-                    <span class="text-xs font-semibold text-slate-400">${cc.setor || 'Geral'}</span>
+                    <span class="text-xs font-extrabold px-2.5 py-0.5 rounded bg-slate-900 text-[#00E5B0]">${escaparHTML(cc.codigoTag)}</span>
+                    <span class="text-xs font-semibold text-slate-400">${escaparHTML(cc.setor || 'Geral')}</span>
                 </div>
-                <h3 class="font-bold text-slate-900 text-base mt-1.5">${cc.nome}</h3>
-                <p class="text-xs text-slate-500 mt-0.5">${cc.fabricante || ''} ${cc.modelo ? '• ' + cc.modelo : ''}</p>
+                <h3 class="font-bold text-slate-900 text-base mt-1.5">${escaparHTML(cc.nome)}</h3>
+                <p class="text-xs text-slate-500 mt-0.5">${escaparHTML(cc.fabricante || '')} ${cc.modelo ? '• ' + escaparHTML(cc.modelo) : ''}</p>
             </div>
 
             <div class="pt-3 border-t border-slate-100 flex items-end justify-between">
@@ -129,7 +129,7 @@ function renderizarCardsCentrosCusto(lista) {
                         ${formatarMoedaBR(cc.custoAcumulado)}
                     </span>
                 </div>
-                <button onclick="abrirDetalheCentroCusto('${cc.id}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1.5">
+                <button onclick="abrirDetalheCentroCusto('${escaparHTML(cc.id)}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1.5">
                     <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                     <span>Detalhes</span>
                 </button>
@@ -171,9 +171,9 @@ function abrirDetalheCentroCusto(ativoId) {
             <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs">
                 <div class="min-w-0">
                     <div class="font-bold text-slate-900">
-                        #OS-${String(item.numeroOs).padStart(4, '0')} • ${item.descricao}
+                        #OS-${String(item.numeroOs).padStart(4, '0')} • ${escaparHTML(item.descricao)}
                     </div>
-                    <span class="text-[11px] text-slate-500">Data: ${item.dataFormatada} • ${item.tipoCusto}</span>
+                    <span class="text-[11px] text-slate-500">Data: ${escaparHTML(item.dataFormatada)} • ${escaparHTML(item.tipoCusto)}</span>
                 </div>
                 <span class="font-extrabold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
                     ${formatarMoedaBR(item.valor)}
@@ -199,10 +199,9 @@ function abrirModalFiltroPDF(tipo, ativoId = '') {
 
     const cc = ativoId ? cacheCentrosCustoDetalhado.find(c => c.id === ativoId) : null;
     document.getElementById('titulo-modal-filtro-pdf').innerHTML = tipo === 'individual' && cc
-        ? `<i data-lucide="file-text" class="w-4 h-4 text-[#00E5B0]"></i><span>PDF Individual • ${cc.codigoTag}</span>`
+        ? `<i data-lucide="file-text" class="w-4 h-4 text-[#00E5B0]"></i><span>PDF Individual • ${escaparHTML(cc.codigoTag)}</span>`
         : `<i data-lucide="file-text" class="w-4 h-4 text-[#00E5B0]"></i><span>PDF Geral • Centros de Custo</span>`;
 
-    // Preenche anos disponíveis (últimos 5 anos até o atual)
     const anoAtual = new Date().getFullYear();
     const mesAtual = String(new Date().getMonth() + 1).padStart(2, '0');
     const selAno = document.getElementById('pdf-filtro-ano');
@@ -212,7 +211,6 @@ function abrirModalFiltroPDF(tipo, ativoId = '') {
     }
     document.getElementById('pdf-filtro-mes').value = mesAtual;
 
-    // Reseta para Total por padrão
     const radioTotal = document.querySelector('input[name="pdf-modo-periodo"][value="total"]');
     if (radioTotal) radioTotal.checked = true;
     alternarCamposPeriodoPDF();
@@ -304,7 +302,6 @@ async function gerarPDFIndividualCentroCusto(ativoId, prefixoFiltro, labelPeriod
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // Cabeçalho Escuro OSync
     doc.setFillColor(11, 17, 32);
     doc.rect(0, 0, 210, 28, 'F');
     doc.setFillColor(0, 229, 176);
@@ -326,7 +323,6 @@ async function gerarPDFIndividualCentroCusto(ativoId, prefixoFiltro, labelPeriod
     doc.setTextColor(0, 229, 176);
     doc.text(labelPeriodo, 196, 20, { align: 'right' });
 
-    // Dados completos do Ativo
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.roundedRect(14, 34, 182, 28, 2, 2, 'FD');
@@ -345,7 +341,6 @@ async function gerarPDFIndividualCentroCusto(ativoId, prefixoFiltro, labelPeriod
     doc.text(`Status Atual: ${cc.status || 'Operacional'}`, 18, 55);
     doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 55);
 
-    // Filtra lançamentos pelo período escolhido
     const itensFiltrados = cc.lancamentos.filter(item =>
         !prefixoFiltro || (item.dataISO && item.dataISO.startsWith(prefixoFiltro))
     );
@@ -391,7 +386,6 @@ async function gerarPDFGeralCentrosCusto(prefixoFiltro, labelPeriodo, logoObj) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // Cabeçalho Escuro OSync
     doc.setFillColor(11, 17, 32);
     doc.rect(0, 0, 210, 28, 'F');
     doc.setFillColor(0, 229, 176);
@@ -417,7 +411,6 @@ async function gerarPDFGeralCentrosCusto(prefixoFiltro, labelPeriodo, logoObj) {
     doc.setFontSize(9);
     doc.text(`Ativos com geração de custo no período • Emitido em ${new Date().toLocaleDateString('pt-BR')}`, 14, 36);
 
-    // Filtra máquinas que geraram custo no período selecionado
     const maquinasComCusto = cacheCentrosCustoDetalhado.map(cc => {
         const itensPeriodo = cc.lancamentos.filter(item =>
             !prefixoFiltro || (item.dataISO && item.dataISO.startsWith(prefixoFiltro))
