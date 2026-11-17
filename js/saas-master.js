@@ -1,10 +1,12 @@
+let unsubscribeSaaSEmpresas = null;
+
 async function initSaaSEmpresas() {
     if (usuarioAtual?.perfil !== 'SuperAdmin') {
         navegarPara('os');
         return;
     }
 
-    await carregarEmpresasSaaS();
+    iniciarListenerEmpresasSaaS();
     document.getElementById('form-nova-empresa-saas')?.addEventListener('submit', salvarNovaEmpresaSaaS);
     document.getElementById('form-usuario-empresa-saas')?.addEventListener('submit', salvarUsuarioEmpresaSaaS);
 }
@@ -16,41 +18,49 @@ function calcularVencimentoContrato(tipoContrato) {
     return hoje.toISOString();
 }
 
-async function carregarEmpresasSaaS() {
+function iniciarListenerEmpresasSaaS() {
+    if (unsubscribeSaaSEmpresas) unsubscribeSaaSEmpresas();
+
+    unsubscribeSaaSEmpresas = db.collection('empresas').onSnapshot(async (empSnap) => {
+        const grid = document.getElementById('lista-empresas-saas');
+        if (!grid) return;
+
+        const empresas = empSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (empresas.length === 0) {
+            grid.innerHTML = `<div class="col-span-full bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">Nenhuma empresa cadastrada no SaaS.</div>`;
+            return;
+        }
+
+        // Busca todos os usuários Admin (Gestores) cadastrados
+        const usersSnap = await db.collection('usuarios').where('perfil', '==', 'Admin').get();
+        const gestores = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        renderizarCardsEmpresasSaaS(empresas, gestores);
+    });
+}
+
+function renderizarCardsEmpresasSaaS(empresas, gestores) {
     const grid = document.getElementById('lista-empresas-saas');
     if (!grid) return;
-
-    // Busca todas as empresas e os usuários com perfil Admin (Gestor) em paralelo
-    const [empSnap, gestoresSnap] = await Promise.all([
-        db.collection('empresas').get(),
-        db.collection('usuarios').where('perfil', '==', 'Admin').get()
-    ]);
-
-    const empresas = empSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const gestores = gestoresSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-    if (empresas.length === 0) {
-        grid.innerHTML = `<div class="col-span-full bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">Nenhuma empresa cadastrada no SaaS.</div>`;
-        return;
-    }
 
     grid.innerHTML = empresas.map(emp => {
         const ativa = emp.ativa !== false;
         const selecionada = usuarioAtual.empresaId === emp.id;
 
-        // Filtra os gestores cadastrados para esta empresa específica
+        // Filtra os gestores vinculados a esta empresa
         const gestoresDaEmpresa = gestores.filter(g => g.empresaId === emp.id);
         const htmlGestores = gestoresDaEmpresa.length > 0
             ? gestoresDaEmpresa.map(g => `
-                <div class="flex items-center justify-between text-xs bg-blue-50/70 border border-blue-100 rounded-lg px-2.5 py-1.5">
+                <div class="flex items-center justify-between text-xs bg-blue-50/80 border border-blue-200/70 rounded-lg px-3 py-2">
                     <div class="min-w-0">
                         <span class="font-bold text-slate-800 block truncate">${g.nome}</span>
                         <span class="text-[11px] text-slate-500 block truncate">${g.email}</span>
                     </div>
-                    <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0 ml-2">Gestor</span>
+                    <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 ml-2">Gestor</span>
                 </div>
             `).join('')
-            : `<div class="text-[11px] text-amber-600 bg-amber-50 border border-amber-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+            : `<div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
                 <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0"></i>
                 <span>Nenhum gestor cadastrado ainda</span>
                </div>`;
@@ -100,7 +110,7 @@ async function carregarEmpresasSaaS() {
                 </div>
 
                 <!-- Gestor(es) Cadastrado(s) -->
-                <div class="mt-2.5 space-y-1.5">
+                <div class="mt-3 space-y-1.5">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Responsável / Gestor</span>
                     ${htmlGestores}
                 </div>
@@ -174,9 +184,9 @@ async function salvarNovaEmpresaSaaS(e) {
 
         fecharModalNovaEmpresaSaaS();
         e.target.reset();
-        carregarEmpresasSaaS();
+        mostrarNotificacaoOSync(`Empresa "${nome}" criada com sucesso!`, 'sucesso');
     } catch (err) {
-        alert('Erro ao criar empresa: ' + err.message);
+        mostrarNotificacaoOSync('Erro ao criar empresa: ' + err.message, 'erro');
     }
 
     btn.disabled = false;
@@ -192,7 +202,7 @@ async function renovarContratoEmpresa(empId, nome) {
         dataVencimento: novaData,
         ativa: true
     });
-    carregarEmpresasSaaS();
+    mostrarNotificacaoOSync(`Contrato de "${nome}" renovado por 1 ano!`, 'sucesso');
 }
 
 function abrirModalUsuarioEmpresaSaaS(empId, empNome) {
@@ -237,10 +247,10 @@ async function salvarUsuarioEmpresaSaaS(e) {
 
         fecharModalUsuarioEmpresaSaaS();
         e.target.reset();
-        await carregarEmpresasSaaS(); // Recarrega os cards para exibir o novo gestor na hora
-        alert(`Usuário "${nome}" (${perfil}) criado com sucesso!`);
+        iniciarListenerEmpresasSaaS(); // Atualiza os cards imediatamente com o novo gestor
+        mostrarNotificacaoOSync(`Usuário "${nome}" (${perfil}) criado com sucesso!`, 'sucesso');
     } catch (err) {
-        alert('Erro ao criar usuário: ' + err.message);
+        mostrarNotificacaoOSync('Erro ao criar usuário: ' + err.message, 'erro');
     }
 
     btn.disabled = false;
@@ -252,7 +262,7 @@ async function alternarStatusEmpresa(empId, statusAtual) {
     if (!confirm(`Deseja realmente ${acao} o acesso desta empresa?`)) return;
 
     await db.collection('empresas').doc(empId).update({ ativa: !statusAtual });
-    carregarEmpresasSaaS();
+    mostrarNotificacaoOSync(`Status da empresa atualizado!`, 'sucesso');
 }
 
 function acessarAmbienteEmpresa(empId, empNome) {
@@ -263,5 +273,5 @@ function acessarAmbienteEmpresa(empId, empNome) {
 
 function copiarTextoSimples(texto) {
     navigator.clipboard.writeText(texto);
-    alert('Código copiado: ' + texto);
+    mostrarNotificacaoOSync('Código copiado para a área de transferência!', 'sucesso');
 }
