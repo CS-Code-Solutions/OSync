@@ -136,44 +136,34 @@
         © 2026 OSync • <a href="pages/privacidade.html" class="hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a> | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
     </footer>
 
-    <!-- MENU INFERIOR MOBILE -->
-    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-1 flex items-center justify-around z-40">
-        <button id="mob-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1">
+    <!-- MENU INFERIOR MOBILE (5 ITENS OTIMIZADOS) -->
+    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
+        <button id="mob-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
             <i data-lucide="layout-dashboard" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[10px] font-medium">Painel</span>
         </button>
-        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1">
+
+        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
             <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[10px] font-medium">O.S.</span>
         </button>
-        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1">
-            <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[10px] font-medium">Chamados</span>
-        </button>
 
-        <!-- BOTÃO CENTRAL DE LEITURA DE QR CODE COM CÂMERA -->
-        <button onclick="abrirLeitorQRCodeCamera()" class="flex flex-col items-center justify-center py-1 px-2 text-[#00E5B0] transition active:scale-95" title="Ler QR Code da Máquina">
-            <div class="w-10 h-10 rounded-full bg-[#00E5B0] text-[#0B1120] flex items-center justify-center shadow-md -mt-3 border-2 border-[#0B1120]">
-                <i data-lucide="scan-line" class="w-6 h-6 stroke-[2.2]"></i>
+        <!-- BOTÃO CENTRAL DE ESCANEAR (CÂMERA) EM DESTAQUE -->
+        <button onclick="abrirLeitorQRCodeCamera()" class="flex flex-col items-center justify-center py-1 px-2 text-[#00E5B0] transition active:scale-95 shrink-0 -mt-3" title="Ler QR Code da Máquina">
+            <div class="w-11 h-11 rounded-full bg-[#00E5B0] text-[#0B1120] flex items-center justify-center shadow-lg border-2 border-[#0B1120]">
+                <i data-lucide="scan-line" class="w-6 h-6 stroke-[2.4]"></i>
             </div>
-            <span class="text-[10px] font-bold mt-0.5">Escanear</span>
+            <span class="text-[10px] font-bold mt-0.5">Escaner</span>
         </button>
 
-        <button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1">
-            <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[10px] font-medium">Cadastros</span>
+        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
+            <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">Solicitação</span>
         </button>
-        <button id="mob-relatorios" onclick="abrirMenuRelatoriosMobile()" data-page="relatorios" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1">
-            <i data-lucide="bar-chart-3" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[10px] font-medium">Relatórios</span>
-        </button>
-        <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1">
-            <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[10px] font-medium">Config</span>
-        </button>
-        <button id="mob-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 text-[#00E5B0]">
-            <i data-lucide="building-2" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[10px] font-bold">SaaS</span>
+
+        <button onclick="abrirMenuGeralMobile()" id="btn-menu-geral-mobile" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
+            <i data-lucide="menu" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">Menu</span>
         </button>
     </nav>
 
@@ -198,7 +188,6 @@
 
         <div class="w-full max-w-md text-center pb-6 space-y-3">
             <p class="text-xs text-slate-400">Posicione o QR Code da máquina no centro da câmera para abrir o prontuário instantaneamente.</p>
-            <!-- Fallback caso a câmera direta não inicie ou o celular prefira tirar foto/arquivo -->
             <label class="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl cursor-pointer border border-slate-700 transition">
                 <i data-lucide="camera" class="w-4 h-4 text-[#00E5B0]"></i>
                 <span>Tirar Foto / Enviar Imagem do QR Code</span>
@@ -207,49 +196,76 @@
         </div>
     </div>
 
-    <!-- GAVETA MOBILE DE CADASTROS -->
-    <div id="mobile-cadastros-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
-        <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-2">
+    <!-- GAVETA MOBILE UNIFICADA (MENU GERAL) -->
+    <div id="mobile-menu-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
+        <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl animate-fade-in">
             <div class="flex justify-between items-center pb-2 border-b border-slate-700">
-                <span class="text-sm font-bold text-white">Cadastros do Sistema</span>
-                <button onclick="fecharMenuCadastrosMobile()" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <div class="flex items-center gap-2">
+                    <i data-lucide="layout-grid" class="w-5 h-5 text-[#00E5B0]"></i>
+                    <span class="text-sm font-bold text-white uppercase tracking-wider">Menu do Sistema</span>
+                </div>
+                <button onclick="fecharMenuGeralMobile()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <button onclick="navegarPara('cad-manutentores'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
-                <i data-lucide="wrench" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span class="font-medium">Manutentores</span>
-            </button>
-            <button onclick="navegarPara('cad-lideranca'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
-                <i data-lucide="user-check" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span class="font-medium">Liderança</span>
-            </button>
-            <button onclick="navegarPara('cad-ativos'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
-                <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span class="font-medium">Ativos (Máquinas)</span>
-            </button>
+
+            <!-- Bloco: Cadastros -->
+            <div id="drawer-group-cadastros" class="space-y-1.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Cadastros</span>
+                <button onclick="navegarPara('cad-manutentores'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="wrench" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Manutentores</span>
+                </button>
+                <button onclick="navegarPara('cad-lideranca'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="user-check" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Liderança</span>
+                </button>
+                <button onclick="navegarPara('cad-ativos'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Ativos (Máquinas)</span>
+                </button>
+            </div>
+
+            <!-- Bloco: Relatórios -->
+            <div id="drawer-group-relatorios" class="space-y-1.5 pt-1">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Relatórios Gerenciais</span>
+                <button onclick="navegarPara('centros-custo'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="wallet" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Centros de Custo</span>
+                </button>
+                <button onclick="navegarPara('relatorios-os'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Relatórios de O.S.</span>
+                </button>
+                <button onclick="navegarPara('relatorios-maquinas'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Relatório de Máquinas</span>
+                </button>
+            </div>
+
+            <!-- Bloco: Sistema & SaaS -->
+            <div class="space-y-1.5 pt-1">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Sistema</span>
+                <button onclick="navegarPara('configuracoes'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="settings" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Configurações</span>
+                </button>
+                <button id="mob-drawer-saas" onclick="navegarPara('saas-empresas'); fecharMenuGeralMobile();" class="hidden w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-[#00E5B0]/30 text-[#00E5B0] flex items-center gap-3 transition">
+                    <i data-lucide="building-2" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold">Empresas (SaaS)</span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- GAVETA MOBILE DE RELATÓRIOS -->
-    <div id="mobile-relatorios-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
-        <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-2">
-            <div class="flex justify-between items-center pb-2 border-b border-slate-700">
-                <span class="text-sm font-bold text-white">Relatórios Gerenciais</span>
-                <button onclick="fecharMenuRelatoriosMobile()" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <button onclick="navegarPara('centros-custo'); fecharMenuRelatoriosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
-                <i data-lucide="wallet" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span class="font-medium">Centros de Custo</span>
-            </button>
-            <button onclick="navegarPara('relatorios-os'); fecharMenuRelatoriosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
-                <i data-lucide="clipboard-list" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span class="font-medium">Relatórios de O.S.</span>
-            </button>
-            <button onclick="navegarPara('relatorios-maquinas'); fecharMenuRelatoriosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
-                <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span class="font-medium">Relatório de Máquinas</span>
-            </button>
-        </div>
-    </div>
+    <!-- SCRIPT DE CONTROLE DA GAVETA DO MENU GERAL -->
+    <script>
+        function abrirMenuGeralMobile() {
+            document.getElementById('mobile-menu-drawer')?.classList.remove('hidden');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        function fecharMenuGeralMobile() {
+            document.getElementById('mobile-menu-drawer')?.classList.add('hidden');
+        }
+    </script>
 
     <!-- MODAL GLOBAL: PRONTUÁRIO & AÇÕES RÁPIDAS VIA QR CODE DA MÁQUINA -->
     <div id="modal-qr-maquina-global" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[70] flex items-center justify-center p-3 sm:p-4">
