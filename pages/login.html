@@ -36,7 +36,6 @@
             <!-- Logo OSync -->
             <div class="flex flex-col items-center mb-8">
                 <img src="../images/log.png" alt="OSync" class="max-h-40 w-auto object-contain mb-2">
-              <!--  <p class="text-xs uppercase tracking-widest text-slate-300">Gestão de Ordens de Serviço</p> -->
             </div>
 
             <!-- FORMULÁRIO DE LOGIN -->
@@ -120,6 +119,15 @@
                         class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
 
+                <!-- ACEITE OBRIGATÓRIO LGPD (NUNCA PRÉ-MARCADO) -->
+                <label class="flex items-start gap-2.5 p-3 rounded-xl bg-[#0B1120]/80 border border-slate-700 cursor-pointer hover:border-[#00E5B0]/60 transition select-none">
+                    <input type="checkbox" id="reg-lgpd-aceite" required
+                        class="mt-0.5 w-4 h-4 accent-[#00E5B0] rounded cursor-pointer shrink-0">
+                    <span class="text-[11px] text-slate-300 leading-relaxed">
+                        Li e concordo com a <a href="privacidade.html" target="_blank" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
+                    </span>
+                </label>
+
                 <div id="reg-error" class="hidden text-xs text-rose-400 bg-rose-950/80 border border-rose-800 p-3 rounded-lg"></div>
 
                 <button type="submit" id="btn-register"
@@ -135,8 +143,13 @@
         </div>
     </div>
 
-    <footer class="py-4 text-center text-xs text-slate-300 bg-[#0B1120]/75 backdrop-blur-xs border-t border-slate-800/80">
-        © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
+    <footer class="py-4 px-4 text-center text-xs text-slate-300 bg-[#0B1120]/75 backdrop-blur-xs border-t border-slate-800/80 space-y-1">
+        <div>
+            <a href="privacidade.html" class="text-slate-300 hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a>
+        </div>
+        <div>
+            © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
+        </div>
     </footer>
 
     <script src="../js/firebase-config.js"></script>
@@ -193,7 +206,7 @@
             }
         });
 
-        // Enviar Solicitação de Cadastro (NÃO libera login automático)
+        // Enviar Solicitação de Cadastro + Registro de Aceite LGPD
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-register');
@@ -203,6 +216,11 @@
             errorBox.classList.add('hidden');
 
             try {
+                const aceiteLgpd = document.getElementById('reg-lgpd-aceite')?.checked;
+                if (!aceiteLgpd) {
+                    throw new Error('É obrigatório aceitar a Política de Privacidade (LGPD) para solicitar acesso.');
+                }
+
                 const empresaId = document.getElementById('reg-empresa-id').value.trim();
                 const nome = document.getElementById('reg-nome').value.trim();
                 const perfil = document.getElementById('reg-perfil').value;
@@ -215,7 +233,7 @@
                 try {
                     empresaDoc = await db.collection('empresas').doc(empresaId).get();
                 } catch (errConsulta) {
-                    throw new Error('Permissão bloqueada ao validar empresa (verifique allow get: if true no Firestore).');
+                    throw new Error('Permissão bloqueada ao validar empresa.');
                 }
 
                 if (!empresaDoc.exists) {
@@ -238,7 +256,18 @@
                     criadoEm: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // 4. Desloga imediatamente para impedir entrada automática
+                // 4. Registra o aceite formal da Política de Privacidade (LGPD)
+                await db.collection('termos_aceites').doc(uid).set({
+                    aceito: true,
+                    versao: '1.0',
+                    nome: nome,
+                    email: email,
+                    empresaId: empresaId,
+                    dataAceite: firebase.firestore.FieldValue.serverTimestamp(),
+                    userAgent: navigator.userAgent || ''
+                });
+
+                // 5. Desloga imediatamente para impedir entrada automática
                 await auth.signOut();
 
                 e.target.reset();
