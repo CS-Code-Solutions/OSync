@@ -4,7 +4,9 @@ let unsubscribePerfilAtual = null;
 function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
     if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
-    if (cargo === 'Lideranca') return ['solicitacoes'];
+    
+    // ATUALIZADO: Líder agora tem acesso a solicitações e também a ativos (para escanear/consultar QR Code e máquinas)
+    if (cargo === 'Lideranca') return ['solicitacoes', 'cad-ativos'];
 
     // Para Manutentor: usa a lista personalizada salva no cadastro (padrão: O.S. e Chamados)
     if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
@@ -32,13 +34,13 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
         document.getElementById('mob-configuracoes')?.classList.toggle('hidden', !permitidas.includes('configuracoes'));
 
-        // Submenus de Cadastros (Apenas Ativos/Máquinas pode ser liberado para Manutentor)
+        // Submenus de Cadastros (Ativos/Máquinas liberado para líderes e manutentores com permissão)
         const temAtivos = permitidas.includes('cad-ativos');
-        document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !temAtivos);
-        document.getElementById('mob-cadastros')?.classList.toggle('hidden', !temAtivos);
+        document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !temAtivos && cargo !== 'Lideranca');
+        document.getElementById('mob-cadastros')?.classList.toggle('hidden', !temAtivos && cargo !== 'Lideranca');
 
         ['cad-manutentores', 'cad-lideranca', 'cad-ativos'].forEach(rota => {
-            const liberado = permitidas.includes(rota);
+            const liberado = permitidas.includes(rota) || (cargo === 'Lideranca' && rota === 'cad-ativos');
             document.querySelectorAll(`[onclick*="navegarPara('${rota}')"]`).forEach(btn => {
                 btn.classList.toggle('hidden', !liberado);
             });
@@ -124,7 +126,7 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                 </button>
             </div>
         </div>
-    </div>`;
+    `;
 
     document.body.classList.remove('auth-loading');
     document.body.insertAdjacentHTML('beforeend', modalHTML);
