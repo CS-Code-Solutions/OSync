@@ -32,7 +32,6 @@ function iniciarListenerEmpresasSaaS() {
             return;
         }
 
-        // Busca todos os usuários Admin (Gestores) cadastrados
         const usersSnap = await db.collection('usuarios').where('perfil', '==', 'Admin').get();
         const gestores = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -45,17 +44,18 @@ function renderizarCardsEmpresasSaaS(empresas, gestores) {
     if (!grid) return;
 
     grid.innerHTML = empresas.map(emp => {
+        const empIdSeguro = escaparHTML(emp.id);
+        const empNomeSeguro = escaparHTML(emp.nome);
         const ativa = emp.ativa !== false;
         const selecionada = usuarioAtual.empresaId === emp.id;
 
-        // Filtra os gestores vinculados a esta empresa
         const gestoresDaEmpresa = gestores.filter(g => g.empresaId === emp.id);
         const htmlGestores = gestoresDaEmpresa.length > 0
             ? gestoresDaEmpresa.map(g => `
                 <div class="flex items-center justify-between text-xs bg-blue-50/80 border border-blue-200/70 rounded-lg px-3 py-2">
                     <div class="min-w-0">
-                        <span class="font-bold text-slate-800 block truncate">${g.nome}</span>
-                        <span class="text-[11px] text-slate-500 block truncate">${g.email}</span>
+                        <span class="font-bold text-slate-800 block truncate">${escaparHTML(g.nome)}</span>
+                        <span class="text-[11px] text-slate-500 block truncate">${escaparHTML(g.email)}</span>
                     </div>
                     <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 ml-2">Gestor</span>
                 </div>
@@ -84,29 +84,29 @@ function renderizarCardsEmpresasSaaS(empresas, gestores) {
             <div>
                 <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${ativa && !expirado ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                        ${!ativa ? 'Suspensa' : (expirado ? 'Contrato Vencido' : 'Ativa')} • ${emp.plano || 'Pro'}
+                        ${!ativa ? 'Suspensa' : (expirado ? 'Contrato Vencido' : 'Ativa')} • ${escaparHTML(emp.plano || 'Pro')}
                     </span>
                     ${selecionada ? '<span class="text-[10px] font-extrabold uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Visualizando</span>' : ''}
                 </div>
 
-                <h3 class="font-bold text-base text-slate-900 mt-1">${emp.nome}</h3>
-                <p class="text-xs text-slate-500">${emp.cnpj || 'CNPJ não informado'}</p>
+                <h3 class="font-bold text-base text-slate-900 mt-1">${empNomeSeguro}</h3>
+                <p class="text-xs text-slate-500">${escaparHTML(emp.cnpj || 'CNPJ não informado')}</p>
 
                 <!-- Bloco de Contrato -->
                 <div class="mt-2.5 p-2.5 rounded-lg border ${expirado ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-slate-50 border-slate-200 text-slate-700'} text-xs space-y-0.5">
                     <div class="font-bold flex items-center justify-between">
-                        <span>Contrato: ${labelContrato}</span>
-                        <button onclick="renovarContratoEmpresa('${emp.id}', '${emp.nome}')" class="text-[11px] font-extrabold text-emerald-600 hover:underline">
+                        <span>Contrato: ${escaparHTML(labelContrato)}</span>
+                        <button data-nome="${empNomeSeguro}" onclick="renovarContratoEmpresa('${empIdSeguro}', this.getAttribute('data-nome'))" class="text-[11px] font-extrabold text-emerald-600 hover:underline">
                             + Renovar 1 Ano
                         </button>
                     </div>
-                    <div class="text-[11px] opacity-80">${infoVencimento}</div>
+                    <div class="text-[11px] opacity-80">${escaparHTML(infoVencimento)}</div>
                 </div>
 
                 <!-- Código de Convite -->
                 <div class="mt-2.5 p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                    <code class="text-[11px] font-mono text-slate-700 truncate">${emp.id}</code>
-                    <button onclick="copiarTextoSimples('${emp.id}')" class="text-xs font-bold text-blue-600 hover:underline shrink-0">Copiar ID</button>
+                    <code class="text-[11px] font-mono text-slate-700 truncate">${empIdSeguro}</code>
+                    <button onclick="copiarTextoSimples('${empIdSeguro}')" class="text-xs font-bold text-blue-600 hover:underline shrink-0">Copiar ID</button>
                 </div>
 
                 <!-- Gestor(es) Cadastrado(s) -->
@@ -118,18 +118,18 @@ function renderizarCardsEmpresasSaaS(empresas, gestores) {
 
             <div class="space-y-2 pt-3 border-t border-slate-100">
                 <div class="flex items-center gap-2">
-                    <button onclick="acessarAmbienteEmpresa('${emp.id}', '${emp.nome}')"
+                    <button data-nome="${empNomeSeguro}" onclick="acessarAmbienteEmpresa('${empIdSeguro}', this.getAttribute('data-nome'))"
                         class="flex-1 bg-[#0B1120] hover:bg-slate-800 text-white text-xs font-bold py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5">
                         <i data-lucide="eye" class="w-3.5 h-3.5 text-[#00E5B0]"></i>
                         <span>Entrar no Painel</span>
                     </button>
-                    <button onclick="alternarStatusEmpresa('${emp.id}', ${ativa})" title="${ativa ? 'Suspender Empresa' : 'Reativar Empresa'}"
+                    <button onclick="alternarStatusEmpresa('${empIdSeguro}', ${Boolean(ativa)})" title="${ativa ? 'Suspender Empresa' : 'Reativar Empresa'}"
                         class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition">
                         <i data-lucide="${ativa ? 'pause-circle' : 'play-circle'}" class="w-4 h-4 ${ativa ? 'text-amber-600' : 'text-emerald-600'}"></i>
                     </button>
                 </div>
 
-                <button onclick="abrirModalUsuarioEmpresaSaaS('${emp.id}', '${emp.nome}')"
+                <button data-nome="${empNomeSeguro}" onclick="abrirModalUsuarioEmpresaSaaS('${empIdSeguro}', this.getAttribute('data-nome'))"
                     class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5">
                     <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
                     <span>+ Criar Usuário / Gestor</span>
@@ -247,7 +247,7 @@ async function salvarUsuarioEmpresaSaaS(e) {
 
         fecharModalUsuarioEmpresaSaaS();
         e.target.reset();
-        iniciarListenerEmpresasSaaS(); // Atualiza os cards imediatamente com o novo gestor
+        iniciarListenerEmpresasSaaS();
         mostrarNotificacaoOSync(`Usuário "${nome}" (${perfil}) criado com sucesso!`, 'sucesso');
     } catch (err) {
         mostrarNotificacaoOSync('Erro ao criar usuário: ' + err.message, 'erro');
