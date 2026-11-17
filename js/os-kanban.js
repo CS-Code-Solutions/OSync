@@ -125,31 +125,38 @@ function renderizarCardsMobile(ordens) {
 }
 
 // ==========================================
-// VISÃO DESKTOP: QUADRO KANBAN COM DRAG & DROP
+// VISÃO DESKTOP: QUADRO KANBAN COM COLUNAS PADRONIZADAS
 // ==========================================
 function renderizarKanbanDesktop(ordens) {
     const board = document.getElementById('os-kanban-board');
     if (!board) return;
 
+    // Garante alinhamento uniforme e altura padronizada no container do quadro
+    board.classList.add('items-stretch', 'h-[calc(100vh-210px)]', 'min-h-[520px]');
+
     if (cacheColunasOS.length === 0) {
-        board.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 w-full text-center">Configure as colunas do Kanban na aba Configurações.</div>`;
+        board.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 w-full text-center flex items-center justify-center">Configure as colunas do Kanban na aba Configurações.</div>`;
         return;
     }
 
     board.innerHTML = cacheColunasOS.map(col => {
         const cardsColuna = ordens.filter(o => o.colunaId === col.id);
         return `
-        <div class="kanban-column rounded-xl p-3 flex flex-col gap-3 shrink-0" style="border-top: 4px solid ${col.corTopo}"
+        <div class="kanban-column w-[340px] min-w-[340px] max-w-[340px] shrink-0 h-full bg-slate-200/75 rounded-2xl border border-slate-300/80 flex flex-col overflow-hidden"
              ondragover="event.preventDefault()" ondrop="soltarCardKanban(event, '${col.id}')">
-            <div class="flex items-center justify-between px-1">
-                <h3 class="font-bold text-sm text-slate-800">${col.titulo}</h3>
-                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-white text-slate-600 border border-slate-200">${cardsColuna.length}</span>
+
+            <!-- Cabeçalho Padronizado -->
+            <div class="p-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0"
+                 style="border-top: 4px solid ${col.corTopo || '#00E5B0'}">
+                <h3 class="font-bold text-sm text-slate-800 truncate" title="${col.titulo}">${col.titulo}</h3>
+                <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">${cardsColuna.length}</span>
             </div>
 
-            <div class="space-y-2.5 min-h-[120px]">
-                ${cardsColuna.map(os => `
+            <!-- Lista de Cartões com Rolagem Interna Independente -->
+            <div class="p-3 space-y-2.5 flex-1 overflow-y-auto">
+                ${cardsColuna.length > 0 ? cardsColuna.map(os => `
                 <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${os.id}')" onclick="abrirDetalhesOS('${os.id}')"
-                     class="osync-card p-3.5 cursor-pointer" style="border-left-color: ${col.corTopo}">
+                     class="osync-card p-3.5 cursor-pointer hover:shadow-md transition" style="border-left-color: ${col.corTopo}">
                     <div class="flex items-center justify-between text-[11px] mb-1">
                         <span class="font-extrabold text-slate-500">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
                         <span class="font-bold px-2 py-0.5 rounded text-white" style="background-color: ${col.corTopo}">${col.titulo}</span>
@@ -160,7 +167,10 @@ function renderizarKanbanDesktop(ordens) {
                         <span class="font-semibold text-slate-600">${os.tipoNome || 'Geral'}</span>
                         <span class="font-semibold text-blue-700">${os.manutentorNome || 'Sem técnico'}</span>
                     </div>
-                </div>`).join('')}
+                </div>`).join('') : `
+                <div class="h-32 border-2 border-dashed border-slate-300/80 rounded-xl flex items-center justify-center text-xs text-slate-400 select-none">
+                    Arraste uma O.S. para cá
+                </div>`}
             </div>
         </div>`;
     }).join('');
@@ -193,7 +203,6 @@ async function soltarCardKanban(event, novaColunaId) {
         mostrarNotificacaoOSync(`O.S. movida para "${colDestino.titulo}".`, 'info');
     }
 }
-
 
 async function abrirModalNovaOS() {
     document.getElementById('modal-nova-os').classList.remove('hidden');
@@ -271,8 +280,9 @@ async function salvarNovaOS(e) {
 
         fecharModalNovaOS();
         e.target.reset();
+        mostrarNotificacaoOSync('Ordem de Serviço criada com sucesso!', 'sucesso');
     } catch (err) {
-        alert('Erro ao criar O.S.: ' + err.message);
+        mostrarNotificacaoOSync('Erro ao criar O.S.: ' + err.message, 'erro');
     }
 
     btn.disabled = false;
