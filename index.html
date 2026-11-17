@@ -9,6 +9,7 @@
     <style>body.auth-loading { opacity: 0; }</style>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -24,13 +25,18 @@
     <!-- CABEÇALHO SUPERIOR -->
     <header class="osync-navbar sticky top-0 z-40 px-4 h-16 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-6">
-            <a href="#" onclick="navegarPara('os')" class="flex items-center gap-2 shrink-0">
+            <a href="#" onclick="navegarPara('dashboard')" class="flex items-center gap-2 shrink-0">
                 <img src="images/cabe.png" alt="OSync" class="h-9 w-auto object-contain">
             </a>
 
             <!-- Menu Superior Desktop -->
             <nav class="hidden md:flex items-center gap-1.5" id="desktop-nav">
-                <button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                <button id="nav-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Dashboard</span>
+                </button>
+
+                <button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
                     <i data-lucide="kanban" class="w-4 h-4"></i>
                     <span>O.S.</span>
                 </button>
@@ -125,31 +131,34 @@
     </footer>
 
     <!-- MENU INFERIOR MOBILE -->
-    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-1.5 flex items-center justify-around z-40">
-        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-2">
+    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-1 flex items-center justify-around z-40">
+        <button id="mob-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5">
+            <i data-lucide="layout-dashboard" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">Painel</span>
+        </button>
+        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5">
             <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[11px] font-medium">O.S.</span>
+            <span class="text-[10px] font-medium">O.S.</span>
         </button>
-        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
+        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5">
             <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[11px] font-medium">Chamados</span>
+            <span class="text-[10px] font-medium">Chamados</span>
         </button>
-        <button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
+        <button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5">
             <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[11px] font-medium">Cadastros</span>
+            <span class="text-[10px] font-medium">Cadastros</span>
         </button>
-        <button id="mob-relatorios" onclick="abrirMenuRelatoriosMobile()" data-page="relatorios" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
+        <button id="mob-relatorios" onclick="abrirMenuRelatoriosMobile()" data-page="relatorios" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5">
             <i data-lucide="bar-chart-3" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[11px] font-medium">Relatórios</span>
+            <span class="text-[10px] font-medium">Relatórios</span>
         </button>
-        <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
+        <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5">
             <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[11px] font-medium">Config</span>
+            <span class="text-[10px] font-medium">Config</span>
         </button>
-        <!-- Botão exclusivo SuperAdmin no Mobile -->
-        <button id="mob-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2 text-[#00E5B0]">
+        <button id="mob-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1.5 text-[#00E5B0]">
             <i data-lucide="building-2" class="w-5 h-5 mb-0.5"></i>
-            <span class="text-[11px] font-bold">SaaS</span>
+            <span class="text-[10px] font-bold">SaaS</span>
         </button>
     </nav>
 
@@ -197,19 +206,20 @@
         </div>
     </div>
 
-    <script src="js/firebase-config.js?v=4"></script>
-    <script src="js/ui-alerts.js?v=4"></script>
-    <script src="js/image-utils.js?v=4"></script>
-    <script src="js/auth.js?v=4"></script>
-    <script src="js/router.js?v=4"></script>
-    <script src="js/configuracoes.js?v=4"></script>
-    <script src="js/cadastros.js?v=4"></script>
-    <script src="js/centros-custo.js?v=4"></script>
-    <script src="js/relatorios-os.js?v=4"></script>
-    <script src="js/relatorios-maquinas.js?v=4"></script>
-    <script src="js/solicitacoes.js?v=4"></script>
-    <script src="js/saas-master.js?v=4"></script>
-    <script src="js/os-kanban.js?v=4"></script>
-    <script src="js/os-execucao.js?v=4"></script>
+    <script src="js/firebase-config.js?v=5"></script>
+    <script src="js/ui-alerts.js?v=5"></script>
+    <script src="js/image-utils.js?v=5"></script>
+    <script src="js/auth.js?v=5"></script>
+    <script src="js/router.js?v=5"></script>
+    <script src="js/dashboard.js?v=5"></script>
+    <script src="js/configuracoes.js?v=5"></script>
+    <script src="js/cadastros.js?v=5"></script>
+    <script src="js/centros-custo.js?v=5"></script>
+    <script src="js/relatorios-os.js?v=5"></script>
+    <script src="js/relatorios-maquinas.js?v=5"></script>
+    <script src="js/solicitacoes.js?v=5"></script>
+    <script src="js/saas-master.js?v=5"></script>
+    <script src="js/os-kanban.js?v=5"></script>
+    <script src="js/os-execucao.js?v=5"></script>
 </body>
 </html>
