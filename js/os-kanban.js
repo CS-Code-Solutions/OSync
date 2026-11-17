@@ -170,8 +170,30 @@ async function soltarCardKanban(event, novaColunaId) {
     event.preventDefault();
     const osId = event.dataTransfer.getData('osId');
     if (!osId) return;
+
+    const os = cacheOrdensServico.find(o => o.id === osId);
+    if (!os || os.colunaId === novaColunaId) return;
+
+    // Identifica se o destino é a última coluna configurada (coluna de encerramento/conclusão)
+    const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
+    const ehColunaFinal = ultimaColuna && ultimaColuna.id === novaColunaId;
+
+    if (ehColunaFinal && !os.encerrada) {
+        // Abre o modal de detalhes e já expande o formulário de encerramento/execução
+        await abrirDetalhesOS(osId);
+        mostrarFormularioEncerramento();
+        mostrarNotificacaoOSync('Preencha o serviço realizado, custos e anexos para concluir a O.S.', 'aviso');
+        return;
+    }
+
+    // Para colunas intermediárias, apenas atualiza a etapa normalmente
     await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColunaId });
+    const colDestino = cacheColunasOS.find(c => c.id === novaColunaId);
+    if (colDestino) {
+        mostrarNotificacaoOSync(`O.S. movida para "${colDestino.titulo}".`, 'info');
+    }
 }
+
 
 async function abrirModalNovaOS() {
     document.getElementById('modal-nova-os').classList.remove('hidden');
