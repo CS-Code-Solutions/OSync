@@ -139,11 +139,12 @@ async function salvarNovoAtivo(e) {
 }
 
 async function excluirAtivo(ativoId, nome) {
-    if (!confirm(`Deseja excluir a máquina "${nome}"?`)) return;
+    if (!await confirmarAcaoOSync(`Deseja excluir a máquina <strong>"${nome}"</strong>?`, { titulo: 'Excluir Máquina', textoConfirmar: 'Excluir' })) return;
     await db.collection('ativos').doc(ativoId).delete();
     await db.collection('centros_custo').doc(ativoId).delete().catch(() => {});
     carregarAtivos();
 }
+
 
 async function abrirProntuarioAtivo(ativoId) {
     const ativo = cacheAtivos.find(a => a.id === ativoId);
@@ -751,7 +752,7 @@ async function salvarNovoUsuario(e) {
 }
 
 async function excluirUsuarioPerfil(userId, nome) {
-    if (!confirm(`Deseja realmente excluir "${nome}" da equipe?`)) return;
+    if (!await confirmarAcaoOSync(`Deseja realmente excluir <strong>"${nome}"</strong> da equipe?`, { titulo: 'Remover Colaborador', textoConfirmar: 'Excluir' })) return;
     try {
         await db.collection('usuarios').doc(userId).delete();
         carregarUsuariosPorPerfil(perfilAtualCadastro);
@@ -759,3 +760,4 @@ async function excluirUsuarioPerfil(userId, nome) {
         alert('Erro ao excluir: ' + err.message);
     }
 }
+
