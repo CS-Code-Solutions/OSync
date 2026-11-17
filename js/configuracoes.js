@@ -1,11 +1,13 @@
 let cacheColunasConfig = [];
 
 async function initConfiguracoes() {
+    await garantirTipoManutencaoExternaFixo();
     carregarSolicitacoesAcesso();
     carregarColunasConfig();
     carregarTiposConfig();
     carregarSetoresConfig();
     carregarCentrosCustoConfig();
+
     // Adicionar ou Editar Coluna
     document.getElementById('form-add-coluna')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -63,6 +65,39 @@ async function initConfiguracoes() {
         e.target.reset();
         carregarSetoresConfig();
     });
+
+    // Adicionar Centro de Custo Manual
+    document.getElementById('form-add-centro-custo')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const codigo = document.getElementById('cc-codigo').value.trim().toUpperCase();
+        const nome = document.getElementById('cc-nome').value.trim();
+
+        await db.collection('centros_custo').add({
+            empresaId: usuarioAtual.empresaId,
+            codigo,
+            nome
+        });
+
+        e.target.reset();
+        carregarCentrosCustoConfig();
+    });
+}
+
+// Garante que o tipo fixo "Manutenção Externa" exista no banco da empresa
+async function garantirTipoManutencaoExternaFixo() {
+    if (!usuarioAtual?.empresaId) return;
+    const snap = await db.collection('tipos_manutencao')
+        .where('empresaId', '==', usuarioAtual.empresaId)
+        .where('nome', '==', 'Manutenção Externa')
+        .get();
+
+    if (snap.empty) {
+        await db.collection('tipos_manutencao').add({
+            empresaId: usuarioAtual.empresaId,
+            nome: 'Manutenção Externa',
+            cor: '#8B5CF6' // Roxo distintivo
+        });
+    }
 }
 
 // ==========================================
@@ -133,7 +168,7 @@ async function recusarAcessoUsuario(userId, nome) {
 }
 
 // ==========================================
-// COLUNAS DO KANBAN (ORDEM AUTOMÁTICA, SETAS E EDIÇÃO)
+// COLUNAS DO KANBAN
 // ==========================================
 async function carregarColunasConfig() {
     const lista = document.getElementById('lista-colunas');
@@ -147,7 +182,6 @@ async function carregarColunasConfig() {
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.ordem - b.ordem);
 
-    // Define automaticamente o próximo número disponível no input de ordem
     const inputOrdem = document.getElementById('col-ordem');
     const editId = document.getElementById('col-edit-id')?.value;
     if (inputOrdem && !editId) {
@@ -165,11 +199,11 @@ async function carregarColunasConfig() {
             
             <div class="flex items-center gap-0.5 shrink-0">
                 <button type="button" onclick="moverColunaConfig(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Mover para cima"
-                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 disabled:pointer-events-none transition">
+                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 transition">
                     <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
                 </button>
                 <button type="button" onclick="moverColunaConfig(${idx}, 1)" ${idx === cacheColunasConfig.length - 1 ? 'disabled' : ''} title="Mover para baixo"
-                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 disabled:pointer-events-none transition">
+                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 transition">
                     <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
                 </button>
                 <button type="button" onclick="prepararEdicaoColuna('${col.id}')" title="Editar coluna"
@@ -191,12 +225,10 @@ async function moverColunaConfig(indexAtual, direcao) {
     const novoIndex = indexAtual + direcao;
     if (novoIndex < 0 || novoIndex >= cacheColunasConfig.length) return;
 
-    // Troca a posição dos itens na lista
     const listaReordenada = [...cacheColunasConfig];
     const [itemMovido] = listaReordenada.splice(indexAtual, 1);
     listaReordenada.splice(novoIndex, 0, itemMovido);
 
-    // Atualiza a numeração sequencial (1, 2, 3...) no Firestore em lote
     const batch = db.batch();
     listaReordenada.forEach((col, i) => {
         const ref = db.collection('kanban_colunas').doc(col.id);
@@ -244,7 +276,6 @@ async function excluirColunaConfig(colId) {
     if (!confirm('Deseja excluir esta coluna?')) return;
     await db.collection('kanban_colunas').doc(colId).delete();
 
-    // Reordena automaticamente as restantes para não ficar buraco na numeração
     const restantes = cacheColunasConfig.filter(c => c.id !== colId);
     const batch = db.batch();
     restantes.forEach((col, i) => {
@@ -259,7 +290,7 @@ async function excluirColunaConfig(colId) {
 }
 
 // ==========================================
-// TIPOS DE MANUTENÇÃO E SETORES EXECUTANTES
+// TIPOS DE MANUTENÇÃO, SETORES E CENTROS DE CUSTO
 // ==========================================
 async function carregarTiposConfig() {
     const lista = document.getElementById('lista-tipos');
@@ -273,17 +304,20 @@ async function carregarTiposConfig() {
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.nome.localeCompare(b.nome));
 
-    lista.innerHTML = tipos.map(t => `
+    lista.innerHTML = tipos.map(t => {
+        const ehFixo = t.nome === 'Manutenção Externa';
+        return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
             <div class="flex items-center gap-2.5">
                 <span class="w-3 h-3 rounded-full" style="background-color: ${t.cor}"></span>
-                <span class="text-sm font-medium text-slate-700">${t.nome}</span>
+                <span class="text-sm font-medium text-slate-700">${t.nome} ${ehFixo ? '<span class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded ml-1 font-bold">Fixo</span>' : ''}</span>
             </div>
+            ${!ehFixo ? `
             <button onclick="deletarItemConfig('tipos_manutencao', '${t.id}', carregarTiposConfig)" class="text-slate-400 hover:text-rose-600 p-1">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-        </div>
-    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum tipo cadastrado.</p>';
+            </button>` : `<span class="text-[11px] text-slate-400 italic pr-1">Sistema</span>`}
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum tipo cadastrado.</p>';
     lucide.createIcons();
 }
 
@@ -310,27 +344,6 @@ async function carregarSetoresConfig() {
     lucide.createIcons();
 }
 
-async function deletarItemConfig(colecao, id, callback) {
-    if (!confirm('Deseja excluir este item?')) return;
-    await db.collection(colecao).doc(id).delete();
-    callback();
-}
-// Listener dentro de initConfiguracoes():
-document.getElementById('form-add-centro-custo')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const codigo = document.getElementById('cc-codigo').value.trim().toUpperCase();
-    const nome = document.getElementById('cc-nome').value.trim();
-
-    await db.collection('centros_custo').add({
-        empresaId: usuarioAtual.empresaId,
-        codigo,
-        nome
-    });
-
-    e.target.reset();
-    carregarCentrosCustoConfig();
-});
-
 async function carregarCentrosCustoConfig() {
     const lista = document.getElementById('lista-centros-custo');
     if (!lista) return;
@@ -355,4 +368,10 @@ async function carregarCentrosCustoConfig() {
         </div>
     `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum centro de custo cadastrado.</p>';
     lucide.createIcons();
+}
+
+async function deletarItemConfig(colecao, id, callback) {
+    if (!confirm('Deseja excluir este item?')) return;
+    await db.collection(colecao).doc(id).delete();
+    callback();
 }
