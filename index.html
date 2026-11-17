@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>OSync | Gestão de Manutenção</title>
     <link rel="icon" type="image/png" href="images/ico.png">
     <link rel="manifest" href="manifest.json">
@@ -133,7 +134,7 @@
 
     <!-- RODAPÉ DESKTOP -->
     <footer class="hidden md:block bg-[#0B1120] text-slate-400 text-xs py-3.5 text-center border-t border-slate-800">
-        © 2026 OSync • <a href="pages/privacidade.html" class="hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a> | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
+        © 2026 OSync • <a href="pages/privacidade.html" class="hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a> | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
     </footer>
 
     <!-- MENU INFERIOR MOBILE (5 ITENS OTIMIZADOS) -->
@@ -260,17 +261,6 @@
             </div>
         </div>
     </div>
-
-    <!-- SCRIPT DE CONTROLE DA GAVETA DO MENU GERAL -->
-    <script>
-        function abrirMenuGeralMobile() {
-            document.getElementById('mobile-menu-drawer')?.classList.remove('hidden');
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-        function fecharMenuGeralMobile() {
-            document.getElementById('mobile-menu-drawer')?.classList.add('hidden');
-        }
-    </script>
 
     <!-- MODAL GLOBAL: PRONTUÁRIO & AÇÕES RÁPIDAS VIA QR CODE DA MÁQUINA -->
     <div id="modal-qr-maquina-global" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[70] flex items-center justify-center p-3 sm:p-4">
@@ -413,13 +403,5 @@
     <script src="js/saas-master.js?v=7"></script>
     <script src="js/os-kanban.js?v=7"></script>
     <script src="js/os-execucao.js?v=7"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .catch((err) => console.warn('Aviso SW:', err));
-            });
-        }
-    </script>
 </body>
 </html>
