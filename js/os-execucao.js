@@ -2,6 +2,27 @@ let anexosOSAtual = [];
 let itensCustoOSAtual = [];
 let cacheCentrosCustoOS = [];
 let osAtualEhExterna = false;
+let osAtualTeveParada = false;
+
+function calcularMinutosParadaEntreDatas(inicioISO, terminoISO) {
+    if (!inicioISO || !terminoISO) return 0;
+    const d1 = new Date(inicioISO);
+    const d2 = new Date(terminoISO);
+    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
+    return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / 60000));
+}
+
+function recalcularTempoParadaEncerramento() {
+    const ini = document.getElementById('enc-inicio-parada')?.value || '';
+    const fim = document.getElementById('enc-termino-parada')?.value || '';
+    const badge = document.getElementById('enc-tempo-parada-calculado');
+    if (!badge) return;
+
+    const mins = calcularMinutosParadaEntreDatas(ini, fim);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
+}
 
 async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
@@ -9,6 +30,7 @@ async function abrirDetalhesOS(osId) {
 
     const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
     osAtualEhExterna = (os.tipoNome || '').trim().toLowerCase() === 'manutenção externa';
+    osAtualTeveParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true || Boolean(os.inicioParada);
 
     document.getElementById('det-os-id').value = os.id;
     document.getElementById('det-os-numero').textContent = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
@@ -16,6 +38,22 @@ async function abrirDetalhesOS(osId) {
     const badge = document.getElementById('det-os-status-badge');
     badge.textContent = coluna.titulo;
     badge.style.backgroundColor = coluna.corTopo || '#00E5B0';
+
+    // Badge de condição da máquina no cabeçalho do modal
+    const condBadge = document.getElementById('det-os-condicao-badge');
+    if (condBadge) {
+        if (osAtualTeveParada) {
+            condBadge.textContent = 'Máquina Parada';
+            condBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-600 text-white';
+            condBadge.classList.remove('hidden');
+        } else if (os.condicaoMaquina === 'Parcialmente funcional') {
+            condBadge.textContent = 'Parcialmente Funcional';
+            condBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500 text-white';
+            condBadge.classList.remove('hidden');
+        } else {
+            condBadge.classList.add('hidden');
+        }
+    }
 
     document.getElementById('det-os-maquina').textContent = `${os.ativoTag} - ${os.ativoNome}`;
     document.getElementById('det-os-tipo').textContent = os.tipoNome || 'Manutenção';
@@ -38,7 +76,6 @@ async function abrirDetalhesOS(osId) {
         manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}" ${d.id === os.manutentorId ? 'selected' : ''}>${d.data().nome}</option>`).join('');
     selManut.disabled = usuarioAtual.perfil === 'Manutentor';
 
-    // Cada Máquina (Ativo) é um Centro de Custo e já vem pré-selecionada
     cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const selCC = document.getElementById('item-custo-cc');
     if (selCC) {
@@ -50,10 +87,8 @@ async function abrirDetalhesOS(osId) {
         }).join('') || `<option value="${labelPadraoOS}" selected>${labelPadraoOS}</option>`;
     }
 
-    // Adapta o bloco de custos conforme o tipo de manutenção (Interna vs. Externa)
     aplicarLayoutCustosPorTipo(osAtualEhExterna);
 
-    // Carrega dados de encerramento se já existirem
     anexosOSAtual = Array.isArray(os.anexos) ? [...os.anexos] : [];
     itensCustoOSAtual = Array.isArray(os.itensCusto) ? [...os.itensCusto] : [];
 
@@ -62,7 +97,36 @@ async function abrirDetalhesOS(osId) {
 
     const agora = new Date();
     agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-    document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agora.toISOString().slice(0, 16);
+    const agoraISO = agora.toISOString().slice(0, 16);
+    document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agoraISO;
+
+    // Configura bloco de Início e Término da Parada de Máquina
+    const blocoParada = document.getElementById('bloco-encerramento-parada');
+    const inpIniParada = document.getElementById('enc-inicio-parada');
+    const inpFimParada = document.getElementById('enc-termino-parada');
+    if (blocoParada && inpIniParada && inpFimParada) {
+        if (osAtualTeveParada) {
+            blocoParada.classList.remove('hidden');
+            inpIniParada.required = true;
+            inpFimParada.required = true;
+
+            let inicioPadrao = os.inicioParada;
+            if (!inicioPadrao && os.criadoEm?.toDate) {
+                const dCriado = os.criadoEm.toDate();
+                dCriado.setMinutes(dCriado.getMinutes() - dCriado.getTimezoneOffset());
+                inicioPadrao = dCriado.toISOString().slice(0, 16);
+            }
+            inpIniParada.value = inicioPadrao || agoraISO;
+            inpFimParada.value = os.terminoParada || agoraISO;
+            recalcularTempoParadaEncerramento();
+        } else {
+            blocoParada.classList.add('hidden');
+            inpIniParada.required = false;
+            inpFimParada.required = false;
+            inpIniParada.value = '';
+            inpFimParada.value = '';
+        }
+    }
 
     renderizarAnexosOS();
     renderizarItensCustoOS();
@@ -94,7 +158,6 @@ function aplicarLayoutCustosPorTipo(ehExterna) {
         inputDesc.placeholder = 'Descrição do serviço externo / Fornecedor';
         inputDesc.className = 'sm:col-span-7 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-purple-600';
 
-        // Esconde o select de Centro de Custo (já vai automático para a máquina da O.S.)
         selCC.classList.add('hidden');
 
         wrapperValor.className = 'sm:col-span-5 flex gap-1.5';
@@ -162,9 +225,6 @@ async function atualizarManutentorRapidoOS() {
     });
 }
 
-// ==========================================
-// ANEXOS OTIMIZADOS (COMPACTAÇÃO + URL)
-// ==========================================
 async function processarUploadFotosOS(event) {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
@@ -212,9 +272,6 @@ function removerAnexoOS(idx) {
     renderizarAnexosOS();
 }
 
-// ==========================================
-// ITENS DE CUSTO & CENTROS DE CUSTO
-// ==========================================
 function adicionarItemCustoOS() {
     const osId = document.getElementById('det-os-id').value;
     const os = cacheOrdensServico.find(o => o.id === osId);
@@ -292,7 +349,29 @@ async function confirmarEncerramentoOS(e) {
         const os = cacheOrdensServico.find(o => o.id === osId);
         const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
 
-        // Caso o usuário tenha digitado o valor do serviço/item e esquecido de clicar no "+"
+        // Valida datas de parada de máquina se aplicável
+        let inicioParada = '';
+        let terminoParada = '';
+        let tempoParadaMinutos = 0;
+
+        if (osAtualTeveParada) {
+            inicioParada = document.getElementById('enc-inicio-parada')?.value || '';
+            terminoParada = document.getElementById('enc-termino-parada')?.value || '';
+            if (!inicioParada || !terminoParada) {
+                alert('Informe a data/hora de início e término da parada da máquina.');
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Encerramento';
+                return;
+            }
+            if (new Date(terminoParada) < new Date(inicioParada)) {
+                alert('O término da parada não pode ser anterior ao início da parada.');
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Encerramento';
+                return;
+            }
+            tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
+        }
+
         const descPendente = document.getElementById('item-custo-desc')?.value.trim();
         const valorPendente = parseFloat(document.getElementById('item-custo-valor')?.value) || 0;
         if (valorPendente > 0) {
@@ -325,6 +404,12 @@ async function confirmarEncerramentoOS(e) {
             encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
         };
 
+        if (osAtualTeveParada) {
+            dadosAtualizacao.inicioParada = inicioParada;
+            dadosAtualizacao.terminoParada = terminoParada;
+            dadosAtualizacao.tempoParadaMinutos = tempoParadaMinutos;
+        }
+
         if (ultimaColuna) {
             dadosAtualizacao.colunaId = ultimaColuna.id;
         }
@@ -333,6 +418,19 @@ async function confirmarEncerramentoOS(e) {
 
         if (os?.ativoId) {
             await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
+        }
+
+        // Atualiza a solicitação vinculada (se existir) para avisar o solicitante que a O.S. foi encerrada
+        if (os?.solicitacaoId) {
+            await db.collection('solicitacoes').doc(os.solicitacaoId).update({
+                status: 'Encerrada',
+                osId: osId,
+                numeroOs: os.numeroOs || 0,
+                servicoRealizado,
+                encerradoPor: usuarioAtual.nome,
+                dataHoraEncerramento,
+                encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
         }
 
         fecharModalDetalhesOS();
