@@ -198,11 +198,18 @@
                 const email = document.getElementById('reg-email').value.trim();
                 const senha = document.getElementById('reg-senha').value;
 
-                // 1. Verifica se o Código da Empresa existe
-                const empresaDoc = await db.collection('empresas').doc(empresaId).get();
-                if (!empresaDoc.exists) {
-                    throw new Error('Código da Empresa inválido. Solicite o código correto ao gestor.');
-                }
+ // 1. Verifica se o Código da Empresa existe
+let empresaDoc;
+try {
+    empresaDoc = await db.collection('empresas').doc(empresaId).get();
+} catch (errConsulta) {
+    throw new Error('Permissão bloqueada ao validar empresa (verifique allow get: if true no Firestore).');
+}
+
+if (!empresaDoc.exists) {
+    throw new Error('Código da Empresa não encontrado no banco. Confira o ID com o gestor.');
+}
+
 
                 // 2. Cria credencial no Auth
                 const cred = await auth.createUserWithEmailAndPassword(email, senha);
