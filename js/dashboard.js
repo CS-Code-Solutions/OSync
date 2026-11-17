@@ -8,7 +8,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
     {
         id: 'kpis_principais',
         titulo: 'Cartões de Resumo (KPIs)',
-        descricao: 'O.S. em aberto, disponibilidade da frota, chamados e custo total.',
+        descricao: 'O.S. em aberto, disponibilidade, tempo de máquina parada e custo total.',
         categoria: 'Indicadores',
         ativo: true,
         ordem: 1
@@ -22,12 +22,20 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         ordem: 2
     },
     {
+        id: 'grafico_horas_paradas_mensais',
+        titulo: 'Gráfico: Horas de Máquina Parada (6 Meses)',
+        descricao: 'Tempo total de indisponibilidade por manutenção mês a mês.',
+        categoria: 'Confiabilidade',
+        ativo: true,
+        ordem: 3
+    },
+    {
         id: 'grafico_tipos_manutencao',
         titulo: 'Gráfico: O.S. por Tipo de Manutenção',
         descricao: 'Distribuição entre Corretiva, Preventiva, Manutenção Externa, etc.',
         categoria: 'Operacional',
         ativo: true,
-        ordem: 3
+        ordem: 4
     },
     {
         id: 'grafico_top_maquinas_custo',
@@ -35,7 +43,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Equipamentos que geraram maior investimento no período.',
         categoria: 'Centros de Custo',
         ativo: true,
-        ordem: 4
+        ordem: 5
     },
     {
         id: 'grafico_top_maquinas_os',
@@ -43,7 +51,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Ranking de reincidência de manutenções por equipamento.',
         categoria: 'Confiabilidade',
         ativo: true,
-        ordem: 5
+        ordem: 6
     },
     {
         id: 'grafico_produtividade_tecnicos',
@@ -51,7 +59,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'O.S. concluídas vs. em andamento por técnico.',
         categoria: 'Equipe',
         ativo: false,
-        ordem: 6
+        ordem: 7
     },
     {
         id: 'grafico_status_kanban',
@@ -59,7 +67,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Quantidade de ordens distribuídas em cada coluna do quadro.',
         categoria: 'Fluxo',
         ativo: false,
-        ordem: 7
+        ordem: 8
     },
     {
         id: 'lista_maquinas_paradas',
@@ -67,7 +75,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Lista rápida dos equipamentos que não estão operacionais agora.',
         categoria: 'Alertas',
         ativo: true,
-        ordem: 8
+        ordem: 9
     },
     {
         id: 'lista_os_urgentes',
@@ -75,11 +83,30 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Ordens de prioridade Urgente aguardando conclusão.',
         categoria: 'Alertas',
         ativo: true,
-        ordem: 9
+        ordem: 10
     }
 ];
 
 let layoutWidgetsAtual = [];
+
+function calcularMinutosParadaDash(os) {
+    if (Number(os.tempoParadaMinutos) > 0) return Number(os.tempoParadaMinutos);
+    if (os.inicioParada && os.terminoParada) {
+        const d1 = new Date(os.inicioParada);
+        const d2 = new Date(os.terminoParada);
+        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
+            return Math.round((d2.getTime() - d1.getTime()) / 60000);
+        }
+    }
+    return 0;
+}
+
+function formatarHorasParadasDash(minutos) {
+    const mins = Math.max(0, Math.round(Number(minutos) || 0));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m`;
+}
 
 async function initDashboard() {
     await carregarPreferenciasLayoutDashboard();
@@ -92,7 +119,6 @@ async function carregarPreferenciasLayoutDashboard() {
         const doc = await db.collection('dashboard_config').doc(usuarioAtual.empresaId).get();
         if (doc.exists && Array.isArray(doc.data().widgets)) {
             const salvos = doc.data().widgets;
-            // Mescla com catálogo para garantir que novos widgets futuros também apareçam
             layoutWidgetsAtual = CATALOGO_WIDGETS_DASHBOARD.map(padrao => {
                 const encontrado = salvos.find(s => s.id === padrao.id);
                 return encontrado ? { ...padrao, ativo: encontrado.ativo, ordem: encontrado.ordem } : { ...padrao };
@@ -129,6 +155,7 @@ async function carregarDadosBrutosDashboard() {
 
 function extrairDataISODash(os) {
     if (os.dataHoraEncerramento) return os.dataHoraEncerramento.slice(0, 10);
+    if (os.inicioParada) return os.inicioParada.slice(0, 10);
     if (os.criadoEm?.toDate) return os.criadoEm.toDate().toISOString().slice(0, 10);
     return new Date().toISOString().slice(0, 10);
 }
@@ -188,7 +215,6 @@ function renderizarWidgetsDashboard() {
 
     const ordensFiltradas = obterOrdensFiltradasDashboard();
 
-    // Monta estrutura HTML respeitando a ordem escolhida (agrupando gráficos/listas em grid de 2 colunas)
     let htmlFinal = '';
     let bufferGrid = [];
 
@@ -211,9 +237,9 @@ function renderizarWidgetsDashboard() {
     container.innerHTML = htmlFinal;
     lucide.createIcons();
 
-    // Renderiza os gráficos Chart.js e listas após inserir o HTML no DOM
     ativosOrdenados.forEach(w => {
         if (w.id === 'grafico_custos_mensais') montarGraficoCustosMensais();
+        if (w.id === 'grafico_horas_paradas_mensais') montarGraficoHorasParadasMensais();
         if (w.id === 'grafico_tipos_manutencao') montarGraficoTiposManutencao(ordensFiltradas);
         if (w.id === 'grafico_top_maquinas_custo') montarGraficoTopMaquinasCusto(ordensFiltradas);
         if (w.id === 'grafico_top_maquinas_os') montarGraficoTopMaquinasOS(ordensFiltradas);
@@ -232,6 +258,9 @@ function construirHTML_KPIs(ordens) {
     const concluidas = ordens.filter(o => o.encerrada).length;
     const custoTotal = ordens.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
 
+    const totalMinutosParados = ordens.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
+    const qtdOSComParada = ordens.filter(o => calcularMinutosParadaDash(o) > 0 || o.maquinaParada || o.condicaoMaquina === 'Maquina parada').length;
+
     const totalMaquinas = cacheDashAtivos.length;
     const operacionais = cacheDashAtivos.filter(a => a.status === 'Operacional').length;
     const disponibilidade = totalMaquinas > 0 ? Math.round((operacionais / totalMaquinas) * 100) : 100;
@@ -239,7 +268,7 @@ function construirHTML_KPIs(ordens) {
     const chamadosPendentes = cacheDashSolicitacoes.filter(s => s.status === 'Pendente').length;
 
     return `
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="osync-card p-5 border-l-4 border-l-blue-600">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase text-slate-400">O.S. no Período</span>
@@ -249,13 +278,22 @@ function construirHTML_KPIs(ordens) {
             <p class="text-[11px] text-slate-500 mt-1"><strong>${abertas}</strong> em aberto • <strong>${concluidas}</strong> concluídas</p>
         </div>
 
+        <div class="osync-card p-5 border-l-4 border-l-rose-600">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase text-slate-400">Máquina Parada</span>
+                <i data-lucide="clock" class="w-4 h-4 text-rose-600"></i>
+            </div>
+            <div class="text-2xl font-extrabold text-rose-600 mt-1.5">${formatarHorasParadasDash(totalMinutosParados)}</div>
+            <p class="text-[11px] text-slate-500 mt-1"><strong>${qtdOSComParada}</strong> parada(s) por manutenção</p>
+        </div>
+
         <div class="osync-card p-5 border-l-4 border-l-emerald-500">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase text-slate-400">Disponibilidade de Ativos</span>
+                <span class="text-xs font-bold uppercase text-slate-400">Disponibilidade</span>
                 <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
             </div>
             <div class="text-2xl font-extrabold text-emerald-700 mt-1.5">${disponibilidade}%</div>
-            <p class="text-[11px] text-slate-500 mt-1"><strong>${operacionais}</strong> de <strong>${totalMaquinas}</strong> máquinas operacionais</p>
+            <p class="text-[11px] text-slate-500 mt-1"><strong>${operacionais}</strong> de <strong>${totalMaquinas}</strong> operacionais</p>
         </div>
 
         <div class="osync-card p-5 border-l-4 border-l-amber-500">
@@ -264,7 +302,7 @@ function construirHTML_KPIs(ordens) {
                 <i data-lucide="bell-ring" class="w-4 h-4 text-amber-500"></i>
             </div>
             <div class="text-2xl font-extrabold text-slate-900 mt-1.5">${chamadosPendentes}</div>
-            <p class="text-[11px] text-slate-500 mt-1">Aguardando aprovação ou abertura de O.S.</p>
+            <p class="text-[11px] text-slate-500 mt-1">Aguardando abertura de O.S.</p>
         </div>
 
         <div class="osync-card p-5 border-l-4 border-l-purple-600">
@@ -328,6 +366,46 @@ function montarGraficoCustosMensais() {
                 label: 'Custo Total (R$)',
                 data: valores,
                 backgroundColor: '#00E5B0',
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function montarGraficoHorasParadasMensais() {
+    const ctx = document.getElementById('canvas-grafico_horas_paradas_mensais');
+    if (!ctx) return;
+
+    const meses = [];
+    const horas = [];
+    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        meses.push(`${nomesMeses[d.getMonth()]}/${String(d.getFullYear()).slice(-2)}`);
+
+        const somaMinutos = cacheDashOrdens
+            .filter(o => o.dataISO && o.dataISO.startsWith(chave))
+            .reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
+        horas.push(Number((somaMinutos / 60).toFixed(2)));
+    }
+
+    instanciasGraficosDash['grafico_horas_paradas_mensais'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: meses,
+            datasets: [{
+                label: 'Horas Paradas (h)',
+                data: horas,
+                backgroundColor: '#E11D48',
                 borderRadius: 8
             }]
         },
