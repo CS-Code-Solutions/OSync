@@ -1,0 +1,64 @@
+<div class="space-y-6">
+    <!-- Cabeçalho -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <span class="text-[11px] font-extrabold uppercase tracking-widest text-[#00B88D]">Controle Financeiro por Ativo</span>
+            <h1 class="text-2xl font-bold text-slate-900">Centros de Custo (Máquinas)</h1>
+            <p class="text-sm text-slate-500">Cada ativo cadastrado atua como um centro de custo individual para apuração de gastos de manutenção.</p>
+        </div>
+        <button onclick="gerarRelatorioCentroCustoPDF('geral')" class="bg-[#0B1120] hover:bg-slate-800 text-white font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-[#00E5B0]"></i>
+            <span>Relatório Geral (PDF)</span>
+        </button>
+    </div>
+
+    <!-- Cards de Resumo Financeiro -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="osync-card p-4" style="border-left-color: #00E5B0">
+            <span class="text-xs font-semibold text-slate-500 uppercase">Custo Total Filtrado</span>
+            <p id="cc-resumo-total" class="text-2xl font-extrabold text-slate-900 mt-1">R$ 0,00</p>
+        </div>
+        <div class="osync-card p-4" style="border-left-color: #1D4ED8">
+            <span class="text-xs font-semibold text-slate-500 uppercase">O.S. com Custos Apurados</span>
+            <p id="cc-resumo-qtd" class="text-2xl font-extrabold text-slate-900 mt-1">0</p>
+        </div>
+        <div class="osync-card p-4" style="border-left-color: #F59E0B">
+            <span class="text-xs font-semibold text-slate-500 uppercase">Máquina Maior Custo</span>
+            <p id="cc-resumo-top" class="text-base font-extrabold text-slate-900 mt-2 truncate">-</p>
+        </div>
+    </div>
+
+    <!-- Barra de Filtros -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="lg:col-span-2">
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Buscar Máquina / TAG</label>
+            <input type="text" id="filtro-cc-busca" oninput="renderizarCentrosCusto()" placeholder="Ex: TR-01, Torno, Prensa..."
+                class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+        </div>
+
+        <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Setor</label>
+            <select id="filtro-cc-setor" onchange="renderizarCentrosCusto()"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                <option value="">Todos Setores</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Data Inicial</label>
+            <input type="date" id="filtro-cc-inicio" onchange="renderizarCentrosCusto()"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+        </div>
+
+        <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Data Final</label>
+            <input type="date" id="filtro-cc-fim" onchange="renderizarCentrosCusto()"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+        </div>
+    </div>
+
+    <!-- Lista de Centros de Custo (1 Card por Máquina) -->
+    <div id="lista-centros-custo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Renderizado via js/centros-custo.js -->
+    </div>
+</div>
