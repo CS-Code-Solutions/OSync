@@ -1,52 +1,53 @@
 <div class="space-y-6">
-    <!-- Cabeçalho da Página -->
     <div>
         <h1 class="text-2xl font-bold text-slate-900">Configurações do Sistema</h1>
-    <!-- BLOCO DE CÓDIGO DA EMPRESA E APROVAÇÕES PENDENTES -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Cartão: Código de Convite da Empresa -->
-        <div class="bg-[#0B1120] text-white rounded-xl shadow-sm border-2 border-[#00E5B0]/40 p-5 flex flex-col justify-between">
+        <p class="text-sm text-slate-500">Gerencie convites da equipe, colunas do quadro Kanban, tipos de manutenção e setores executantes.</p>
+    </div>
+
+    <!-- BLOCO DE CONVITE DA EMPRESA E APROVAÇÕES PENDENTES -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Código da Empresa -->
+        <div class="lg:col-span-5 bg-[#0B1120] text-white p-6 rounded-2xl border border-slate-800 shadow-lg flex flex-col justify-between">
             <div>
                 <span class="text-[11px] font-bold uppercase tracking-wider text-[#00E5B0]">Código da Empresa</span>
-                <h3 class="text-base font-bold mt-1">Convite para Equipe</h3>
+                <h2 class="text-lg font-bold mt-1">Convite para Equipe</h2>
                 <p class="text-xs text-slate-400 mt-1">Envie este código para manutentores e líderes solicitarem cadastro na tela de login.</p>
             </div>
+
             <div class="mt-4 flex items-center gap-2">
                 <input type="text" id="config-codigo-empresa" readonly value="Carregando..."
-                    class="flex-1 px-3 py-2 bg-[#131C31] border border-slate-700 rounded-lg text-xs font-mono text-[#00E5B0] outline-none">
-                <button type="button" onclick="copiarCodigoEmpresa()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 transition">
-                    <i data-lucide="copy" class="w-4 h-4"></i> Copiar
+                    class="w-full px-3.5 py-2.5 bg-[#131C31] border border-slate-700 rounded-xl text-xs font-mono text-[#00E5B0] outline-none">
+                <button type="button" onclick="copiarCodigoEmpresa()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shrink-0 transition flex items-center gap-1.5">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    <span>Copiar</span>
                 </button>
             </div>
         </div>
 
-        <!-- Cartão: Solicitações de Acesso Pendentes -->
-        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="user-check" class="w-5 h-5 text-amber-500"></i>
-                    <h2 class="font-bold text-slate-800">Solicitações de Acesso Pendentes</h2>
-                </div>
-                <span id="badge-qtd-pendentes" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700">0</span>
+        <!-- Solicitações de Cadastro Pendentes -->
+        <div class="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="user-plus" class="w-5 h-5 text-amber-500"></i>
+                    <span>Solicitações de Cadastro Pendentes</span>
+                </h2>
+                <span id="badge-qtd-pendentes" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700">0</span>
             </div>
+
             <div id="lista-acessos-pendentes" class="space-y-2 max-h-48 overflow-y-auto">
-                <!-- Preenchido via JS -->
+                <p class="text-xs text-slate-400 text-center py-4">Nenhuma solicitação pendente no momento.</p>
             </div>
         </div>
     </div>
 
-        <p class="text-sm text-slate-500">Gerencie colunas do quadro Kanban, tipos de manutenção e setores executantes.</p>
-    </div>
-
-    <!-- Grid de 3 Blocos de Configuração -->
+    <!-- GRID DE 3 COLUNAS: KANBAN, TIPOS E SETORES -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-                  <!-- BLOCO 1: COLUNAS DO KANBAN -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+        <!-- 1. COLUNAS DO KANBAN -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col">
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
                 <i data-lucide="columns" class="w-5 h-5 text-blue-600"></i>
-                <h2 class="font-bold text-slate-800">Colunas do Kanban (O.S.)</h2>
-            </div>
+                <span>Colunas do Kanban (O.S.)</span>
+            </h2>
 
             <form id="form-add-coluna" class="space-y-3 mb-4">
                 <input type="hidden" id="col-edit-id" value="">
@@ -69,79 +70,49 @@
                 </div>
             </form>
 
-            <div id="lista-colunas" class="space-y-2 flex-1 overflow-y-auto max-h-72">
-                <!-- Preenchido via JS -->
-            </div>
+            <div id="lista-colunas" class="space-y-2 flex-1 overflow-y-auto max-h-80"></div>
         </div>
 
-
-
-        <!-- BLOCO 2: TIPOS DE MANUTENÇÃO -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-                <i data-lucide="tag" class="w-5 h-5 text-[#00B88D]"></i>
-                <h2 class="font-bold text-slate-800">Tipos de Manutenção</h2>
-            </div>
+        <!-- 2. TIPOS DE MANUTENÇÃO -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col">
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
+                <i data-lucide="tags" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span>Tipos de Manutenção</span>
+            </h2>
 
             <form id="form-add-tipo" class="space-y-3 mb-4">
-                <div class="flex gap-2">
-                    <input type="text" id="tipo-nome" required placeholder="Ex: Corretiva, Preventiva..."
-                        class="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
-                    <input type="color" id="tipo-cor" value="#00E5B0" title="Cor da Etiqueta"
-                        class="w-10 h-9 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="tipo-nome" required placeholder="Ex: Preventiva, Corretiva..."
+                        class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
+                    <input type="color" id="tipo-cor" value="#00E5B0" title="Cor da etiqueta"
+                        class="w-10 h-10 shrink-0 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer">
                 </div>
                 <button type="submit" class="w-full bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
-                    <i data-lucide="plus" class="w-4 h-4"></i> Adicionar Tipo
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Adicionar Tipo</span>
                 </button>
             </form>
 
-            <div id="lista-tipos" class="space-y-2 flex-1 overflow-y-auto max-h-72">
-                <!-- Preenchido via JS -->
-            </div>
+            <div id="lista-tipos" class="space-y-2 flex-1 overflow-y-auto max-h-80"></div>
         </div>
 
-        <!-- BLOCO 3: SETORES EXECUTANTES -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+        <!-- 3. SETORES EXECUTANTES -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col">
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
                 <i data-lucide="layers" class="w-5 h-5 text-slate-700"></i>
-                <h2 class="font-bold text-slate-800">Setores Executantes</h2>
-            </div>
+                <span>Setores Executantes</span>
+            </h2>
 
             <form id="form-add-setor" class="space-y-3 mb-4">
                 <input type="text" id="setor-nome" required placeholder="Ex: Mecânica, Elétrica, Predial..."
                     class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
                 <button type="submit" class="w-full bg-[#0B1120] hover:bg-slate-800 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
-                    <i data-lucide="plus" class="w-4 h-4 text-[#00E5B0]"></i> Adicionar Setor
+                    <i data-lucide="plus" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span>Adicionar Setor</span>
                 </button>
             </form>
 
-            <div id="lista-setores" class="space-y-2 flex-1 overflow-y-auto max-h-72">
-                <!-- Preenchido via JS -->
-            </div>
+            <div id="lista-setores" class="space-y-2 flex-1 overflow-y-auto max-h-80"></div>
         </div>
-
     </div>
 </div>
-        <!-- BLOCO 4: CENTROS DE CUSTO -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-                <i data-lucide="wallet" class="w-5 h-5 text-emerald-600"></i>
-                <h2 class="font-bold text-slate-800">Centros de Custo</h2>
-            </div>
-
-            <form id="form-add-centro-custo" class="space-y-3 mb-4">
-                <div class="flex gap-2">
-                    <input type="text" id="cc-codigo" required placeholder="Cód. (Ex: CC-01)"
-                        class="w-28 shrink-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
-                    <input type="text" id="cc-nome" required placeholder="Ex: Linha de Produção 1"
-                        class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
-                </div>
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
-                    <i data-lucide="plus" class="w-4 h-4"></i> Adicionar Centro de Custo
-                </button>
-            </form>
-
-            <div id="lista-centros-custo" class="space-y-2 flex-1 overflow-y-auto max-h-72">
-                <!-- Preenchido via JS -->
-            </div>
-        </div>
