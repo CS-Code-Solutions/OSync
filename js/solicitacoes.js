@@ -44,6 +44,7 @@ function renderizarSolicitacoes(lista) {
     const isGestor = usuarioAtual.perfil === 'Admin' || usuarioAtual.perfil === 'SuperAdmin';
 
     grid.innerHTML = lista.map(sol => {
+        const solIdSeguro = escaparHTML(sol.id);
         const statusNorm = (sol.status || 'Pendente').trim();
         const pendente = statusNorm === 'Pendente';
         const emAtendimento = statusNorm === 'Convertida em O.S.';
@@ -75,13 +76,13 @@ function renderizarSolicitacoes(lista) {
             <div>
                 <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${badgeClasse}">
-                        ${labelStatus}
+                        ${escaparHTML(labelStatus)}
                     </span>
                     ${sol.maquinaParada && !encerrada && !cancelada ? '<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-600 text-white animate-pulse">Máquina Parada</span>' : ''}
                 </div>
-                <h4 class="font-bold text-slate-900 text-sm">${sol.ativoTag} - ${sol.ativoNome}</h4>
-                <p class="text-xs text-slate-600 mt-1">${sol.problema}</p>
-                <span class="text-[11px] text-slate-400 block mt-2">Solicitante: <strong>${sol.solicitanteNome}</strong> (${sol.setor || 'Produção'})</span>
+                <h4 class="font-bold text-slate-900 text-sm">${escaparHTML(sol.ativoTag)} - ${escaparHTML(sol.ativoNome)}</h4>
+                <p class="text-xs text-slate-600 mt-1">${escaparHTML(sol.problema)}</p>
+                <span class="text-[11px] text-slate-400 block mt-2">Solicitante: <strong>${escaparHTML(sol.solicitanteNome)}</strong> (${escaparHTML(sol.setor || 'Produção')})</span>
 
                 ${encerrada ? `
                 <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-1">
@@ -89,9 +90,9 @@ function renderizarSolicitacoes(lista) {
                         <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
                         <span>Chamado Concluído pela Manutenção</span>
                     </div>
-                    ${sol.servicoRealizado ? `<p class="text-emerald-900"><strong>Serviço realizado:</strong> ${sol.servicoRealizado}</p>` : ''}
+                    ${sol.servicoRealizado ? `<p class="text-emerald-900"><strong>Serviço realizado:</strong> ${escaparHTML(sol.servicoRealizado)}</p>` : ''}
                     <p class="text-[11px] text-emerald-700">
-                        Encerrado por <strong>${sol.encerradoPor || 'Manutenção'}</strong>${sol.dataHoraEncerramento ? ` em ${formatarDataHoraSolicitacaoBR(sol.dataHoraEncerramento)}` : ''}
+                        Encerrado por <strong>${escaparHTML(sol.encerradoPor || 'Manutenção')}</strong>${sol.dataHoraEncerramento ? ` em ${escaparHTML(formatarDataHoraSolicitacaoBR(sol.dataHoraEncerramento))}` : ''}
                     </p>
                 </div>` : ''}
 
@@ -101,21 +102,21 @@ function renderizarSolicitacoes(lista) {
                         <i data-lucide="x-circle" class="w-4 h-4 text-rose-600 shrink-0"></i>
                         <span>Chamado Cancelado pela Gestão</span>
                     </div>
-                    <p class="text-rose-900"><strong>Motivo:</strong> ${sol.motivoCancelamento || 'Cancelado pela gestão de manutenção.'}</p>
+                    <p class="text-rose-900"><strong>Motivo:</strong> ${escaparHTML(sol.motivoCancelamento || 'Cancelado pela gestão de manutenção.')}</p>
                     ${sol.canceladoPor ? `
                     <p class="text-[11px] text-rose-700">
-                        Cancelado por <strong>${sol.canceladoPor}</strong>${sol.dataHoraCancelamento ? ` em ${formatarDataHoraSolicitacaoBR(sol.dataHoraCancelamento)}` : ''}
+                        Cancelado por <strong>${escaparHTML(sol.canceladoPor)}</strong>${sol.dataHoraCancelamento ? ` em ${escaparHTML(formatarDataHoraSolicitacaoBR(sol.dataHoraCancelamento))}` : ''}
                     </p>` : ''}
                 </div>` : ''}
             </div>
 
             ${isGestor && (pendente || emAtendimento) ? `
             <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                <button onclick="abrirModalCancelarSolicitacao('${sol.id}')" class="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition flex items-center gap-1">
+                <button onclick="abrirModalCancelarSolicitacao('${solIdSeguro}')" class="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition flex items-center gap-1">
                     <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> Cancelar
                 </button>
                 ${pendente ? `
-                <button onclick="aprovarEConverterEmOS('${sol.id}')" class="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center gap-1.5 transition">
+                <button onclick="aprovarEConverterEmOS('${solIdSeguro}')" class="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center gap-1.5 transition">
                     <i data-lucide="arrow-right-circle" class="w-4 h-4"></i> Converter em O.S.
                 </button>` : ''}
             </div>` : ''}
@@ -130,7 +131,9 @@ async function abrirModalNovaSolicitacao() {
     const snap = await db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get();
     document.getElementById('sol-ativo').innerHTML = snap.docs.map(d => {
         const a = d.data();
-        return `<option value="${d.id}" data-tag="${a.codigoTag}" data-nome="${a.nome}">${a.codigoTag} - ${a.nome}</option>`;
+        const tagSegura = escaparHTML(a.codigoTag);
+        const nomeSeguro = escaparHTML(a.nome);
+        return `<option value="${escaparHTML(d.id)}" data-tag="${tagSegura}" data-nome="${nomeSeguro}">${tagSegura} - ${nomeSeguro}</option>`;
     }).join('');
 }
 
@@ -241,9 +244,9 @@ function abrirModalCancelarSolicitacao(solId) {
     document.getElementById('cancelar-sol-atalho').value = '';
     document.getElementById('cancelar-sol-motivo').value = '';
     document.getElementById('cancelar-sol-resumo').innerHTML = `
-        <div class="font-bold text-slate-900">${sol.ativoTag} - ${sol.ativoNome}</div>
-        <div class="text-slate-600 mt-0.5">${sol.problema}</div>
-        <div class="text-[11px] text-slate-400 mt-1">Solicitante: <strong>${sol.solicitanteNome}</strong></div>
+        <div class="font-bold text-slate-900">${escaparHTML(sol.ativoTag)} - ${escaparHTML(sol.ativoNome)}</div>
+        <div class="text-slate-600 mt-0.5">${escaparHTML(sol.problema)}</div>
+        <div class="text-[11px] text-slate-400 mt-1">Solicitante: <strong>${escaparHTML(sol.solicitanteNome)}</strong></div>
     `;
 
     document.getElementById('modal-cancelar-solicitacao').classList.remove('hidden');
@@ -283,7 +286,6 @@ async function confirmarCancelamentoSolicitacao(e) {
             canceladaEm: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Se estava marcado como máquina parada e não há O.S. ativa para o ativo, libera o status da máquina
         if (sol?.maquinaParada && sol?.ativoId && !sol?.osId) {
             await db.collection('ativos').doc(sol.ativoId).update({ status: 'Operacional' });
         }
