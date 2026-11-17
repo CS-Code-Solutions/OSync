@@ -2,7 +2,8 @@ let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
 
 function aplicarPermissoesInterface(perfil) {
-    const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
+    const cargo = (perfil || '').trim();
+    const isGestor = cargo === 'Admin' || cargo === 'SuperAdmin';
 
     // Esconde Cadastros e Configurações de Manutentores e Líderes
     if (!isGestor) {
@@ -13,17 +14,16 @@ function aplicarPermissoesInterface(perfil) {
     }
 
     // Líder não acessa o quadro Kanban de O.S., apenas Solicitações
-    if (perfil === 'Lideranca') {
+    if (cargo === 'Lideranca') {
         document.getElementById('nav-os')?.classList.add('hidden');
         document.getElementById('mob-os')?.classList.add('hidden');
     }
 
-      // Painel Master SaaS exclusivo para SuperAdmin (Desktop + Mobile)
-    if (perfil === 'SuperAdmin') {
+    // Painel Master SaaS exclusivo para SuperAdmin (Desktop + Mobile)
+    if (cargo === 'SuperAdmin') {
         document.getElementById('btn-menu-saas')?.classList.remove('hidden');
         document.getElementById('mob-saas')?.classList.remove('hidden');
     }
-
 }
 
 auth.onAuthStateChanged(async (user) => {
@@ -45,6 +45,26 @@ auth.onAuthStateChanged(async (user) => {
 
         const primeiraCarga = !usuarioAtual;
         usuarioAtual = { id: doc.id, ...doc.data() };
+        usuarioAtual.perfil = (usuarioAtual.perfil || '').trim();
+
+        // Valida se a empresa cliente está ativa e dentro do prazo do contrato (exceto SuperAdmin)
+        if (usuarioAtual.perfil !== 'SuperAdmin' && usuarioAtual.empresaId) {
+            try {
+                const empDoc = await db.collection('empresas').doc(usuarioAtual.empresaId).get();
+                if (empDoc.exists) {
+                    const emp = empDoc.data();
+                    const vencida = emp.dataVencimento && new Date(emp.dataVencimento) < new Date();
+                    if (emp.ativa === false || vencida) {
+                        alert('O período de teste ou contrato da sua empresa expirou. Entre em contato com o suporte OSync.');
+                        await auth.signOut();
+                        window.location.href = 'pages/login.html';
+                        return;
+                    }
+                }
+            } catch (errEmp) {
+                console.warn('Aviso ao validar vigência da empresa:', errEmp.message);
+            }
+        }
 
         document.getElementById('header-user-name').textContent = usuarioAtual.nome;
         document.getElementById('header-user-role').textContent = usuarioAtual.perfil;
