@@ -3,12 +3,13 @@ let cacheDashAtivos = [];
 let cacheDashSolicitacoes = [];
 let cacheDashColunas = [];
 let instanciasGraficosDash = {};
+let periodoWidgetParadas = 'mes'; // 'semana' | 'mes' | 'ano' | 'total'
 
 const CATALOGO_WIDGETS_DASHBOARD = [
     {
         id: 'kpis_principais',
         titulo: 'Cartões de Resumo (KPIs)',
-        descricao: 'O.S. em aberto, disponibilidade, tempo de máquina parada e custo total.',
+        descricao: 'O.S. em aberto, máquinas paradas, disponibilidade, chamados e custo total.',
         categoria: 'Indicadores',
         ativo: true,
         ordem: 1
@@ -22,9 +23,9 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         ordem: 2
     },
     {
-        id: 'grafico_horas_paradas_mensais',
-        titulo: 'Gráfico: Horas de Máquina Parada (6 Meses)',
-        descricao: 'Tempo total de indisponibilidade por manutenção mês a mês.',
+        id: 'grafico_maquinas_paradas_periodo',
+        titulo: 'Gráfico: Máquinas Paradas por Período',
+        descricao: 'Horas paradas por equipamento (apenas máquinas que tiveram parada na Semana, Mês ou Ano).',
         categoria: 'Confiabilidade',
         ativo: true,
         ordem: 3
@@ -108,6 +109,15 @@ function formatarHorasParadasDash(minutos) {
     return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+function osTeveParadaDash(os) {
+    return (
+        calcularMinutosParadaDash(os) > 0 ||
+        os.maquinaParada === true ||
+        os.condicaoMaquina === 'Maquina parada' ||
+        Boolean(os.inicioParada)
+    );
+}
+
 async function initDashboard() {
     await carregarPreferenciasLayoutDashboard();
     await carregarDadosBrutosDashboard();
@@ -120,7 +130,11 @@ async function carregarPreferenciasLayoutDashboard() {
         if (doc.exists && Array.isArray(doc.data().widgets)) {
             const salvos = doc.data().widgets;
             layoutWidgetsAtual = CATALOGO_WIDGETS_DASHBOARD.map(padrao => {
-                const encontrado = salvos.find(s => s.id === padrao.id);
+                // Migra preferência caso o usuário tivesse o ID antigo 'grafico_horas_paradas_mensais'
+                const encontrado = salvos.find(s =>
+                    s.id === padrao.id ||
+                    (padrao.id === 'grafico_maquinas_paradas_periodo' && s.id === 'grafico_horas_paradas_mensais')
+                );
                 return encontrado ? { ...padrao, ativo: encontrado.ativo, ordem: encontrado.ordem } : { ...padrao };
             }).sort((a, b) => a.ordem - b.ordem);
         } else {
@@ -239,7 +253,7 @@ function renderizarWidgetsDashboard() {
 
     ativosOrdenados.forEach(w => {
         if (w.id === 'grafico_custos_mensais') montarGraficoCustosMensais();
-        if (w.id === 'grafico_horas_paradas_mensais') montarGraficoHorasParadasMensais();
+        if (w.id === 'grafico_maquinas_paradas_periodo') montarGraficoMaquinasParadasPeriodo();
         if (w.id === 'grafico_tipos_manutencao') montarGraficoTiposManutencao(ordensFiltradas);
         if (w.id === 'grafico_top_maquinas_custo') montarGraficoTopMaquinasCusto(ordensFiltradas);
         if (w.id === 'grafico_top_maquinas_os') montarGraficoTopMaquinasOS(ordensFiltradas);
@@ -258,8 +272,12 @@ function construirHTML_KPIs(ordens) {
     const concluidas = ordens.filter(o => o.encerrada).length;
     const custoTotal = ordens.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
 
-    const totalMinutosParados = ordens.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
-    const qtdOSComParada = ordens.filter(o => calcularMinutosParadaDash(o) > 0 || o.maquinaParada || o.condicaoMaquina === 'Maquina parada').length;
+    // Conta quantas máquinas distintas estiveram paradas no período e o total acumulado
+    const ordensParadas = ordens.filter(osTeveParadaDash);
+    const maquinasUnicasParadas = new Set(
+        ordensParadas.map(o => o.ativoId || `${o.ativoTag}-${o.ativoNome}`)
+    ).size;
+    const totalMinutosParados = ordensParadas.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
 
     const totalMaquinas = cacheDashAtivos.length;
     const operacionais = cacheDashAtivos.filter(a => a.status === 'Operacional').length;
@@ -280,11 +298,15 @@ function construirHTML_KPIs(ordens) {
 
         <div class="osync-card p-5 border-l-4 border-l-rose-600">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase text-slate-400">Máquina Parada</span>
-                <i data-lucide="clock" class="w-4 h-4 text-rose-600"></i>
+                <span class="text-xs font-bold uppercase text-slate-400">Máquinas Paradas</span>
+                <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-600"></i>
             </div>
-            <div class="text-2xl font-extrabold text-rose-600 mt-1.5">${formatarHorasParadasDash(totalMinutosParados)}</div>
-            <p class="text-[11px] text-slate-500 mt-1"><strong>${qtdOSComParada}</strong> parada(s) por manutenção</p>
+            <div class="text-2xl font-extrabold text-rose-600 mt-1.5">
+                ${maquinasUnicasParadas} <span class="text-sm font-bold text-slate-600">${maquinasUnicasParadas === 1 ? 'máquina' : 'máquinas'}</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">
+                <strong>${ordensParadas.length}</strong> ${ordensParadas.length === 1 ? 'parada' : 'paradas'}${totalMinutosParados > 0 ? ` • <strong>${formatarHorasParadasDash(totalMinutosParados)}</strong> totais` : ''}
+            </p>
         </div>
 
         <div class="osync-card p-5 border-l-4 border-l-emerald-500">
@@ -318,19 +340,40 @@ function construirHTML_KPIs(ordens) {
 
 function construirHTML_CardWidget(widget) {
     const ehLista = widget.id.startsWith('lista_');
+    const ehWidgetParadas = widget.id === 'grafico_maquinas_paradas_periodo';
+
+    const botoesPeriodoParadas = ehWidgetParadas ? `
+        <div class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 shrink-0">
+            <button type="button" onclick="alterarPeriodoWidgetParadas('semana')"
+                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition ${periodoWidgetParadas === 'semana' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+                Semana
+            </button>
+            <button type="button" onclick="alterarPeriodoWidgetParadas('mes')"
+                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition ${periodoWidgetParadas === 'mes' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+                Mês
+            </button>
+            <button type="button" onclick="alterarPeriodoWidgetParadas('ano')"
+                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition ${periodoWidgetParadas === 'ano' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+                Ano
+            </button>
+        </div>
+    ` : `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${widget.categoria}</span>`;
+
     return `
     <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between">
-        <div class="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-100">
+        <div class="flex items-start justify-between gap-2 mb-4 pb-2.5 border-b border-slate-100">
             <div>
                 <h3 class="font-bold text-slate-900 text-sm">${widget.titulo.replace(/^(Gráfico:|Alerta:|Lista:)\s*/, '')}</h3>
                 <p class="text-[11px] text-slate-400">${widget.descricao}</p>
             </div>
-            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">${widget.categoria}</span>
+            ${botoesPeriodoParadas}
         </div>
 
         ${ehLista
             ? `<div id="conteudo-${widget.id}" class="space-y-2 max-h-64 overflow-y-auto"></div>`
-            : `<div class="relative h-64 w-full"><canvas id="canvas-${widget.id}"></canvas></div>`
+            : ehWidgetParadas
+                ? `<div id="wrapper-grafico-maquinas-paradas" class="relative h-64 w-full"><canvas id="canvas-${widget.id}"></canvas></div>`
+                : `<div class="relative h-64 w-full"><canvas id="canvas-${widget.id}"></canvas></div>`
         }
     </div>`;
 }
@@ -378,42 +421,113 @@ function montarGraficoCustosMensais() {
     });
 }
 
-function montarGraficoHorasParadasMensais() {
-    const ctx = document.getElementById('canvas-grafico_horas_paradas_mensais');
-    if (!ctx) return;
+function alterarPeriodoWidgetParadas(novoPeriodo) {
+    periodoWidgetParadas = novoPeriodo;
+    renderizarWidgetsDashboard();
+}
 
-    const meses = [];
-    const horas = [];
-    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+function montarGraficoMaquinasParadasPeriodo() {
+    const wrapper = document.getElementById('wrapper-grafico-maquinas-paradas');
+    if (!wrapper) return;
 
-    for (let i = 5; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        meses.push(`${nomesMeses[d.getMonth()]}/${String(d.getFullYear()).slice(-2)}`);
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
 
-        const somaMinutos = cacheDashOrdens
-            .filter(o => o.dataISO && o.dataISO.startsWith(chave))
-            .reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
-        horas.push(Number((somaMinutos / 60).toFixed(2)));
+    // Filtra O.S. dentro do intervalo selecionado no widget (Semana = últimos 7 dias, Mês = mês atual, Ano = ano atual)
+    const ordensNoIntervalo = cacheDashOrdens.filter(os => {
+        if (!osTeveParadaDash(os)) return false;
+        if (!os.dataISO) return false;
+
+        if (periodoWidgetParadas === 'semana') {
+            const limite = new Date();
+            limite.setDate(limite.getDate() - 7);
+            return new Date(os.dataISO) >= limite;
+        }
+        if (periodoWidgetParadas === 'mes') {
+            return os.dataISO.startsWith(`${anoAtual}-${mesAtual}`);
+        }
+        if (periodoWidgetParadas === 'ano') {
+            return os.dataISO.startsWith(`${anoAtual}-`);
+        }
+        return true;
+    });
+
+    // Agrupa APENAS as máquinas que tiveram parada no período
+    const mapaMaquinas = {};
+    ordensNoIntervalo.forEach(os => {
+        const chave = `${os.ativoTag || 'TAG'} - ${os.ativoNome || 'Máquina'}`;
+        if (!mapaMaquinas[chave]) {
+            mapaMaquinas[chave] = { minutos: 0, ocorrencias: 0 };
+        }
+        mapaMaquinas[chave].minutos += calcularMinutosParadaDash(os);
+        mapaMaquinas[chave].ocorrencias += 1;
+    });
+
+    const ranking = Object.entries(mapaMaquinas).sort((a, b) => {
+        if (b[1].minutos !== a[1].minutos) return b[1].minutos - a[1].minutos;
+        return b[1].ocorrencias - a[1].ocorrencias;
+    });
+
+    const labelPeriodoTexto = {
+        semana: 'nos últimos 7 dias',
+        mes: 'neste mês',
+        ano: 'neste ano'
+    }[periodoWidgetParadas] || 'no período';
+
+    if (ranking.length === 0) {
+        wrapper.innerHTML = `
+            <div class="h-full flex flex-col items-center justify-center bg-emerald-50/70 border border-emerald-200 rounded-xl p-6 text-center">
+                <span class="text-xs font-extrabold text-emerald-800">Nenhuma máquina parada ${labelPeriodoTexto}!</span>
+                <span class="text-[11px] text-emerald-600 mt-1">100% da frota sem registros de parada no intervalo selecionado.</span>
+            </div>`;
+        return;
     }
 
-    instanciasGraficosDash['grafico_horas_paradas_mensais'] = new Chart(ctx, {
+    wrapper.innerHTML = `<canvas id="canvas-grafico_maquinas_paradas_periodo"></canvas>`;
+    const ctx = document.getElementById('canvas-grafico_maquinas_paradas_periodo');
+    if (!ctx) return;
+
+    const labels = ranking.map(([nome, info]) => `${nome} (${info.ocorrencias}x)`);
+    const horasDados = ranking.map(([, info]) => Number((info.minutos / 60).toFixed(2)));
+    const minutosOriginais = ranking.map(([, info]) => info.minutos);
+    const ocorrenciasOriginais = ranking.map(([, info]) => info.ocorrencias);
+
+    instanciasGraficosDash['grafico_maquinas_paradas_periodo'] = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: meses,
+            labels,
             datasets: [{
-                label: 'Horas Paradas (h)',
-                data: horas,
+                label: 'Tempo Parado (horas)',
+                data: horasDados,
                 backgroundColor: '#E11D48',
-                borderRadius: 8
+                borderRadius: 6
             }]
         },
         options: {
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const idx = context.dataIndex;
+                            const mins = minutosOriginais[idx] || 0;
+                            const qtd = ocorrenciasOriginais[idx] || 1;
+                            const tempoFmt = mins > 0 ? formatarHorasParadasDash(mins) : 'Em aberto';
+                            return ` Parada: ${tempoFmt} (${qtd} ${qtd === 1 ? 'ocorrência' : 'ocorrências'})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Horas Paradas', font: { size: 10 } }
+                }
+            }
         }
     });
 }
