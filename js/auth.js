@@ -1,6 +1,29 @@
 let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
 
+function aplicarPermissoesInterface(perfil) {
+    const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
+
+    // Esconde Cadastros e Configurações de Manutentores e Líderes
+    if (!isGestor) {
+        document.getElementById('nav-cadastros-group')?.classList.add('hidden');
+        document.getElementById('nav-configuracoes')?.classList.add('hidden');
+        document.getElementById('mob-cadastros')?.classList.add('hidden');
+        document.getElementById('mob-configuracoes')?.classList.add('hidden');
+    }
+
+    // Líder não acessa o quadro Kanban de O.S., apenas Solicitações
+    if (perfil === 'Lideranca') {
+        document.getElementById('nav-os')?.classList.add('hidden');
+        document.getElementById('mob-os')?.classList.add('hidden');
+    }
+
+    // Painel Master SaaS exclusivo para SuperAdmin
+    if (perfil === 'SuperAdmin') {
+        document.getElementById('btn-menu-saas')?.classList.remove('hidden');
+    }
+}
+
 auth.onAuthStateChanged(async (user) => {
     if (!user) {
         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
@@ -8,12 +31,11 @@ auth.onAuthStateChanged(async (user) => {
         return;
     }
 
-    // Monitora o perfil em tempo real: se o Admin excluir ou desativar, o usuário é expulso na hora
     if (unsubscribePerfilAtual) unsubscribePerfilAtual();
 
     unsubscribePerfilAtual = db.collection('usuarios').doc(user.uid).onSnapshot(async (doc) => {
         if (!doc.exists || doc.data().ativo === false) {
-            alert('Seu acesso foi revogado ou desativado pelo administrador.');
+            alert('Seu acesso foi revogado ou está pendente de aprovação pelo gestor.');
             await auth.signOut();
             window.location.href = 'pages/login.html';
             return;
@@ -24,15 +46,17 @@ auth.onAuthStateChanged(async (user) => {
 
         document.getElementById('header-user-name').textContent = usuarioAtual.nome;
         document.getElementById('header-user-role').textContent = usuarioAtual.perfil;
-if (usuarioAtual.perfil === 'SuperAdmin') {
-    document.getElementById('btn-menu-saas')?.classList.remove('hidden');
-}
 
         if (primeiraCarga) {
+            aplicarPermissoesInterface(usuarioAtual.perfil);
             atualizarStatusNuvem(true);
             document.body.classList.remove('auth-loading');
 
-            if (typeof navegarPara === 'function') {
+            if (usuarioAtual.perfil === 'Lideranca') {
+                navegarPara('solicitacoes');
+            } else if (usuarioAtual.perfil === 'SuperAdmin') {
+                navegarPara('saas-empresas');
+            } else {
                 navegarPara('os');
             }
         }
