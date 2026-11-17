@@ -20,22 +20,27 @@
     <!-- CABEÇALHO SUPERIOR -->
     <header class="osync-navbar sticky top-0 z-40 px-4 h-16 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-6">
-            <a href="#" onclick="navegarPara('os')" class="flex items-center gap-2">
+            <a href="#" onclick="navegarPara('os')" class="flex items-center gap-2 shrink-0">
                 <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-[#00E5B0] flex items-center justify-center text-[#0B1120]">
                     <i data-lucide="refresh-cw" class="w-5 h-5 stroke-[2.5]"></i>
                 </div>
                 <span class="text-xl font-extrabold tracking-tight text-white">OS<span class="text-[#00E5B0]">ync</span></span>
             </a>
 
-            <!-- Menu Superior Desktop -->
+            <!-- Menu Superior Desktop (Sem duplicação) -->
             <nav class="hidden md:flex items-center gap-1.5" id="desktop-nav">
-                <button onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                <button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
                     <i data-lucide="kanban" class="w-4 h-4"></i>
                     <span>O.S.</span>
                 </button>
 
+                <button id="nav-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="bell-ring" class="w-4 h-4"></i>
+                    <span>Solicitações</span>
+                </button>
+
                 <!-- Dropdown Cadastros -->
-                <div class="relative dropdown">
+                <div id="nav-cadastros-group" class="relative dropdown">
                     <button id="btn-menu-cadastros" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
                         <i data-lucide="folder-plus" class="w-4 h-4"></i>
                         <span>Cadastros</span>
@@ -57,45 +62,20 @@
                     </div>
                 </div>
 
-                <button onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                <button id="nav-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
                     <i data-lucide="settings" class="w-4 h-4"></i>
                     <span>Configurações</span>
                 </button>
+
+                <button id="btn-menu-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm border border-[#00E5B0]/30 text-[#00E5B0]">
+                    <i data-lucide="building-2" class="w-4 h-4"></i>
+                    <span>Empresas (SaaS)</span>
+                </button>
             </nav>
         </div>
-<button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
-    <i data-lucide="kanban" class="w-4 h-4"></i>
-    <span>O.S.</span>
-</button>
-
-<button id="nav-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
-    <i data-lucide="bell-ring" class="w-4 h-4"></i>
-    <span>Solicitações</span>
-</button>
-
-<!-- Dropdown Cadastros (Apenas Gestor/SuperAdmin) -->
-<div id="nav-cadastros-group" class="relative dropdown">
-    <button id="btn-menu-cadastros" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
-        <i data-lucide="folder-plus" class="w-4 h-4"></i>
-        <span>Cadastros</span>
-        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
-    </button>
-    <!-- ... manter os sub-botões iguais ... -->
-</div>
-
-<button id="nav-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
-    <i data-lucide="settings" class="w-4 h-4"></i>
-    <span>Configurações</span>
-</button>
-
-<button
- id="btn-menu-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm border border-[#00E5B0]/30 text-[#00E5B0]">
-    <i data-lucide="building-2" class="w-4 h-4"></i>
-    <span>Empresas (SaaS)</span>
-</button>
 
         <!-- Direita: Status Nuvem + Usuário + Sair -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 shrink-0">
             <div id="cloud-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-[#00E5B0] border border-[#00E5B0]/30">
                 <span id="cloud-dot" class="w-2 h-2 rounded-full bg-[#00E5B0] animate-pulse"></span>
                 <span id="cloud-label">Online</span>
@@ -122,35 +102,22 @@
 
     <!-- MENU INFERIOR MOBILE -->
     <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
-        <button onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-3">
+        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-2.5">
             <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">O.S.</span>
         </button>
-        <button onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
+        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2.5">
+            <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[11px] font-medium">Chamados</span>
+        </button>
+        <button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2.5">
             <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Cadastros</span>
         </button>
-        <button onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
+        <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2.5">
             <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Config</span>
         </button>
-<button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-3">
-    <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
-    <span class="text-[11px] font-medium">O.S.</span>
-</button>
-<button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
-    <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
-    <span class="text-[11px] font-medium">Solicitações</span>
-</button>
-<button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
-    <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
-    <span class="text-[11px] font-medium">Cadastros</span>
-</button>
-<button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-3">
-    <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
-    <span class="text-[11px] font-medium">Config</span>
-</button>
-
     </nav>
 
     <!-- GAVETA MOBILE DE CADASTROS -->
@@ -181,9 +148,9 @@
     <script src="js/router.js"></script>
     <script src="js/configuracoes.js"></script>
     <script src="js/cadastros.js"></script>
+    <script src="js/solicitacoes.js"></script>
+    <script src="js/saas-master.js"></script>
     <script src="js/os-kanban.js"></script>
     <script src="js/os-execucao.js"></script>
-<script src="js/saas-master.js"></script>
-<script src="js/solicitacoes.js"></script>  
 </body>
 </html>
