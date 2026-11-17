@@ -31,7 +31,8 @@ async function initKanbanOS() {
     ajustarLarguraContainerKanban(true);
 
     const isGestor = usuarioAtual?.perfil === 'Admin' || usuarioAtual?.perfil === 'SuperAdmin';
-    if (isGestor) {
+    // Exibe o botão "Editar Kanban" apenas para gestores em telas desktop/tablet (a partir de 768px)
+    if (isGestor && window.innerWidth >= 768) {
         document.getElementById('btn-editar-kanban-os')?.classList.remove('hidden');
     }
 
