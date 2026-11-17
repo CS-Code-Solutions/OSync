@@ -1,188 +1,184 @@
-let cacheOrdens = [];
-let cacheColunas = [];
+let cacheColunasOS = [];
+let cacheOrdensServico = [];
 let unsubscribeOS = null;
 
 async function initKanbanOS() {
-    await carregarColunasKanban();
-    iniciarListenerTempoRealOS();
+    await carregarColunasEModaisOS();
+    iniciarListenerOrdensServico();
 
     document.getElementById('form-nova-os')?.addEventListener('submit', salvarNovaOS);
+    document.getElementById('form-encerramento-os')?.addEventListener('submit', confirmarEncerramentoOS);
 }
 
-async function carregarColunasKanban() {
-    const snap = await db.collection('kanban_colunas')
-        .where('empresaId', '==', usuarioAtual.empresaId)
-        .get();
+async function carregarColunasEModaisOS() {
+    const [colSnap, manutSnap] = await Promise.all([
+        db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get(),
+        db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
+    ]);
 
-    cacheColunas = snap.docs
+    cacheColunasOS = colSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.ordem - b.ordem);
 
-    // Popula filtro de manutentores
-    const selectFiltroManut = document.getElementById('filtro-manutentor-os');
-    if (selectFiltroManut && selectFiltroManut.options.length <= 1) {
-        const snapManut = await db.collection('usuarios')
-            .where('empresaId', '==', usuarioAtual.empresaId)
-            .where('perfil', '==', 'Manutentor')
-            .get();
+    const filtroCol = document.getElementById('filtro-os-coluna');
+    if (filtroCol) {
+        filtroCol.innerHTML = '<option value="">Todos Status / Colunas</option>' +
+            cacheColunasOS.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+    }
 
-        snapManut.docs.forEach(d => {
-            const m = d.data();
-            selectFiltroManut.innerHTML += `<option value="${d.id}">${m.nome}</option>`;
-        });
+    const filtroManut = document.getElementById('filtro-os-manutentor');
+    if (filtroManut) {
+        filtroManut.innerHTML = '<option value="">Todos Manutentores</option>' +
+            manutSnap.docs.map(d => `<option value="${d.id}">${d.data().nome}</option>`).join('');
     }
 }
 
-function iniciarListenerTempoRealOS() {
+function iniciarListenerOrdensServico() {
     if (unsubscribeOS) unsubscribeOS();
 
     unsubscribeOS = db.collection('ordens_servico')
         .where('empresaId', '==', usuarioAtual.empresaId)
-        .onSnapshot((snapshot) => {
-            atualizarStatusNuvem(true);
-            cacheOrdens = snapshot.docs
+        .onSnapshot((snap) => {
+            cacheOrdensServico = snap.docs
                 .map(d => ({ id: d.id, ...d.data() }))
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
-            filtrarCardsOS();
-        }, () => {
-            atualizarStatusNuvem(false);
+            renderizarVisaoOS();
         });
 }
 
-function renderizarQuadroKanban(listaOS) {
-    const board = document.getElementById('kanban-board');
-    if (!board) return;
+function obterOrdensFiltradas() {
+    const busca = (document.getElementById('filtro-os-busca')?.value || '').toLowerCase();
+    const colId = document.getElementById('filtro-os-coluna')?.value || '';
+    const prio = document.getElementById('filtro-os-prioridade')?.value || '';
+    const manutId = document.getElementById('filtro-os-manutentor')?.value || '';
 
-    if (cacheColunas.length === 0) {
-        board.innerHTML = `
-            <div class="w-full bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center">
-                <p class="text-slate-600 font-medium mb-2">Nenhuma coluna configurada no Kanban.</p>
-                <button onclick="navegarPara('configuracoes')" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold">
-                    Ir para Configurações e Criar Colunas
-                </button>
-            </div>`;
-        return;
-    }
+    return cacheOrdensServico.filter(os => {
+        if (colId && os.colunaId !== colId) return false;
+        if (prio && os.prioridade !== prio) return false;
+        if (manutId && os.manutentorId !== manutId) return false;
+        if (busca) {
+            const texto = `${os.numeroOs} ${os.ativoTag} ${os.ativoNome} ${os.descricao} ${os.tipoNome}`.toLowerCase();
+            if (!texto.includes(busca)) return false;
+        }
+        return true;
+    });
+}
 
-    board.innerHTML = cacheColunas.map(col => {
-        const cardsDaColuna = listaOS.filter(os => os.colunaId === col.id);
-
-        return `
-        <div class="w-80 shrink-0 bg-slate-200/70 rounded-xl border border-slate-200 flex flex-col">
-            <div class="bg-white p-3.5 rounded-t-xl border-b border-slate-200 flex items-center justify-between" style="border-top: 3px solid ${col.corTopo}">
-                <span class="font-bold text-sm text-slate-800">${col.titulo}</span>
-                <span class="bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-0.5 rounded-full col-counter">${cardsDaColuna.length}</span>
-            </div>
-            <div class="p-2.5 space-y-2.5 kanban-col-body" data-coluna-id="${col.id}">
-                ${cardsDaColuna.map(os => gerarHTMLCardOS(os)).join('')}
-            </div>
-        </div>`;
-    }).join('');
-
-    ativarDragAndDrop();
+function renderizarVisaoOS() {
+    const filtradas = obterOrdensFiltradas();
+    renderizarCardsMobile(filtradas);
+    renderizarKanbanDesktop(filtradas);
     lucide.createIcons();
 }
 
-function gerarHTMLCardOS(os) {
-    const coresPrioridade = {
-        'Urgente': 'bg-rose-100 text-rose-700',
-        'Alta': 'bg-amber-100 text-amber-700',
-        'Normal': 'bg-blue-100 text-blue-700',
-        'Baixa': 'bg-slate-100 text-slate-600'
-    };
+// ==========================================
+// VISÃO MOBILE: CARDS LIMPÍSSIMOS SEM ARRASTAR
+// ==========================================
+function renderizarCardsMobile(ordens) {
+    const container = document.getElementById('os-mobile-list');
+    if (!container) return;
 
-    const badgePrio = coresPrioridade[os.prioridade] || coresPrioridade['Normal'];
-    const corTipo = os.tipoCor || '#1D4ED8';
+    if (ordens.length === 0) {
+        container.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400 text-sm">Nenhuma Ordem de Serviço encontrada.</div>`;
+        return;
+    }
 
-    return `
-    <div onclick="abrirModalExecucaoOS('${os.id}')" class="osync-card kanban-card p-3.5 select-none" draggable="true" data-os-id="${os.id}" style="border-left-color: ${corTipo}">
-        <div class="flex items-center justify-between mb-1.5">
-            <span class="text-xs font-extrabold text-slate-400">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
-            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${badgePrio}">${os.prioridade}</span>
-        </div>
-        <div class="font-bold text-sm text-slate-900 leading-snug">
-            ${os.ativoTag ? `${os.ativoTag} - ${os.ativoNome}` : 'Ativo não vinculado'}
-        </div>
-        <p class="text-xs text-slate-500 mt-1 line-clamp-2">${os.descricao}</p>
-        
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span class="font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                ${os.tipoNome || 'Geral'}
-            </span>
-            <span class="flex items-center gap-1 font-medium">
-                <i data-lucide="user" class="w-3 h-3 text-blue-600"></i>
-                ${os.manutentorNome || 'Sem técnico'}
-            </span>
-        </div>
-    </div>`;
+    container.innerHTML = ordens.map(os => {
+        const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
+        const corStatus = coluna.corTopo || '#00E5B0';
+        const numFormatado = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
+
+        return `
+        <div onclick="abrirDetalhesOS('${os.id}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <span class="text-xs font-extrabold text-slate-500">${numFormatado}</span>
+                <!-- Identificação do Status na mesma cor escolhida para a coluna -->
+                <span class="text-[11px] font-extrabold px-3 py-0.5 rounded-full text-white shadow-2xs" style="background-color: ${corStatus}">
+                    ${coluna.titulo}
+                </span>
+            </div>
+
+            <!-- Máquina -->
+            <h3 class="font-bold text-slate-900 text-base leading-snug">
+                ${os.ativoTag || ''} - ${os.ativoNome || 'Equipamento'}
+            </h3>
+
+            <!-- Tipo e Manutentor Selecionado (se houver) -->
+            <div class="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
+                <span class="inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${os.tipoCor || '#1D4ED8'}"></span>
+                    ${os.tipoNome || 'Manutenção'}
+                </span>
+
+                ${os.manutentorNome ? `
+                <span class="inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                    <i data-lucide="wrench" class="w-3 h-3"></i>
+                    ${os.manutentorNome}
+                </span>` : `
+                <span class="inline-flex items-center gap-1 text-slate-400 italic">
+                    Sem técnico definido
+                </span>`}
+            </div>
+        </div>`;
+    }).join('');
 }
 
-function ativarDragAndDrop() {
-    const cards = document.querySelectorAll('.kanban-card');
-    const colunas = document.querySelectorAll('.kanban-col-body');
+// ==========================================
+// VISÃO DESKTOP: QUADRO KANBAN COM DRAG & DROP
+// ==========================================
+function renderizarKanbanDesktop(ordens) {
+    const board = document.getElementById('os-kanban-board');
+    if (!board) return;
 
-    cards.forEach(card => {
-        card.addEventListener('dragstart', (e) => {
-            e.stopPropagation();
-            card.classList.add('dragging');
-        });
-        card.addEventListener('dragend', () => card.classList.remove('dragging'));
-    });
+    if (cacheColunasOS.length === 0) {
+        board.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 w-full text-center">Configure as colunas do Kanban na aba Configurações.</div>`;
+        return;
+    }
 
-    colunas.forEach(col => {
-        col.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            col.classList.add('drag-over');
-            const dragging = document.querySelector('.dragging');
-            if (dragging) col.appendChild(dragging);
-        });
+    board.innerHTML = cacheColunasOS.map(col => {
+        const cardsColuna = ordens.filter(o => o.colunaId === col.id);
+        return `
+        <div class="kanban-column rounded-xl p-3 flex flex-col gap-3 shrink-0" style="border-top: 4px solid ${col.corTopo}"
+             ondragover="event.preventDefault()" ondrop="soltarCardKanban(event, '${col.id}')">
+            <div class="flex items-center justify-between px-1">
+                <h3 class="font-bold text-sm text-slate-800">${col.titulo}</h3>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-white text-slate-600 border border-slate-200">${cardsColuna.length}</span>
+            </div>
 
-        col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-
-        col.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            col.classList.remove('drag-over');
-            const cardArrastado = document.querySelector('.dragging');
-            if (!cardArrastado) return;
-
-            const osId = cardArrastado.getAttribute('data-os-id');
-            const novaColunaId = col.getAttribute('data-coluna-id');
-
-            document.querySelectorAll('.kanban-col-body').forEach(c => {
-                c.parentElement.querySelector('.col-counter').textContent = c.querySelectorAll('.kanban-card').length;
-            });
-
-            await db.collection('ordens_servico').doc(osId).update({
-                colunaId: novaColunaId
-            });
-        });
-    });
+            <div class="space-y-2.5 min-h-[120px]">
+                ${cardsColuna.map(os => `
+                <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${os.id}')" onclick="abrirDetalhesOS('${os.id}')"
+                     class="osync-card p-3.5 cursor-pointer" style="border-left-color: ${col.corTopo}">
+                    <div class="flex items-center justify-between text-[11px] mb-1">
+                        <span class="font-extrabold text-slate-500">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
+                        <span class="font-bold px-2 py-0.5 rounded text-white" style="background-color: ${col.corTopo}">${col.titulo}</span>
+                    </div>
+                    <h4 class="font-bold text-slate-900 text-sm">${os.ativoTag} - ${os.ativoNome}</h4>
+                    <p class="text-xs text-slate-500 line-clamp-2 mt-1">${os.descricao}</p>
+                    <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 text-[11px]">
+                        <span class="font-semibold text-slate-600">${os.tipoNome || 'Geral'}</span>
+                        <span class="font-semibold text-blue-700">${os.manutentorNome || 'Sem técnico'}</span>
+                    </div>
+                </div>`).join('')}
+            </div>
+        </div>`;
+    }).join('');
 }
 
-function filtrarCardsOS() {
-    const termo = (document.getElementById('filtro-busca-os')?.value || '').toLowerCase();
-    const prio = document.getElementById('filtro-prioridade-os')?.value || '';
-    const manut = document.getElementById('filtro-manutentor-os')?.value || '';
-
-    const filtradas = cacheOrdens.filter(os => {
-        const textoCard = `${os.numeroOs} ${os.descricao} ${os.ativoNome || ''} ${os.ativoTag || ''}`.toLowerCase();
-        const matchTexto = !termo || textoCard.includes(termo);
-        const matchPrio = !prio || os.prioridade === prio;
-        const matchManut = !manut || os.manutentorId === manut;
-        return matchTexto && matchPrio && matchManut;
-    });
-
-    renderizarQuadroKanban(filtradas);
+async function soltarCardKanban(event, novaColunaId) {
+    event.preventDefault();
+    const osId = event.dataTransfer.getData('osId');
+    if (!osId) return;
+    await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColunaId });
 }
 
 async function abrirModalNovaOS() {
     document.getElementById('modal-nova-os').classList.remove('hidden');
 
-    const [ativosSnap, tiposSnap, setoresSnap, manutSnap] = await Promise.all([
+    const [ativosSnap, tiposSnap, manutSnap] = await Promise.all([
         db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get(),
         db.collection('tipos_manutencao').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('setores_executantes').where('empresaId', '==', usuarioAtual.empresaId).get(),
         db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
     ]);
 
@@ -193,20 +189,22 @@ async function abrirModalNovaOS() {
 
     document.getElementById('os-tipo').innerHTML = tiposSnap.docs.map(d => {
         const t = d.data();
-        return `<option value="${d.id}" data-nome="${t.nome}" data-cor="${t.cor}">${t.nome}</option>`;
+        return `<option value="${t.nome}" data-cor="${t.cor}">${t.nome}</option>`;
     }).join('');
 
-    document.getElementById('os-setor').innerHTML = '<option value="">Selecione...</option>' + setoresSnap.docs.map(d => {
-        const s = d.data();
-        return `<option value="${d.id}">${s.nome}</option>`;
-    }).join('');
+    document.getElementById('os-coluna-inicial').innerHTML = cacheColunasOS.map(c =>
+        `<option value="${c.id}">${c.titulo}</option>`
+    ).join('');
 
-    document.getElementById('os-manutentor').innerHTML = '<option value="">Não direcionado</option>' + manutSnap.docs.map(d => {
-        const m = d.data();
-        return `<option value="${d.id}" data-nome="${m.nome}">${m.nome}</option>`;
-    }).join('');
-
-    document.getElementById('os-coluna').innerHTML = cacheColunas.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+    const selectManut = document.getElementById('os-manutentor');
+    if (usuarioAtual.perfil === 'Manutentor') {
+        selectManut.innerHTML = `<option value="${usuarioAtual.id}" data-nome="${usuarioAtual.nome}" selected>${usuarioAtual.nome}</option>`;
+        selectManut.disabled = true;
+    } else {
+        selectManut.disabled = false;
+        selectManut.innerHTML = '<option value="">-- Não atribuído --</option>' +
+            manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}">${d.data().nome}</option>`).join('');
+    }
 }
 
 function fecharModalNovaOS() {
@@ -215,36 +213,35 @@ function fecharModalNovaOS() {
 
 async function salvarNovaOS(e) {
     e.preventDefault();
-
-    const selAtivo = document.getElementById('os-ativo');
-    const optAtivo = selAtivo.options[selAtivo.selectedIndex];
-
-    const selTipo = document.getElementById('os-tipo');
-    const optTipo = selTipo.options[selTipo.selectedIndex];
-
-    const selManut = document.getElementById('os-manutentor');
-    const optManut = selManut.options[selManut.selectedIndex];
-
-    // Gera numeração sequencial simples baseada na maior O.S. atual
-    const maiorNumero = cacheOrdens.reduce((max, item) => Math.max(max, item.numeroOs || 0), 0);
+    const btn = document.getElementById('btn-criar-os');
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
 
     try {
+        const selAtivo = document.getElementById('os-ativo');
+        const optAtivo = selAtivo.options[selAtivo.selectedIndex];
+
+        const selTipo = document.getElementById('os-tipo');
+        const optTipo = selTipo.options[selTipo.selectedIndex];
+
+        const selManut = document.getElementById('os-manutentor');
+        const optManut = selManut.options[selManut.selectedIndex];
+
+        const maiorNum = cacheOrdensServico.reduce((max, o) => Math.max(max, o.numeroOs || 0), 0);
+
         await db.collection('ordens_servico').add({
             empresaId: usuarioAtual.empresaId,
-            numeroOs: maiorNumero + 1,
+            numeroOs: maiorNum + 1,
             ativoId: selAtivo.value,
             ativoTag: optAtivo?.getAttribute('data-tag') || '',
             ativoNome: optAtivo?.getAttribute('data-nome') || '',
-            tipoManutencaoId: selTipo.value,
-            tipoNome: optTipo?.getAttribute('data-nome') || 'Geral',
+            tipoNome: selTipo.value,
             tipoCor: optTipo?.getAttribute('data-cor') || '#1D4ED8',
-            setorExecutanteId: document.getElementById('os-setor').value || null,
-            manutentorId: selManut.value || null,
-            manutentorNome: selManut.value ? (optManut?.getAttribute('data-nome') || '') : '',
-            colunaId: document.getElementById('os-coluna').value,
+            colunaId: document.getElementById('os-coluna-inicial').value,
             prioridade: document.getElementById('os-prioridade').value,
+            manutentorId: selManut.value || '',
+            manutentorNome: selManut.value ? (optManut?.getAttribute('data-nome') || '') : '',
             descricao: document.getElementById('os-descricao').value.trim(),
-            parecerTecnico: '',
             custoTotal: 0,
             encerrada: false,
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
@@ -255,4 +252,7 @@ async function salvarNovaOS(e) {
     } catch (err) {
         alert('Erro ao criar O.S.: ' + err.message);
     }
+
+    btn.disabled = false;
+    btn.textContent = 'Criar O.S.';
 }
