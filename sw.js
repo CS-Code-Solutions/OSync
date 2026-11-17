@@ -1,41 +1,36 @@
 const CACHE_NAME = 'osync-pwa-v1';
-const ASSETS_BASE = [
+const ASSETS_ESSENCIAIS = [
     './',
     './index.html',
+    './manifest.json',
     './css/style.css',
-    './pages/login.html',
-    './pages/os.html',
-    './pages/solicitacoes.html',
-    './pages/configuracoes.html',
-    './pages/cad-ativos.html',
-    './pages/cad-manutentores.html',
-    './pages/cad-lideranca.html',
-    './pages/saas-empresas.html'
+    './images/ico.png',
+    './images/ico192.png',
+    './images/ico512.png',
+    './images/cabe.png'
 ];
 
-// Instala e guarda a estrutura básica
 self.addEventListener('install', (event) => {
-    self.skipWaiting();
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_BASE).catch(() => {}))
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_ESSENCIAIS))
     );
+    self.skipWaiting();
 });
 
-// Limpa caches antigos automaticamente ao atualizar a versão
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
-            Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+            Promise.all(
+                keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+            )
         )
     );
     self.clients.claim();
 });
 
-// Estratégia Network-First: busca sempre o código atualizado; se estiver offline, usa o cache
+// Estratégia Network-First: sempre busca dados/telas atualizados online, usando cache só como fallback
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
-
-    // Ignora requisições externas de API do Firebase/Google
     if (!event.request.url.startsWith(self.location.origin)) return;
 
     event.respondWith(
