@@ -39,7 +39,6 @@ async function abrirDetalhesOS(osId) {
     badge.textContent = coluna.titulo;
     badge.style.backgroundColor = coluna.corTopo || '#00E5B0';
 
-    // Badge de condição da máquina no cabeçalho do modal
     const condBadge = document.getElementById('det-os-condicao-badge');
     if (condBadge) {
         if (osAtualTeveParada) {
@@ -60,7 +59,6 @@ async function abrirDetalhesOS(osId) {
     document.getElementById('det-os-prioridade').textContent = `Prioridade: ${os.prioridade || 'Normal'}`;
     document.getElementById('det-os-descricao').textContent = os.descricao;
 
-    // Preenche seletor de Status/Coluna e Manutentor
     const selCol = document.getElementById('det-os-coluna-select');
     selCol.innerHTML = cacheColunasOS.map(c =>
         `<option value="${c.id}" ${c.id === os.colunaId ? 'selected' : ''}>${c.titulo}</option>`
@@ -100,7 +98,6 @@ async function abrirDetalhesOS(osId) {
     const agoraISO = agora.toISOString().slice(0, 16);
     document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agoraISO;
 
-    // Configura bloco de Início e Término da Parada de Máquina
     const blocoParada = document.getElementById('bloco-encerramento-parada');
     const inpIniParada = document.getElementById('enc-inicio-parada');
     const inpFimParada = document.getElementById('enc-termino-parada');
@@ -349,7 +346,6 @@ async function confirmarEncerramentoOS(e) {
         const os = cacheOrdensServico.find(o => o.id === osId);
         const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
 
-        // Valida datas de parada de máquina se aplicável
         let inicioParada = '';
         let terminoParada = '';
         let tempoParadaMinutos = 0;
@@ -420,22 +416,42 @@ async function confirmarEncerramentoOS(e) {
             await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
         }
 
-        // Atualiza a solicitação vinculada (se existir) para avisar o solicitante que a O.S. foi encerrada
-        if (os?.solicitacaoId) {
-            await db.collection('solicitacoes').doc(os.solicitacaoId).update({
-                status: 'Encerrada',
-                osId: osId,
-                numeroOs: os.numeroOs || 0,
-                servicoRealizado,
-                encerradoPor: usuarioAtual.nome,
-                dataHoraEncerramento,
-                encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
-            });
+        // Sincroniza a solicitação vinculada (tanto por solicitacaoId quanto por osId/numeroOs em chamados antigos)
+        const payloadSolicitacaoEncerrada = {
+            status: 'Encerrada',
+            osId: osId,
+            numeroOs: os?.numeroOs || 0,
+            servicoRealizado,
+            encerradoPor: usuarioAtual.nome,
+            dataHoraEncerramento,
+            encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        const idsSolicitacoesAtualizar = new Set();
+        if (os?.solicitacaoId) idsSolicitacoesAtualizar.add(os.solicitacaoId);
+
+        const solSnap = await db.collection('solicitacoes')
+            .where('empresaId', '==', usuarioAtual.empresaId)
+            .get();
+
+        solSnap.docs.forEach(docSol => {
+            const s = docSol.data();
+            if (
+                s.osId === osId ||
+                (os?.numeroOs && Number(s.numeroOs) === Number(os.numeroOs)) ||
+                (s.status === 'Convertida em O.S.' && s.ativoId === os?.ativoId && (os?.descricao || '').includes(s.problema || '___'))
+            ) {
+                idsSolicitacoesAtualizar.add(docSol.id);
+            }
+        });
+
+        for (const solIdVinc of idsSolicitacoesAtualizar) {
+            await db.collection('solicitacoes').doc(solIdVinc).update(payloadSolicitacaoEncerrada);
         }
 
         fecharModalDetalhesOS();
         if (typeof mostrarNotificacaoOSync === 'function') {
-            mostrarNotificacaoOSync('O.S. encerrada e custos vinculados ao Centro de Custo!', 'sucesso');
+            mostrarNotificacaoOSync('O.S. encerrada e chamado atualizado para o solicitante!', 'sucesso');
         }
     } catch (err) {
         alert('Erro ao encerrar O.S.: ' + err.message);
