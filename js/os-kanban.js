@@ -11,25 +11,29 @@ async function initKanbanOS() {
 }
 
 async function carregarColunasEModaisOS() {
-    const [colSnap, manutSnap] = await Promise.all([
-        db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
-    ]);
+    try {
+        const [colSnap, manutSnap] = await Promise.all([
+            db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get(),
+            db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
+        ]);
 
-    cacheColunasOS = colSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.ordem - b.ordem);
+        cacheColunasOS = colSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 
-    const filtroCol = document.getElementById('filtro-os-coluna');
-    if (filtroCol) {
-        filtroCol.innerHTML = '<option value="">Todos Status / Colunas</option>' +
-            cacheColunasOS.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
-    }
+        const filtroCol = document.getElementById('filtro-os-coluna');
+        if (filtroCol) {
+            filtroCol.innerHTML = '<option value="">Todos Status / Colunas</option>' +
+                cacheColunasOS.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+        }
 
-    const filtroManut = document.getElementById('filtro-os-manutentor');
-    if (filtroManut) {
-        filtroManut.innerHTML = '<option value="">Todos Manutentores</option>' +
-            manutSnap.docs.map(d => `<option value="${d.id}">${d.data().nome}</option>`).join('');
+        const filtroManut = document.getElementById('filtro-os-manutentor');
+        if (filtroManut) {
+            filtroManut.innerHTML = '<option value="">Todos Manutentores</option>' +
+                manutSnap.docs.map(d => `<option value="${d.id}">${d.data().nome}</option>`).join('');
+        }
+    } catch (err) {
+        console.error('Erro ao carregar colunas:', err);
     }
 }
 
@@ -69,7 +73,7 @@ function renderizarVisaoOS() {
     const filtradas = obterOrdensFiltradas();
     renderizarCardsMobile(filtradas);
     renderizarKanbanDesktop(filtradas);
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // ==========================================
@@ -93,18 +97,15 @@ function renderizarCardsMobile(ordens) {
         <div onclick="abrirDetalhesOS('${os.id}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <span class="text-xs font-extrabold text-slate-500">${numFormatado}</span>
-                <!-- Identificação do Status na mesma cor escolhida para a coluna -->
                 <span class="text-[11px] font-extrabold px-3 py-0.5 rounded-full text-white shadow-2xs" style="background-color: ${corStatus}">
                     ${coluna.titulo}
                 </span>
             </div>
 
-            <!-- Máquina -->
             <h3 class="font-bold text-slate-900 text-base leading-snug">
                 ${os.ativoTag || ''} - ${os.ativoNome || 'Equipamento'}
             </h3>
 
-            <!-- Tipo e Manutentor Selecionado (se houver) -->
             <div class="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
                 <span class="inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700">
                     <span class="w-2 h-2 rounded-full" style="background-color: ${os.tipoCor || '#1D4ED8'}"></span>
@@ -128,10 +129,9 @@ function renderizarCardsMobile(ordens) {
 // VISÃO DESKTOP: QUADRO KANBAN COM COLUNAS PADRONIZADAS
 // ==========================================
 function renderizarKanbanDesktop(ordens) {
-    const board = document.getElementById('os-kanban-board');
+    const board = document.getElementById('os-kanban-board') || document.getElementById('kanban-board');
     if (!board) return;
 
-    // Garante alinhamento uniforme e altura padronizada no container do quadro
     board.classList.add('items-stretch', 'h-[calc(100vh-210px)]', 'min-h-[520px]');
 
     if (cacheColunasOS.length === 0) {
@@ -145,14 +145,12 @@ function renderizarKanbanDesktop(ordens) {
         <div class="kanban-column w-[340px] min-w-[340px] max-w-[340px] shrink-0 h-full bg-slate-200/75 rounded-2xl border border-slate-300/80 flex flex-col overflow-hidden"
              ondragover="event.preventDefault()" ondrop="soltarCardKanban(event, '${col.id}')">
 
-            <!-- Cabeçalho Padronizado -->
             <div class="p-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0"
                  style="border-top: 4px solid ${col.corTopo || '#00E5B0'}">
                 <h3 class="font-bold text-sm text-slate-800 truncate" title="${col.titulo}">${col.titulo}</h3>
                 <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">${cardsColuna.length}</span>
             </div>
 
-            <!-- Lista de Cartões com Rolagem Interna Independente -->
             <div class="p-3 space-y-2.5 flex-1 overflow-y-auto">
                 ${cardsColuna.length > 0 ? cardsColuna.map(os => `
                 <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${os.id}')" onclick="abrirDetalhesOS('${os.id}')"
@@ -184,22 +182,21 @@ async function soltarCardKanban(event, novaColunaId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os || os.colunaId === novaColunaId) return;
 
-    // Identifica se o destino é a última coluna configurada (coluna de encerramento/conclusão)
     const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
     const ehColunaFinal = ultimaColuna && ultimaColuna.id === novaColunaId;
 
     if (ehColunaFinal && !os.encerrada) {
-        // Abre o modal de detalhes e já expande o formulário de encerramento/execução
         await abrirDetalhesOS(osId);
         mostrarFormularioEncerramento();
-        mostrarNotificacaoOSync('Preencha o serviço realizado, custos e anexos para concluir a O.S.', 'aviso');
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Preencha o serviço realizado, custos e anexos para concluir a O.S.', 'aviso');
+        }
         return;
     }
 
-    // Para colunas intermediárias, apenas atualiza a etapa normalmente
     await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColunaId });
     const colDestino = cacheColunasOS.find(c => c.id === novaColunaId);
-    if (colDestino) {
+    if (colDestino && typeof mostrarNotificacaoOSync === 'function') {
         mostrarNotificacaoOSync(`O.S. movida para "${colDestino.titulo}".`, 'info');
     }
 }
@@ -280,9 +277,11 @@ async function salvarNovaOS(e) {
 
         fecharModalNovaOS();
         e.target.reset();
-        mostrarNotificacaoOSync('Ordem de Serviço criada com sucesso!', 'sucesso');
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Ordem de Serviço criada com sucesso!', 'sucesso');
+        }
     } catch (err) {
-        mostrarNotificacaoOSync('Erro ao criar O.S.: ' + err.message, 'erro');
+        alert('Erro ao criar O.S.: ' + err.message);
     }
 
     btn.disabled = false;
