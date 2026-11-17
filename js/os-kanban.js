@@ -3,6 +3,12 @@ let cacheOrdensServico = [];
 let unsubscribeOS = null;
 
 async function initKanbanOS() {
+    // Exibe botão "Editar Kanban" no topo à esquerda apenas para Admin/SuperAdmin
+    const isGestor = usuarioAtual?.perfil === 'Admin' || usuarioAtual?.perfil === 'SuperAdmin';
+    if (isGestor) {
+        document.getElementById('btn-editar-kanban-os')?.classList.remove('hidden');
+    }
+
     await carregarColunasEModaisOS();
     iniciarListenerOrdensServico();
 
@@ -127,7 +133,7 @@ function renderizarKanbanDesktop(ordens) {
     board.classList.add('items-stretch', 'h-[calc(100vh-210px)]', 'min-h-[520px]');
 
     if (cacheColunasOS.length === 0) {
-        board.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 w-full text-center flex items-center justify-center">Configure as colunas do Kanban na aba Configurações.</div>`;
+        board.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 w-full text-center flex items-center justify-center">Clique em "Editar Kanban" no topo para criar suas colunas.</div>`;
         return;
     }
 
@@ -189,9 +195,166 @@ async function soltarCardKanban(event, novaColunaId) {
     await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColunaId });
 }
 
-function verificarTipoManutencaoCriacao() {
-    // Função auxiliar para gerenciar selects na criação
+// ==========================================
+// MODAL FLUTUANTE DE EDIÇÃO DO KANBAN (NA TELA DE O.S.)
+// ==========================================
+function abrirModalEditarKanbanOS() {
+    document.getElementById('modal-editar-kanban-os')?.classList.remove('hidden');
+    cancelarEdicaoColunaModalOS();
+    renderizarListaColunasModalOS();
 }
+
+function fecharModalEditarKanbanOS() {
+    document.getElementById('modal-editar-kanban-os')?.classList.add('hidden');
+    renderizarVisaoOS();
+}
+
+function renderizarListaColunasModalOS() {
+    const lista = document.getElementById('lista-colunas-modal-os');
+    if (!lista) return;
+
+    const inputOrdem = document.getElementById('os-col-ordem');
+    const editId = document.getElementById('os-col-edit-id')?.value;
+    if (inputOrdem && !editId) {
+        const maiorOrdem = cacheColunasOS.reduce((max, c) => Math.max(max, Number(c.ordem) || 0), 0);
+        inputOrdem.value = maiorOrdem + 1;
+    }
+
+    lista.innerHTML = cacheColunasOS.map((col, idx) => `
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${col.corTopo}"></span>
+                <span class="text-xs font-bold text-slate-400 shrink-0">#${col.ordem}</span>
+                <span class="text-sm font-medium text-slate-700 truncate">${col.titulo}</span>
+            </div>
+
+            <div class="flex items-center gap-0.5 shrink-0">
+                <button type="button" onclick="moverColunaModalOS(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Mover para cima"
+                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="moverColunaModalOS(${idx}, 1)" ${idx === cacheColunasOS.length - 1 ? 'disabled' : ''} title="Mover para baixo"
+                    class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 transition">
+                    <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="prepararEdicaoColunaModalOS('${col.id}')" title="Editar coluna"
+                    class="p-1.5 rounded text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="excluirColunaModalOS('${col.id}')" title="Excluir coluna"
+                    class="p-1.5 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhuma coluna cadastrada.</p>';
+
+    lucide.createIcons();
+}
+
+async function salvarColunaModalOS(e) {
+    e.preventDefault();
+    const editId = document.getElementById('os-col-edit-id').value;
+    const titulo = document.getElementById('os-col-titulo').value.trim();
+    const ordem = parseInt(document.getElementById('os-col-ordem').value) || 1;
+    const corTopo = document.getElementById('os-col-cor').value;
+
+    if (editId) {
+        await db.collection('kanban_colunas').doc(editId).update({ titulo, ordem, corTopo });
+        cancelarEdicaoColunaModalOS();
+    } else {
+        await db.collection('kanban_colunas').add({
+            empresaId: usuarioAtual.empresaId,
+            titulo,
+            ordem,
+            corTopo
+        });
+        e.target.reset();
+    }
+
+    await carregarColunasEModaisOS();
+    renderizarListaColunasModalOS();
+    renderizarVisaoOS();
+}
+
+async function moverColunaModalOS(indexAtual, direcao) {
+    const novoIndex = indexAtual + direcao;
+    if (novoIndex < 0 || novoIndex >= cacheColunasOS.length) return;
+
+    const listaReordenada = [...cacheColunasOS];
+    const [itemMovido] = listaReordenada.splice(indexAtual, 1);
+    listaReordenada.splice(novoIndex, 0, itemMovido);
+
+    const batch = db.batch();
+    listaReordenada.forEach((col, i) => {
+        batch.update(db.collection('kanban_colunas').doc(col.id), { ordem: i + 1 });
+    });
+
+    await batch.commit();
+    await carregarColunasEModaisOS();
+    renderizarListaColunasModalOS();
+    renderizarVisaoOS();
+}
+
+function prepararEdicaoColunaModalOS(colId) {
+    const col = cacheColunasOS.find(c => c.id === colId);
+    if (!col) return;
+
+    document.getElementById('os-col-edit-id').value = col.id;
+    document.getElementById('os-col-titulo').value = col.titulo;
+    document.getElementById('os-col-ordem').value = col.ordem;
+    document.getElementById('os-col-cor').value = col.corTopo || '#1D4ED8';
+
+    const btnSalvar = document.getElementById('btn-os-salvar-coluna');
+    btnSalvar.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>Salvar Alteração</span>';
+    btnSalvar.className = 'flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5';
+
+    document.getElementById('btn-os-cancelar-edit-coluna').classList.remove('hidden');
+    document.getElementById('os-col-titulo').focus();
+    lucide.createIcons();
+}
+
+function cancelarEdicaoColunaModalOS() {
+    document.getElementById('os-col-edit-id').value = '';
+    document.getElementById('form-kanban-modal-os')?.reset();
+
+    const btnSalvar = document.getElementById('btn-os-salvar-coluna');
+    if (btnSalvar) {
+        btnSalvar.innerHTML = '<i data-lucide="plus" class="w-4 h-4"></i><span>Adicionar Coluna</span>';
+        btnSalvar.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5';
+    }
+
+    document.getElementById('btn-os-cancelar-edit-coluna')?.classList.add('hidden');
+    const maiorOrdem = cacheColunasOS.reduce((max, c) => Math.max(max, Number(c.ordem) || 0), 0);
+    if (document.getElementById('os-col-ordem')) {
+        document.getElementById('os-col-ordem').value = maiorOrdem + 1;
+    }
+    lucide.createIcons();
+}
+
+async function excluirColunaModalOS(colId) {
+    if (!confirm('Deseja excluir esta coluna?')) return;
+    await db.collection('kanban_colunas').doc(colId).delete();
+
+    const restantes = cacheColunasOS.filter(c => c.id !== colId);
+    const batch = db.batch();
+    restantes.forEach((col, i) => {
+        batch.update(db.collection('kanban_colunas').doc(col.id), { ordem: i + 1 });
+    });
+    await batch.commit();
+
+    if (document.getElementById('os-col-edit-id').value === colId) {
+        cancelarEdicaoColunaModalOS();
+    }
+    await carregarColunasEModaisOS();
+    renderizarListaColunasModalOS();
+    renderizarVisaoOS();
+}
+
+// ==========================================
+// MODAL NOVA O.S.
+// ==========================================
+function verificarTipoManutencaoCriacao() {}
 
 async function abrirModalNovaOS() {
     document.getElementById('modal-nova-os').classList.remove('hidden');
