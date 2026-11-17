@@ -1,3 +1,39 @@
+// ==========================================
+// UTILITÁRIOS GLOBAIS DE BLINDAGEM CONTRA XSS
+// ==========================================
+window.escaparHTML = function (valor) {
+    if (valor === null || valor === undefined) return '';
+    return String(valor)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
+window.sanitizarCorHex = function (cor, fallback = '#00E5B0') {
+    const str = String(cor || '').trim();
+    return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(str) ? str : fallback;
+};
+
+// Controle da Gaveta Mobile Unificada (movido do HTML inline)
+window.abrirMenuGeralMobile = function () {
+    document.getElementById('mobile-menu-drawer')?.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.fecharMenuGeralMobile = function () {
+    document.getElementById('mobile-menu-drawer')?.classList.add('hidden');
+};
+
+// Registro do Service Worker (movido do HTML inline)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .catch((err) => console.warn('Aviso SW:', err));
+    });
+}
+
 let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
 
@@ -5,7 +41,7 @@ function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
     if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
     
-    // ATUALIZADO: Líder agora tem acesso a solicitações e também a ativos (para escanear/consultar QR Code e máquinas)
+    // Líder tem acesso a solicitações e ativos (para escanear/consultar QR Code e máquinas)
     if (cargo === 'Lideranca') return ['solicitacoes', 'cad-ativos'];
 
     // Para Manutentor: usa a lista personalizada salva no cadastro (padrão: O.S. e Chamados)
@@ -77,14 +113,15 @@ function aplicarPermissoesInterface(perfil) {
 function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
     document.getElementById('modal-licenca-expirada')?.remove();
 
-    const labelContrato = tipoContrato === 'teste_7d' ? '7 dias (Teste)' : '1 ano (Renovável)';
-    const dataFormatada = dataVencimento ? new Date(dataVencimento).toLocaleDateString('pt-BR') : 'Não informada';
+    const empresaSegura = escaparHTML(nomeEmpresa);
+    const labelContrato = escaparHTML(tipoContrato === 'teste_7d' ? '7 dias (Teste)' : '1 ano (Renovável)');
+    const dataFormatada = escaparHTML(dataVencimento ? new Date(dataVencimento).toLocaleDateString('pt-BR') : 'Não informada');
 
     const mensagemWhatsApp = encodeURIComponent(
         `Olá! A licença do sistema *OSync* expirou e gostaria de solicitar a renovação.\n\n` +
         `• *Empresa:* ${nomeEmpresa}\n` +
-        `• *Contrato atual:* ${labelContrato}\n` +
-        `• *Vencimento:* ${dataFormatada}`
+        `• *Contrato atual:* ${tipoContrato === 'teste_7d' ? '7 dias (Teste)' : '1 ano (Renovável)'}\n` +
+        `• *Vencimento:* ${dataVencimento ? new Date(dataVencimento).toLocaleDateString('pt-BR') : 'Não informada'}`
     );
 
     const linkWhatsApp = `https://wa.me/5551981061618?text=${mensagemWhatsApp}`;
@@ -104,7 +141,7 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5">
                     <div class="flex justify-between">
                         <span class="text-slate-500">Empresa:</span>
-                        <span class="font-bold text-slate-800">${nomeEmpresa}</span>
+                        <span class="font-bold text-slate-800">${empresaSegura}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-500">Contrato:</span>
