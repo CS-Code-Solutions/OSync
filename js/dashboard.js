@@ -271,7 +271,6 @@ function construirHTML_KPIs(ordens) {
     const concluidas = ordens.filter(o => o.encerrada).length;
     const custoTotal = ordens.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
 
-    // Máquinas que ESTÃO paradas agora (status 'Parada' no cadastro de ativos OU O.S. de máquina parada ainda em aberto)
     const idsMaquinasParadasAgora = new Set();
     cacheDashAtivos.forEach(a => {
         if (a.status === 'Parada') {
@@ -285,7 +284,6 @@ function construirHTML_KPIs(ordens) {
     });
     const qtdMaquinasParadasAgora = idsMaquinasParadasAgora.size;
 
-    // Resumo histórico de paradas dentro do período selecionado
     const ordensParadasPeriodo = ordens.filter(osTeveParadaDash);
     const totalMinutosParados = ordensParadasPeriodo.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
 
@@ -369,23 +367,26 @@ function construirHTML_CardWidget(widget) {
                 Ano
             </button>
         </div>
-    ` : `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${widget.categoria}</span>`;
+    ` : `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${escaparHTML(widget.categoria)}</span>`;
+
+    const idSeguro = escaparHTML(widget.id);
+    const tituloLimpo = escaparHTML(widget.titulo.replace(/^(Gráfico:|Alerta:|Lista:)\s*/, ''));
 
     return `
     <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between">
         <div class="flex items-start justify-between gap-2 mb-4 pb-2.5 border-b border-slate-100">
             <div>
-                <h3 class="font-bold text-slate-900 text-sm">${widget.titulo.replace(/^(Gráfico:|Alerta:|Lista:)\s*/, '')}</h3>
-                <p class="text-[11px] text-slate-400">${widget.descricao}</p>
+                <h3 class="font-bold text-slate-900 text-sm">${tituloLimpo}</h3>
+                <p class="text-[11px] text-slate-400">${escaparHTML(widget.descricao)}</p>
             </div>
             ${botoesPeriodoParadas}
         </div>
 
         ${ehLista
-            ? `<div id="conteudo-${widget.id}" class="space-y-2 max-h-64 overflow-y-auto"></div>`
+            ? `<div id="conteudo-${idSeguro}" class="space-y-2 max-h-64 overflow-y-auto"></div>`
             : ehWidgetParadas
-                ? `<div id="wrapper-grafico-maquinas-paradas" class="relative h-64 w-full"><canvas id="canvas-${widget.id}"></canvas></div>`
-                : `<div class="relative h-64 w-full"><canvas id="canvas-${widget.id}"></canvas></div>`
+                ? `<div id="wrapper-grafico-maquinas-paradas" class="relative h-64 w-full"><canvas id="canvas-${idSeguro}"></canvas></div>`
+                : `<div class="relative h-64 w-full"><canvas id="canvas-${idSeguro}"></canvas></div>`
         }
     </div>`;
 }
@@ -488,7 +489,7 @@ function montarGraficoMaquinasParadasPeriodo() {
     if (ranking.length === 0) {
         wrapper.innerHTML = `
             <div class="h-full flex flex-col items-center justify-center bg-emerald-50/70 border border-emerald-200 rounded-xl p-6 text-center">
-                <span class="text-xs font-extrabold text-emerald-800">Nenhuma máquina parada ${labelPeriodoTexto}!</span>
+                <span class="text-xs font-extrabold text-emerald-800">Nenhuma máquina parada ${escaparHTML(labelPeriodoTexto)}!</span>
                 <span class="text-[11px] text-emerald-600 mt-1">100% da frota sem registros de parada no intervalo selecionado.</span>
             </div>`;
         return;
@@ -726,10 +727,10 @@ function preencherListaMaquinasParadas() {
     el.innerHTML = paradas.map(m => `
         <div class="p-3 bg-rose-50/70 border border-rose-200 rounded-xl flex items-center justify-between text-xs">
             <div>
-                <span class="font-extrabold text-slate-900">${m.codigoTag} - ${m.nome}</span>
-                <span class="block text-[11px] text-slate-500">Setor: ${m.setor || 'Geral'}</span>
+                <span class="font-extrabold text-slate-900">${escaparHTML(m.codigoTag)} - ${escaparHTML(m.nome)}</span>
+                <span class="block text-[11px] text-slate-500">Setor: ${escaparHTML(m.setor || 'Geral')}</span>
             </div>
-            <span class="font-bold px-2.5 py-0.5 rounded-full bg-rose-600 text-white">${m.status}</span>
+            <span class="font-bold px-2.5 py-0.5 rounded-full bg-rose-600 text-white">${escaparHTML(m.status)}</span>
         </div>
     `).join('');
 }
@@ -747,10 +748,10 @@ function preencherListaOSUrgentes() {
     el.innerHTML = urgentes.map(os => `
         <div onclick="navegarPara('os')" class="cursor-pointer p-3 bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200 rounded-xl flex items-center justify-between gap-2 text-xs transition">
             <div class="min-w-0">
-                <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${os.ativoTag} - ${os.ativoNome}</span>
-                <p class="text-[11px] text-slate-600 truncate">${os.descricao}</p>
+                <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome)}</span>
+                <p class="text-[11px] text-slate-600 truncate">${escaparHTML(os.descricao)}</p>
             </div>
-            <span class="text-[11px] font-bold text-blue-700 shrink-0">${os.manutentorNome || 'Sem técnico'}</span>
+            <span class="text-[11px] font-bold text-blue-700 shrink-0">${escaparHTML(os.manutentorNome || 'Sem técnico')}</span>
         </div>
     `).join('');
 }
@@ -776,11 +777,11 @@ function renderizarListaConfigWidgets() {
     lista.innerHTML = layoutWidgetsAtual.map((w, idx) => `
         <div class="p-3.5 rounded-xl border ${w.ativo ? 'bg-white border-blue-200 shadow-2xs' : 'bg-slate-50 border-slate-200 opacity-70'} flex items-center justify-between gap-3 transition">
             <div class="flex items-start gap-3 min-w-0">
-                <input type="checkbox" ${w.ativo ? 'checked' : ''} onchange="alternarWidgetDashboard('${w.id}', this.checked)"
+                <input type="checkbox" ${w.ativo ? 'checked' : ''} onchange="alternarWidgetDashboard('${escaparHTML(w.id)}', this.checked)"
                     class="mt-1 w-4 h-4 accent-blue-600 cursor-pointer shrink-0">
                 <div class="min-w-0">
-                    <div class="text-xs font-bold text-slate-900 truncate">${w.titulo}</div>
-                    <p class="text-[11px] text-slate-500 leading-snug mt-0.5">${w.descricao}</p>
+                    <div class="text-xs font-bold text-slate-900 truncate">${escaparHTML(w.titulo)}</div>
+                    <p class="text-[11px] text-slate-500 leading-snug mt-0.5">${escaparHTML(w.descricao)}</p>
                 </div>
             </div>
 
