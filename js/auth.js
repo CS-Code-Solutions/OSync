@@ -5,7 +5,6 @@ function aplicarPermissoesInterface(perfil) {
     const cargo = (perfil || '').trim();
     const isGestor = cargo === 'Admin' || cargo === 'SuperAdmin';
 
-    // Esconde Dashboard, Cadastros, Relatórios e Configurações de Manutentores e Líderes
     if (!isGestor) {
         document.getElementById('nav-dashboard')?.classList.add('hidden');
         document.getElementById('nav-cadastros-group')?.classList.add('hidden');
@@ -18,13 +17,11 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('mob-configuracoes')?.classList.add('hidden');
     }
 
-    // Líder não acessa o quadro Kanban de O.S., apenas Solicitações
     if (cargo === 'Lideranca') {
         document.getElementById('nav-os')?.classList.add('hidden');
         document.getElementById('mob-os')?.classList.add('hidden');
     }
 
-    // Painel Master SaaS exclusivo para SuperAdmin (Desktop + Mobile)
     if (cargo === 'SuperAdmin') {
         document.getElementById('btn-menu-saas')?.classList.remove('hidden');
         document.getElementById('mob-saas')?.classList.remove('hidden');
@@ -152,13 +149,17 @@ auth.onAuthStateChanged(async (user) => {
             document.body.classList.remove('auth-loading');
 
             if (usuarioAtual.perfil === 'Lideranca') {
-                navegarPara('solicitacoes');
+                await navegarPara('solicitacoes');
             } else if (usuarioAtual.perfil === 'SuperAdmin') {
-                navegarPara('saas-empresas');
+                await navegarPara('saas-empresas');
             } else if (usuarioAtual.perfil === 'Admin') {
-                navegarPara('dashboard');
+                await navegarPara('dashboard');
             } else {
-                navegarPara('os');
+                await navegarPara('os');
+            }
+
+            if (typeof verificarQRCodeNaURL === 'function') {
+                verificarQRCodeNaURL();
             }
         }
     }, async (err) => {
