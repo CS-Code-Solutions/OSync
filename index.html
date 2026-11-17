@@ -228,5 +228,14 @@
     <script src="js/saas-master.js?v=5"></script>
     <script src="js/os-kanban.js?v=5"></script>
     <script src="js/os-execucao.js?v=5"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .catch((err) => console.warn('Aviso SW:', err));
+            });
+        }
+    </script>
+
 </body>
 </html>
