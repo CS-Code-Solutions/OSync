@@ -38,10 +38,11 @@
     </div>
 
     <!-- VISÃO DESKTOP: QUADRO KANBAN -->
-    <div id="os-kanban-board" class="hidden md:flex gap-4 overflow-x-auto pb-4 items-start">
-        <!-- Preenchido via js/os-kanban.js -->
-    </div>
+    <!-- VISÃO DESKTOP: QUADRO KANBAN COM COLUNAS PADRONIZADAS -->
+<div id="kanban-board" class="hidden md:flex items-stretch gap-4 overflow-x-auto pb-4 h-[calc(100vh-195px)] min-h-[520px]">
+    <!-- Colunas renderizadas dinamicamente via js/os-kanban.js -->
 </div>
+
 
 <!-- MODAL 1: CRIAR NOVA O.S. -->
 <div id="modal-nova-os" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
