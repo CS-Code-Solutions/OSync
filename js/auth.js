@@ -32,12 +32,17 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('mob-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
         document.getElementById('mob-os')?.classList.toggle('hidden', !permitidas.includes('os'));
         document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
-        document.getElementById('mob-configuracoes')?.classList.toggle('hidden', !permitidas.includes('configuracoes'));
 
-        // Submenus de Cadastros (Ativos/Máquinas liberado para líderes e manutentores com permissão)
+        // Oculta botão de Configurações dentro da gaveta mobile caso não tenha permissão
+        document.querySelectorAll(`[onclick*="navegarPara('configuracoes')"]`).forEach(btn => {
+            btn.classList.toggle('hidden', !permitidas.includes('configuracoes'));
+        });
+
+        // Submenus de Cadastros (Desktop e Gaveta Mobile)
         const temAtivos = permitidas.includes('cad-ativos');
-        document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !temAtivos && cargo !== 'Lideranca');
-        document.getElementById('mob-cadastros')?.classList.toggle('hidden', !temAtivos && cargo !== 'Lideranca');
+        const exibirGrupoCadastros = temAtivos || cargo === 'Lideranca';
+        document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !exibirGrupoCadastros);
+        document.getElementById('drawer-group-cadastros')?.classList.toggle('hidden', !exibirGrupoCadastros);
 
         ['cad-manutentores', 'cad-lideranca', 'cad-ativos'].forEach(rota => {
             const liberado = permitidas.includes(rota) || (cargo === 'Lideranca' && rota === 'cad-ativos');
@@ -46,11 +51,11 @@ function aplicarPermissoesInterface(perfil) {
             });
         });
 
-        // Submenus de Relatórios
+        // Submenus de Relatórios (Desktop e Gaveta Mobile)
         const rotasRelatorios = ['centros-custo', 'relatorios-os', 'relatorios-maquinas'];
         const temAlgumRelatorio = rotasRelatorios.some(r => permitidas.includes(r));
         document.getElementById('nav-relatorios-group')?.classList.toggle('hidden', !temAlgumRelatorio);
-        document.getElementById('mob-relatorios')?.classList.toggle('hidden', !temAlgumRelatorio);
+        document.getElementById('drawer-group-relatorios')?.classList.toggle('hidden', !temAlgumRelatorio);
 
         rotasRelatorios.forEach(rota => {
             const liberado = permitidas.includes(rota);
@@ -62,7 +67,10 @@ function aplicarPermissoesInterface(perfil) {
 
     if (cargo === 'SuperAdmin') {
         document.getElementById('btn-menu-saas')?.classList.remove('hidden');
-        document.getElementById('mob-saas')?.classList.remove('hidden');
+        document.getElementById('mob-drawer-saas-group')?.classList.remove('hidden');
+    } else {
+        document.getElementById('btn-menu-saas')?.classList.add('hidden');
+        document.getElementById('mob-drawer-saas-group')?.classList.add('hidden');
     }
 }
 
