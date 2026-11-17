@@ -251,7 +251,7 @@ function construirHTML_KPIs(ordens) {
 
         <div class="osync-card p-5 border-l-4 border-l-emerald-500">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase text-slate-400">Disponibilidade Frota</span>
+                <span class="text-xs font-bold uppercase text-slate-400">Disponibilidade de Ativos</span>
                 <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
             </div>
             <div class="text-2xl font-extrabold text-emerald-700 mt-1.5">${disponibilidade}%</div>
