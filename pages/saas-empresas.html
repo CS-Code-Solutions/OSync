@@ -4,7 +4,7 @@
         <div>
             <span class="text-[11px] font-extrabold uppercase tracking-widest text-[#00B88D]">Painel Master SaaS</span>
             <h1 class="text-2xl font-bold text-slate-900">Empresas Clientes (Tenants)</h1>
-            <p class="text-sm text-slate-500">Crie empresas clientes, gere códigos de convite, crie gestores e gerencie planos.</p>
+            <p class="text-sm text-slate-500">Gerencie planos, prazos de contrato (7 dias teste / 1 ano), códigos de convite e acessos.</p>
         </div>
         <button onclick="abrirModalNovaEmpresaSaaS()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
             <i data-lucide="building-2" class="w-5 h-5"></i>
@@ -36,18 +36,26 @@
                     class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
             </div>
 
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">CNPJ (Opcional)</label>
+                <input type="text" id="saas-emp-cnpj" placeholder="00.000.000/0001-00"
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">CNPJ (Opcional)</label>
-                    <input type="text" id="saas-emp-cnpj" placeholder="00.000.000/0001-00"
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Plano Contratado</label>
-                    <select id="saas-emp-plano" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Plano Contratado *</label>
+                    <select id="saas-emp-plano" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
                         <option value="Starter">Starter</option>
                         <option value="Pro" selected>Pro</option>
                         <option value="Enterprise">Enterprise</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Contrato *</label>
+                    <select id="saas-emp-contrato" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                        <option value="teste_7d">7 dias (Teste)</option>
+                        <option value="anual_1a" selected>1 ano (Renovável)</option>
                     </select>
                 </div>
             </div>
@@ -60,7 +68,7 @@
     </div>
 </div>
 
-<!-- MODAL 2: CRIAR USUÁRIO PARA A EMPRESA (GESTOR OU TESTE) -->
+<!-- MODAL 2: CRIAR USUÁRIO PARA A EMPRESA -->
 <div id="modal-usuario-empresa-saas" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
@@ -92,7 +100,7 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Setor *</label>
                     <input type="text" id="saas-user-setor" required value="Manutenção"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
                 </div>
             </div>
 
