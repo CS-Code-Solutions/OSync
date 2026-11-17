@@ -4,6 +4,14 @@ let cacheCentrosCustoOS = [];
 let osAtualEhExterna = false;
 let osAtualTeveParada = false;
 
+function sanitizarURLImagem(url) {
+    const str = String(url || '').trim();
+    if (/^https?:\/\//i.test(str) || /^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(str)) {
+        return escaparHTML(str);
+    }
+    return '';
+}
+
 function calcularMinutosParadaEntreDatas(inicioISO, terminoISO) {
     if (!inicioISO || !terminoISO) return 0;
     const d1 = new Date(inicioISO);
@@ -37,7 +45,7 @@ async function abrirDetalhesOS(osId) {
 
     const badge = document.getElementById('det-os-status-badge');
     badge.textContent = coluna.titulo;
-    badge.style.backgroundColor = coluna.corTopo || '#00E5B0';
+    badge.style.backgroundColor = sanitizarCorHex(coluna.corTopo, '#00E5B0');
 
     const condBadge = document.getElementById('det-os-condicao-badge');
     if (condBadge) {
@@ -61,7 +69,7 @@ async function abrirDetalhesOS(osId) {
 
     const selCol = document.getElementById('det-os-coluna-select');
     selCol.innerHTML = cacheColunasOS.map(c =>
-        `<option value="${c.id}" ${c.id === os.colunaId ? 'selected' : ''}>${c.titulo}</option>`
+        `<option value="${escaparHTML(c.id)}" ${c.id === os.colunaId ? 'selected' : ''}>${escaparHTML(c.titulo)}</option>`
     ).join('');
 
     const [manutSnap, ativosSnap] = await Promise.all([
@@ -71,15 +79,18 @@ async function abrirDetalhesOS(osId) {
 
     const selManut = document.getElementById('det-os-manutentor-select');
     selManut.innerHTML = '<option value="">-- Sem técnico --</option>' +
-        manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}" ${d.id === os.manutentorId ? 'selected' : ''}>${d.data().nome}</option>`).join('');
+        manutSnap.docs.map(d => {
+            const nomeSeg = escaparHTML(d.data().nome);
+            return `<option value="${escaparHTML(d.id)}" data-nome="${nomeSeg}" ${d.id === os.manutentorId ? 'selected' : ''}>${nomeSeg}</option>`;
+        }).join('');
     selManut.disabled = usuarioAtual.perfil === 'Manutentor';
 
     cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const selCC = document.getElementById('item-custo-cc');
     if (selCC) {
-        const labelPadraoOS = `${os.ativoTag} - ${os.ativoNome}`;
+        const labelPadraoOS = escaparHTML(`${os.ativoTag} - ${os.ativoNome}`);
         selCC.innerHTML = cacheCentrosCustoOS.map(a => {
-            const label = `${a.codigoTag} - ${a.nome}`;
+            const label = escaparHTML(`${a.codigoTag} - ${a.nome}`);
             const selecionado = a.id === os.ativoId ? 'selected' : '';
             return `<option value="${label}" ${selecionado}>${label}</option>`;
         }).join('') || `<option value="${labelPadraoOS}" selected>${labelPadraoOS}</option>`;
@@ -207,7 +218,7 @@ async function atualizarStatusRapidoOS() {
     if (col) {
         const badge = document.getElementById('det-os-status-badge');
         badge.textContent = col.titulo;
-        badge.style.backgroundColor = col.corTopo;
+        badge.style.backgroundColor = sanitizarCorHex(col.corTopo, '#00E5B0');
     }
 }
 
@@ -253,15 +264,18 @@ function renderizarAnexosOS() {
         return;
     }
 
-    container.innerHTML = anexosOSAtual.map((url, idx) => `
+    container.innerHTML = anexosOSAtual.map((url, idx) => {
+        const urlSegura = sanitizarURLImagem(url);
+        if (!urlSegura) return '';
+        return `
         <div class="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-slate-300 bg-white">
-            <a href="${url}" target="_blank">
-                <img src="${url}" class="w-full h-full object-cover">
+            <a href="${urlSegura}" target="_blank" rel="noopener noreferrer">
+                <img src="${urlSegura}" class="w-full h-full object-cover">
             </a>
             <button type="button" onclick="removerAnexoOS(${idx})"
                 class="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">×</button>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function removerAnexoOS(idx) {
@@ -321,8 +335,8 @@ function renderizarItensCustoOS() {
     lista.innerHTML = itensCustoOSAtual.map((item, idx) => `
         <div class="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
             <div class="min-w-0 pr-2">
-                <span class="font-bold text-slate-800">${item.descricao}</span>
-                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ml-1">${item.centroCusto}</span>
+                <span class="font-bold text-slate-800">${escaparHTML(item.descricao)}</span>
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ml-1">${escaparHTML(item.centroCusto)}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
                 <span class="font-bold text-emerald-700">R$ ${Number(item.valor).toFixed(2).replace('.', ',')}</span>
@@ -416,7 +430,6 @@ async function confirmarEncerramentoOS(e) {
             await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
         }
 
-        // Sincroniza a solicitação vinculada (tanto por solicitacaoId quanto por osId/numeroOs em chamados antigos)
         const payloadSolicitacaoEncerrada = {
             status: 'Encerrada',
             osId: osId,
