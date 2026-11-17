@@ -18,10 +18,12 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('mob-os')?.classList.add('hidden');
     }
 
-    // Painel Master SaaS exclusivo para SuperAdmin
+      // Painel Master SaaS exclusivo para SuperAdmin (Desktop + Mobile)
     if (perfil === 'SuperAdmin') {
         document.getElementById('btn-menu-saas')?.classList.remove('hidden');
+        document.getElementById('mob-saas')?.classList.remove('hidden');
     }
+
 }
 
 auth.onAuthStateChanged(async (user) => {
