@@ -26,9 +26,9 @@ async function abrirDetalhesOS(osId) {
         `<option value="${c.id}" ${c.id === os.colunaId ? 'selected' : ''}>${c.titulo}</option>`
     ).join('');
 
-    const [manutSnap, ccSnap] = await Promise.all([
+    const [manutSnap, ativosSnap] = await Promise.all([
         db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get(),
-        db.collection('centros_custo').where('empresaId', '==', usuarioAtual.empresaId).get()
+        db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get()
     ]);
 
     const selManut = document.getElementById('det-os-manutentor-select');
@@ -36,11 +36,17 @@ async function abrirDetalhesOS(osId) {
         manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}" ${d.id === os.manutentorId ? 'selected' : ''}>${d.data().nome}</option>`).join('');
     selManut.disabled = usuarioAtual.perfil === 'Manutentor';
 
-    // Preenche Centros de Custo
-    cacheCentrosCustoOS = ccSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Cada Máquina (Ativo) é um Centro de Custo e já vem pré-selecionada para a O.S. atual
+    cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const selCC = document.getElementById('item-custo-cc');
-    selCC.innerHTML = '<option value="">Centro de Custo (Opcional)</option>' +
-        cacheCentrosCustoOS.map(cc => `<option value="${cc.codigo} - ${cc.nome}">${cc.codigo} - ${cc.nome}</option>`).join('');
+    if (selCC) {
+        const labelPadraoOS = `${os.ativoTag} - ${os.ativoNome}`;
+        selCC.innerHTML = cacheCentrosCustoOS.map(a => {
+            const label = `${a.codigoTag} - ${a.nome}`;
+            const selecionado = a.id === os.ativoId ? 'selected' : '';
+            return `<option value="${label}" ${selecionado}>${label}</option>`;
+        }).join('') || `<option value="${labelPadraoOS}" selected>${labelPadraoOS}</option>`;
+    }
 
     // Carrega dados de encerramento se já existirem
     anexosOSAtual = Array.isArray(os.anexos) ? [...os.anexos] : [];
@@ -88,7 +94,6 @@ async function atualizarStatusRapidoOS() {
     const ehColunaFinal = ultimaColuna && ultimaColuna.id === novaColId;
 
     if (ehColunaFinal && os && !os.encerrada) {
-        // Volta o select para a coluna atual até que o botão "Confirmar Encerramento" seja salvo
         document.getElementById('det-os-coluna-select').value = os.colunaId;
         mostrarFormularioEncerramento();
         mostrarNotificacaoOSync('Preencha os dados abaixo e clique em Confirmar Encerramento.', 'aviso');
@@ -104,7 +109,6 @@ async function atualizarStatusRapidoOS() {
         badge.style.backgroundColor = col.corTopo;
     }
 }
-
 
 async function atualizarManutentorRapidoOS() {
     const osId = document.getElementById('det-os-id').value;
@@ -168,11 +172,15 @@ function removerAnexoOS(idx) {
 }
 
 // ==========================================
-// ITENS DE CUSTO & CENTROS DE CUSTO
+// ITENS DE CUSTO & CENTROS DE CUSTO (MÁQUINA)
 // ==========================================
 function adicionarItemCustoOS() {
+    const osId = document.getElementById('det-os-id').value;
+    const os = cacheOrdensServico.find(o => o.id === osId);
+    const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
+
     const desc = document.getElementById('item-custo-desc').value.trim();
-    const cc = document.getElementById('item-custo-cc').value;
+    const cc = document.getElementById('item-custo-cc')?.value || padraoMaquina;
     const valor = parseFloat(document.getElementById('item-custo-valor').value) || 0;
 
     if (!desc) {
@@ -180,7 +188,7 @@ function adicionarItemCustoOS() {
         return;
     }
 
-    itensCustoOSAtual.push({ descricao: desc, centroCusto: cc || 'Geral', valor });
+    itensCustoOSAtual.push({ descricao: desc, centroCusto: cc || padraoMaquina, valor });
 
     document.getElementById('item-custo-desc').value = '';
     document.getElementById('item-custo-valor').value = '';
@@ -229,23 +237,26 @@ async function confirmarEncerramentoOS(e) {
 
     try {
         const osId = document.getElementById('det-os-id').value;
+        const os = cacheOrdensServico.find(o => o.id === osId);
         const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
         const dataHoraEncerramento = document.getElementById('enc-data-hora').value;
         const observacoes = document.getElementById('enc-observacoes').value.trim();
         const custoTotal = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
 
-        // Move automaticamente para a última coluna configurada (ex: Fechadas / Concluída)
         const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
 
         const dadosAtualizacao = {
             servicoRealizado,
-            anexos: anexosOSAtual, // Salva apenas o array de URLs leves
+            anexos: anexosOSAtual,
             itensCusto: itensCustoOSAtual,
             custoTotal,
+            centroCustoId: os?.ativoId || '',
+            centroCustoNome: os ? `${os.ativoTag} - ${os.ativoNome}` : '',
             dataHoraEncerramento,
             observacoes,
             encerrada: true,
-            encerradoPor: usuarioAtual.nome
+            encerradoPor: usuarioAtual.nome,
+            encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         if (ultimaColuna) {
@@ -255,12 +266,14 @@ async function confirmarEncerramentoOS(e) {
         await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
 
         // Atualiza status da máquina de volta para Operacional
-        const os = cacheOrdensServico.find(o => o.id === osId);
         if (os?.ativoId) {
             await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
         }
 
         fecharModalDetalhesOS();
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('O.S. encerrada e custos vinculados ao Centro de Custo!', 'sucesso');
+        }
     } catch (err) {
         alert('Erro ao encerrar O.S.: ' + err.message);
     }
