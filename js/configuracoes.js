@@ -8,7 +8,6 @@ async function initConfiguracoes() {
     carregarSetoresConfig();
     carregarCentrosCustoConfig();
 
-    // Adicionar ou Editar Coluna
     document.getElementById('form-add-coluna')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const editId = document.getElementById('col-edit-id').value;
@@ -36,7 +35,6 @@ async function initConfiguracoes() {
         await carregarColunasConfig();
     });
 
-    // Adicionar Tipo de Manutenção
     document.getElementById('form-add-tipo')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const nome = document.getElementById('tipo-nome').value.trim();
@@ -52,7 +50,6 @@ async function initConfiguracoes() {
         carregarTiposConfig();
     });
 
-    // Adicionar Setor Executante
     document.getElementById('form-add-setor')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const nome = document.getElementById('setor-nome').value.trim();
@@ -66,7 +63,6 @@ async function initConfiguracoes() {
         carregarSetoresConfig();
     });
 
-    // Adicionar Centro de Custo Manual
     document.getElementById('form-add-centro-custo')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const codigo = document.getElementById('cc-codigo').value.trim().toUpperCase();
@@ -83,7 +79,6 @@ async function initConfiguracoes() {
     });
 }
 
-// Garante que o tipo fixo "Manutenção Externa" exista no banco da empresa
 async function garantirTipoManutencaoExternaFixo() {
     if (!usuarioAtual?.empresaId) return;
     const snap = await db.collection('tipos_manutencao')
@@ -95,7 +90,7 @@ async function garantirTipoManutencaoExternaFixo() {
         await db.collection('tipos_manutencao').add({
             empresaId: usuarioAtual.empresaId,
             nome: 'Manutenção Externa',
-            cor: '#8B5CF6' // Roxo distintivo
+            cor: '#8B5CF6'
         });
     }
 }
@@ -108,7 +103,7 @@ function copiarCodigoEmpresa() {
     if (!input) return;
     input.select();
     navigator.clipboard.writeText(input.value);
-    alert('Código da empresa copiado!');
+    mostrarNotificacaoOSync('Código da empresa copiado!', 'sucesso');
 }
 
 async function carregarSolicitacoesAcesso() {
@@ -158,12 +153,19 @@ async function aprovarAcessoUsuario(userId) {
         ativo: true,
         statusAcesso: 'aprovado'
     });
+    mostrarNotificacaoOSync('Acesso do colaborador liberado!', 'sucesso');
     carregarSolicitacoesAcesso();
 }
 
 async function recusarAcessoUsuario(userId, nome) {
-    if (!confirm(`Recusar e excluir o pedido de "${nome}"?`)) return;
+    const confirmado = await confirmarAcaoOSync(
+        `Recusar e excluir o pedido de cadastro de <strong>"${nome}"</strong>?`,
+        { titulo: 'Recusar Solicitação', textoConfirmar: 'Recusar e Excluir' }
+    );
+    if (!confirmado) return;
+
     await db.collection('usuarios').doc(userId).delete();
+    mostrarNotificacaoOSync('Solicitação recusada e removida.', 'info');
     carregarSolicitacoesAcesso();
 }
 
@@ -273,7 +275,12 @@ function cancelarEdicaoColuna() {
 }
 
 async function excluirColunaConfig(colId) {
-    if (!confirm('Deseja excluir esta coluna?')) return;
+    const confirmado = await confirmarAcaoOSync(
+        'Deseja excluir esta coluna do quadro Kanban?',
+        { titulo: 'Excluir Coluna', textoConfirmar: 'Excluir' }
+    );
+    if (!confirmado) return;
+
     await db.collection('kanban_colunas').doc(colId).delete();
 
     const restantes = cacheColunasConfig.filter(c => c.id !== colId);
@@ -371,7 +378,12 @@ async function carregarCentrosCustoConfig() {
 }
 
 async function deletarItemConfig(colecao, id, callback) {
-    if (!confirm('Deseja excluir este item?')) return;
+    const confirmado = await confirmarAcaoOSync(
+        'Deseja excluir este item permanentemente?',
+        { titulo: 'Excluir Registro', textoConfirmar: 'Excluir' }
+    );
+    if (!confirmado) return;
+
     await db.collection(colecao).doc(id).delete();
     callback();
 }
