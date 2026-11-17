@@ -3,8 +3,9 @@ async function navegarPara(pagina) {
     const perfil = usuarioAtual?.perfil;
     const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
 
-    // Travas de Permissão por Perfil
-    if (!isGestor && (pagina.startsWith('cad-') || pagina === 'configuracoes' || pagina === 'saas-empresas' || pagina === 'centros-custo')) {
+    const paginasRestritas = ['configuracoes', 'saas-empresas', 'centros-custo', 'relatorios-os', 'relatorios-maquinas'];
+
+    if (!isGestor && (pagina.startsWith('cad-') || paginasRestritas.includes(pagina))) {
         alert('Acesso restrito aos gestores da manutenção.');
         return;
     }
@@ -19,9 +20,9 @@ async function navegarPara(pagina) {
     if (pagina.startsWith('cad-')) {
         document.getElementById('btn-menu-cadastros')?.classList.add('active');
         document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
-    } else if (pagina === 'centros-custo') {
-        document.querySelectorAll(`[data-page="centros-custo"]`).forEach(btn => btn.classList.add('active'));
-        document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
+    } else if (pagina === 'centros-custo' || pagina.startsWith('relatorios-')) {
+        document.getElementById('btn-menu-relatorios')?.classList.add('active');
+        document.querySelector('.mobile-nav-btn[data-page="relatorios"]')?.classList.add('active');
     } else {
         document.querySelectorAll(`[data-page="${pagina}"]`).forEach(btn => btn.classList.add('active'));
     }
@@ -39,6 +40,8 @@ async function navegarPara(pagina) {
         if (pagina === 'configuracoes' && typeof initConfiguracoes === 'function') initConfiguracoes();
         if (pagina === 'saas-empresas' && typeof initSaaSEmpresas === 'function') initSaaSEmpresas();
         if (pagina === 'centros-custo' && typeof initCentrosCusto === 'function') initCentrosCusto();
+        if (pagina === 'relatorios-os' && typeof initRelatoriosOS === 'function') initRelatoriosOS();
+        if (pagina === 'relatorios-maquinas' && typeof initRelatoriosMaquinas === 'function') initRelatoriosMaquinas();
         if (pagina === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
         if (pagina === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
         if (pagina === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
@@ -54,4 +57,12 @@ function abrirMenuCadastrosMobile() {
 
 function fecharMenuCadastrosMobile() {
     document.getElementById('mobile-cadastros-drawer')?.classList.add('hidden');
+}
+
+function abrirMenuRelatoriosMobile() {
+    document.getElementById('mobile-relatorios-drawer')?.classList.remove('hidden');
+}
+
+function fecharMenuRelatoriosMobile() {
+    document.getElementById('mobile-relatorios-drawer')?.classList.add('hidden');
 }
