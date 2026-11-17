@@ -35,7 +35,7 @@
     <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
         <div class="relative lg:col-span-2">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-            <input type="text" id="rel-os-busca" oninput="filtrarRelatorioOS()" placeholder="Buscar nº O.S., máquina, descrição..."
+            <input type="text" id="rel-os-busca" oninput="filtrarRelatorioOS()" placeholder="Buscar nº O.S., máquina, falha..."
                 class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
         </div>
         <select id="rel-os-status" onchange="filtrarRelatorioOS()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
@@ -55,13 +55,12 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-900 text-white text-xs uppercase">
-                        <th class="py-3 px-4 font-bold">Nº O.S.</th>
-                        <th class="py-3 px-4 font-bold">Data</th>
-                        <th class="py-3 px-4 font-bold">Máquina / Ativo</th>
-                        <th class="py-3 px-4 font-bold">Tipo</th>
-                        <th class="py-3 px-4 font-bold">Técnico</th>
-                        <th class="py-3 px-4 font-bold">Status</th>
-                        <th class="py-3 px-4 font-bold text-right">Custo Total</th>
+                        <th class="py-3 px-2.5 font-bold w-24 whitespace-nowrap">Nº O.S.</th>
+                        <th class="py-3 px-2.5 font-bold w-24 whitespace-nowrap">Data</th>
+                        <th class="py-3 px-3 font-bold w-48">Máquina / Ativo</th>
+                        <th class="py-3 px-3 font-bold w-32">Tipo</th>
+                        <th class="py-3 px-3 font-bold">Falha do Equipamento</th>
+                        <th class="py-3 px-3 font-bold w-32 text-right">Status</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-relatorios-os" class="divide-y divide-slate-100 text-xs text-slate-700">
