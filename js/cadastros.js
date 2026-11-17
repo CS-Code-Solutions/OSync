@@ -99,20 +99,41 @@ function fecharModalNovoAtivo() {
 async function salvarNovoAtivo(e) {
     e.preventDefault();
     try {
-        await db.collection('ativos').add({
+        const codigoTag = document.getElementById('ativo-tag').value.trim().toUpperCase();
+        const nome = document.getElementById('ativo-nome').value.trim();
+        const fabricante = document.getElementById('ativo-fabricante').value.trim();
+        const modelo = document.getElementById('ativo-modelo').value.trim();
+        const setor = document.getElementById('ativo-setor').value.trim();
+        const status = document.getElementById('ativo-status').value;
+
+        const ativoRef = await db.collection('ativos').add({
             empresaId: usuarioAtual.empresaId,
-            codigoTag: document.getElementById('ativo-tag').value.trim().toUpperCase(),
-            nome: document.getElementById('ativo-nome').value.trim(),
-            fabricante: document.getElementById('ativo-fabricante').value.trim(),
-            modelo: document.getElementById('ativo-modelo').value.trim(),
-            setor: document.getElementById('ativo-setor').value.trim(),
-            status: document.getElementById('ativo-status').value,
+            codigoTag,
+            nome,
+            fabricante,
+            modelo,
+            setor,
+            status,
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Cria automaticamente o Centro de Custo vinculado à máquina
+        await db.collection('centros_custo').doc(ativoRef.id).set({
+            empresaId: usuarioAtual.empresaId,
+            ativoId: ativoRef.id,
+            codigo: codigoTag,
+            nome: `${codigoTag} - ${nome}`,
+            setor: setor || 'Geral',
+            ativo: true,
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         fecharModalNovoAtivo();
         e.target.reset();
         carregarAtivos();
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync(`Máquina "${codigoTag} - ${nome}" cadastrada como Centro de Custo!`, 'sucesso');
+        }
     } catch (err) {
         alert('Erro ao cadastrar máquina: ' + err.message);
     }
@@ -121,6 +142,7 @@ async function salvarNovoAtivo(e) {
 async function excluirAtivo(ativoId, nome) {
     if (!confirm(`Deseja excluir a máquina "${nome}"?`)) return;
     await db.collection('ativos').doc(ativoId).delete();
+    await db.collection('centros_custo').doc(ativoId).delete().catch(() => {});
     carregarAtivos();
 }
 
