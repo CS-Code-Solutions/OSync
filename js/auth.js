@@ -1,25 +1,61 @@
 let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
 
+function obterPaginasPermitidasUsuario(userObj) {
+    const cargo = (userObj?.perfil || '').trim();
+    if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
+    if (cargo === 'Lideranca') return ['solicitacoes'];
+
+    // Para Manutentor: usa a lista personalizada salva no cadastro (padrão: O.S. e Chamados)
+    if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
+        return userObj.paginasPermitidas;
+    }
+    return ['os', 'solicitacoes'];
+}
+
 function aplicarPermissoesInterface(perfil) {
     const cargo = (perfil || '').trim();
     const isGestor = cargo === 'Admin' || cargo === 'SuperAdmin';
 
     if (!isGestor) {
-        document.getElementById('nav-dashboard')?.classList.add('hidden');
-        document.getElementById('nav-cadastros-group')?.classList.add('hidden');
-        document.getElementById('nav-relatorios-group')?.classList.add('hidden');
-        document.getElementById('nav-configuracoes')?.classList.add('hidden');
+        const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || [];
 
-        document.getElementById('mob-dashboard')?.classList.add('hidden');
-        document.getElementById('mob-cadastros')?.classList.add('hidden');
-        document.getElementById('mob-relatorios')?.classList.add('hidden');
-        document.getElementById('mob-configuracoes')?.classList.add('hidden');
-    }
+        // Menu Desktop Principal
+        document.getElementById('nav-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
+        document.getElementById('nav-os')?.classList.toggle('hidden', !permitidas.includes('os'));
+        document.getElementById('nav-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
+        document.getElementById('nav-configuracoes')?.classList.toggle('hidden', !permitidas.includes('configuracoes'));
 
-    if (cargo === 'Lideranca') {
-        document.getElementById('nav-os')?.classList.add('hidden');
-        document.getElementById('mob-os')?.classList.add('hidden');
+        // Menu Mobile Inferior
+        document.getElementById('mob-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
+        document.getElementById('mob-os')?.classList.toggle('hidden', !permitidas.includes('os'));
+        document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
+        document.getElementById('mob-configuracoes')?.classList.toggle('hidden', !permitidas.includes('configuracoes'));
+
+        // Submenus de Cadastros (Apenas Ativos/Máquinas pode ser liberado para Manutentor)
+        const temAtivos = permitidas.includes('cad-ativos');
+        document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !temAtivos);
+        document.getElementById('mob-cadastros')?.classList.toggle('hidden', !temAtivos);
+
+        ['cad-manutentores', 'cad-lideranca', 'cad-ativos'].forEach(rota => {
+            const liberado = permitidas.includes(rota);
+            document.querySelectorAll(`[onclick*="navegarPara('${rota}')"]`).forEach(btn => {
+                btn.classList.toggle('hidden', !liberado);
+            });
+        });
+
+        // Submenus de Relatórios
+        const rotasRelatorios = ['centros-custo', 'relatorios-os', 'relatorios-maquinas'];
+        const temAlgumRelatorio = rotasRelatorios.some(r => permitidas.includes(r));
+        document.getElementById('nav-relatorios-group')?.classList.toggle('hidden', !temAlgumRelatorio);
+        document.getElementById('mob-relatorios')?.classList.toggle('hidden', !temAlgumRelatorio);
+
+        rotasRelatorios.forEach(rota => {
+            const liberado = permitidas.includes(rota);
+            document.querySelectorAll(`[onclick*="navegarPara('${rota}')"]`).forEach(btn => {
+                btn.classList.toggle('hidden', !liberado);
+            });
+        });
     }
 
     if (cargo === 'SuperAdmin') {
@@ -143,8 +179,10 @@ auth.onAuthStateChanged(async (user) => {
         document.getElementById('header-user-name').textContent = usuarioAtual.nome;
         document.getElementById('header-user-role').textContent = usuarioAtual.perfil;
 
+        // Reaplica permissões sempre que o documento do usuário for atualizado
+        aplicarPermissoesInterface(usuarioAtual.perfil);
+
         if (primeiraCarga) {
-            aplicarPermissoesInterface(usuarioAtual.perfil);
             atualizarStatusNuvem(true);
             document.body.classList.remove('auth-loading');
 
@@ -155,7 +193,9 @@ auth.onAuthStateChanged(async (user) => {
             } else if (usuarioAtual.perfil === 'Admin') {
                 await navegarPara('dashboard');
             } else {
-                await navegarPara('os');
+                const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || ['os'];
+                const paginaInicial = permitidas.includes('os') ? 'os' : permitidas[0];
+                await navegarPara(paginaInicial);
             }
 
             if (typeof verificarAceiteLGPD === 'function') {
