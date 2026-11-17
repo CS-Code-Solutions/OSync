@@ -102,23 +102,29 @@
 
     <!-- MENU INFERIOR MOBILE -->
     <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
-        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-2.5">
+        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-2">
             <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">O.S.</span>
         </button>
-        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2.5">
+        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
             <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Chamados</span>
         </button>
-        <button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2.5">
+        <button id="mob-cadastros" onclick="abrirMenuCadastrosMobile()" data-page="cadastros" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
             <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Cadastros</span>
         </button>
-        <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2.5">
+        <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
             <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Config</span>
         </button>
+        <!-- Botão exclusivo SuperAdmin no Mobile -->
+        <button id="mob-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2 text-[#00E5B0]">
+            <i data-lucide="building-2" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[11px] font-bold">SaaS</span>
+        </button>
     </nav>
+
 
     <!-- GAVETA MOBILE DE CADASTROS -->
     <div id="mobile-cadastros-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
