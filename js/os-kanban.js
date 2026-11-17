@@ -76,9 +76,6 @@ function renderizarVisaoOS() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// ==========================================
-// VISÃO MOBILE: CARDS LIMPÍSSIMOS SEM ARRASTAR
-// ==========================================
 function renderizarCardsMobile(ordens) {
     const container = document.getElementById('os-mobile-list');
     if (!container) return;
@@ -117,17 +114,12 @@ function renderizarCardsMobile(ordens) {
                     <i data-lucide="wrench" class="w-3 h-3"></i>
                     ${os.manutentorNome}
                 </span>` : `
-                <span class="inline-flex items-center gap-1 text-slate-400 italic">
-                    Sem técnico definido
-                </span>`}
+                <span class="text-slate-400 italic">Sem técnico definido</span>`}
             </div>
         </div>`;
     }).join('');
 }
 
-// ==========================================
-// VISÃO DESKTOP: QUADRO KANBAN COM COLUNAS PADRONIZADAS
-// ==========================================
 function renderizarKanbanDesktop(ordens) {
     const board = document.getElementById('os-kanban-board') || document.getElementById('kanban-board');
     if (!board) return;
@@ -195,10 +187,10 @@ async function soltarCardKanban(event, novaColunaId) {
     }
 
     await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColunaId });
-    const colDestino = cacheColunasOS.find(c => c.id === novaColunaId);
-    if (colDestino && typeof mostrarNotificacaoOSync === 'function') {
-        mostrarNotificacaoOSync(`O.S. movida para "${colDestino.titulo}".`, 'info');
-    }
+}
+
+function verificarTipoManutencaoCriacao() {
+    // Função auxiliar para gerenciar selects na criação
 }
 
 async function abrirModalNovaOS() {
