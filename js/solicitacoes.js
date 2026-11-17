@@ -24,6 +24,13 @@ function iniciarListenerSolicitacoes() {
     });
 }
 
+function formatarDataHoraSolicitacaoBR(isoStr) {
+    if (!isoStr || isoStr.length < 16) return '';
+    const [data, hora] = isoStr.split('T');
+    const [a, m, d] = data.split('-');
+    return `${d}/${m}/${a} às ${hora}`;
+}
+
 function renderizarSolicitacoes(lista) {
     const grid = document.getElementById('lista-solicitacoes');
     if (!grid) return;
@@ -37,18 +44,51 @@ function renderizarSolicitacoes(lista) {
 
     grid.innerHTML = lista.map(sol => {
         const pendente = sol.status === 'Pendente';
+        const encerrada = sol.status === 'Encerrada';
+        const recusada = sol.status === 'Recusada';
+        const numOsLabel = sol.numeroOs ? `#OS-${String(sol.numeroOs).padStart(4, '0')}` : '';
+
+        let badgeClasse = 'bg-blue-100 text-blue-700';
+        let corBorda = '#1D4ED8';
+        if (pendente) {
+            badgeClasse = 'bg-amber-100 text-amber-700';
+            corBorda = sol.maquinaParada ? '#E11D48' : '#F59E0B';
+        } else if (encerrada) {
+            badgeClasse = 'bg-emerald-600 text-white';
+            corBorda = '#10B981';
+        } else if (recusada) {
+            badgeClasse = 'bg-rose-100 text-rose-700';
+            corBorda = '#E11D48';
+        }
+
+        const labelStatus = encerrada
+            ? `O.S. Encerrada ${numOsLabel}`.trim()
+            : (sol.status === 'Convertida em O.S.' && numOsLabel ? `Em Atendimento (${numOsLabel})` : sol.status);
+
         return `
-        <div class="osync-card p-4 flex flex-col justify-between gap-3" style="border-left-color: ${sol.maquinaParada ? '#E11D48' : (pendente ? '#F59E0B' : '#10B981')}">
+        <div class="osync-card p-4 flex flex-col justify-between gap-3" style="border-left-color: ${corBorda}">
             <div>
-                <div class="flex items-center justify-between gap-2 mb-1.5">
-                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pendente ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}">
-                        ${sol.status}
+                <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${badgeClasse}">
+                        ${labelStatus}
                     </span>
-                    ${sol.maquinaParada ? '<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-600 text-white animate-pulse">Máquina Parada</span>' : ''}
+                    ${sol.maquinaParada && !encerrada ? '<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-600 text-white animate-pulse">Máquina Parada</span>' : ''}
                 </div>
                 <h4 class="font-bold text-slate-900 text-sm">${sol.ativoTag} - ${sol.ativoNome}</h4>
                 <p class="text-xs text-slate-600 mt-1">${sol.problema}</p>
                 <span class="text-[11px] text-slate-400 block mt-2">Solicitante: <strong>${sol.solicitanteNome}</strong> (${sol.setor || 'Produção'})</span>
+
+                ${encerrada ? `
+                <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-1">
+                    <div class="font-extrabold text-emerald-800 flex items-center gap-1.5">
+                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                        <span>Chamado Concluído pela Manutenção</span>
+                    </div>
+                    ${sol.servicoRealizado ? `<p class="text-emerald-900"><strong>Serviço realizado:</strong> ${sol.servicoRealizado}</p>` : ''}
+                    <p class="text-[11px] text-emerald-700">
+                        Encerrado por <strong>${sol.encerradoPor || 'Manutenção'}</strong>${sol.dataHoraEncerramento ? ` em ${formatarDataHoraSolicitacaoBR(sol.dataHoraEncerramento)}` : ''}
+                    </p>
+                </div>` : ''}
             </div>
 
             ${isGestor && pendente ? `
@@ -83,6 +123,10 @@ async function salvarNovaSolicitacao(e) {
     const opt = sel.options[sel.selectedIndex];
     const parada = document.getElementById('sol-maquina-parada').checked;
 
+    const agora = new Date();
+    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+    const agoraISO = agora.toISOString().slice(0, 16);
+
     await db.collection('solicitacoes').add({
         empresaId: usuarioAtual.empresaId,
         ativoId: sel.value,
@@ -93,6 +137,7 @@ async function salvarNovaSolicitacao(e) {
         setor: usuarioAtual.setor || '',
         prioridade: document.getElementById('sol-prioridade').value,
         maquinaParada: parada,
+        inicioParada: parada ? agoraISO : '',
         problema: document.getElementById('sol-problema').value.trim(),
         status: 'Pendente',
         criadoEm: firebase.firestore.FieldValue.serverTimestamp()
@@ -123,10 +168,16 @@ async function aprovarEConverterEmOS(solId) {
     }
 
     const maiorNum = osSnap.docs.reduce((max, d) => Math.max(max, d.data().numeroOs || 0), 0);
+    const novoNumeroOs = maiorNum + 1;
 
-    await db.collection('ordens_servico').add({
+    const agora = new Date();
+    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+    const agoraISO = agora.toISOString().slice(0, 16);
+
+    const novaOSRef = await db.collection('ordens_servico').add({
         empresaId: usuarioAtual.empresaId,
-        numeroOs: maiorNum + 1,
+        numeroOs: novoNumeroOs,
+        solicitacaoId: solId,
         ativoId: sol.ativoId,
         ativoTag: sol.ativoTag,
         ativoNome: sol.ativoNome,
@@ -134,18 +185,31 @@ async function aprovarEConverterEmOS(solId) {
         tipoCor: sol.maquinaParada ? '#E11D48' : '#1D4ED8',
         colunaId: colunas[0].id,
         prioridade: sol.maquinaParada ? 'Urgente' : sol.prioridade,
+        condicaoMaquina: sol.maquinaParada ? 'Maquina parada' : 'Operacional',
+        maquinaParada: Boolean(sol.maquinaParada),
+        inicioParada: sol.maquinaParada ? (sol.inicioParada || agoraISO) : '',
+        terminoParada: '',
+        tempoParadaMinutos: 0,
         descricao: `[Solicitação de ${sol.solicitanteNome}] ${sol.problema}`,
         custoTotal: 0,
         encerrada: false,
         criadoEm: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    await db.collection('solicitacoes').doc(solId).update({ status: 'Convertida em O.S.' });
-    alert(`O.S. #${String(maiorNum + 1).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`);
+    await db.collection('solicitacoes').doc(solId).update({
+        status: 'Convertida em O.S.',
+        osId: novaOSRef.id,
+        numeroOs: novoNumeroOs
+    });
+
+    if (typeof mostrarNotificacaoOSync === 'function') {
+        mostrarNotificacaoOSync(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`, 'sucesso');
+    } else {
+        alert(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`);
+    }
 }
 
 async function recusarSolicitacao(solId) {
     if (!await confirmarAcaoOSync('Deseja recusar esta solicitação de manutenção?', { titulo: 'Recusar Chamado', textoConfirmar: 'Recusar' })) return;
     await db.collection('solicitacoes').doc(solId).update({ status: 'Recusada' });
 }
-
