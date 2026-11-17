@@ -1,12 +1,14 @@
 let anexosOSAtual = [];
 let itensCustoOSAtual = [];
 let cacheCentrosCustoOS = [];
+let osAtualEhExterna = false;
 
 async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
 
     const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
+    osAtualEhExterna = (os.tipoNome || '').trim().toLowerCase() === 'manutenção externa';
 
     document.getElementById('det-os-id').value = os.id;
     document.getElementById('det-os-numero').textContent = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
@@ -20,7 +22,7 @@ async function abrirDetalhesOS(osId) {
     document.getElementById('det-os-prioridade').textContent = `Prioridade: ${os.prioridade || 'Normal'}`;
     document.getElementById('det-os-descricao').textContent = os.descricao;
 
-    // Preenche seletor de Status/Coluna e Manutentor para troca rápida no mobile
+    // Preenche seletor de Status/Coluna e Manutentor
     const selCol = document.getElementById('det-os-coluna-select');
     selCol.innerHTML = cacheColunasOS.map(c =>
         `<option value="${c.id}" ${c.id === os.colunaId ? 'selected' : ''}>${c.titulo}</option>`
@@ -36,7 +38,7 @@ async function abrirDetalhesOS(osId) {
         manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}" ${d.id === os.manutentorId ? 'selected' : ''}>${d.data().nome}</option>`).join('');
     selManut.disabled = usuarioAtual.perfil === 'Manutentor';
 
-    // Cada Máquina (Ativo) é um Centro de Custo e já vem pré-selecionada para a O.S. atual
+    // Cada Máquina (Ativo) é um Centro de Custo e já vem pré-selecionada
     cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const selCC = document.getElementById('item-custo-cc');
     if (selCC) {
@@ -48,6 +50,9 @@ async function abrirDetalhesOS(osId) {
         }).join('') || `<option value="${labelPadraoOS}" selected>${labelPadraoOS}</option>`;
     }
 
+    // Adapta o bloco de custos conforme o tipo de manutenção (Interna vs. Externa)
+    aplicarLayoutCustosPorTipo(osAtualEhExterna);
+
     // Carrega dados de encerramento se já existirem
     anexosOSAtual = Array.isArray(os.anexos) ? [...os.anexos] : [];
     itensCustoOSAtual = Array.isArray(os.itensCusto) ? [...os.itensCusto] : [];
@@ -55,7 +60,6 @@ async function abrirDetalhesOS(osId) {
     document.getElementById('enc-servico-realizado').value = os.servicoRealizado || '';
     document.getElementById('enc-observacoes').value = os.observacoes || '';
 
-    // Preenche data e hora atual por padrão (formato YYYY-MM-DDTHH:mm)
     const agora = new Date();
     agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
     document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agora.toISOString().slice(0, 16);
@@ -63,7 +67,6 @@ async function abrirDetalhesOS(osId) {
     renderizarAnexosOS();
     renderizarItensCustoOS();
 
-    // Se a O.S. já tiver encerramento salvo, já mostra o formulário aberto para consulta/edição
     if (os.encerrada) {
         mostrarFormularioEncerramento();
     } else {
@@ -73,6 +76,42 @@ async function abrirDetalhesOS(osId) {
 
     document.getElementById('modal-detalhes-os').classList.remove('hidden');
     lucide.createIcons();
+}
+
+function aplicarLayoutCustosPorTipo(ehExterna) {
+    const tituloCustos = document.getElementById('label-titulo-custos');
+    const inputDesc = document.getElementById('item-custo-desc');
+    const selCC = document.getElementById('item-custo-cc');
+    const inputValor = document.getElementById('item-custo-valor');
+    const wrapperValor = inputValor?.parentElement;
+
+    if (!inputDesc || !selCC || !inputValor || !wrapperValor) return;
+
+    if (ehExterna) {
+        if (tituloCustos) {
+            tituloCustos.innerHTML = `<i data-lucide="briefcase" class="w-4 h-4 text-purple-600"></i><span>Serviço Terceirizado & Valor</span>`;
+        }
+        inputDesc.placeholder = 'Descrição do serviço externo / Fornecedor';
+        inputDesc.className = 'sm:col-span-7 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-purple-600';
+
+        // Esconde o select de Centro de Custo (já vai automático para a máquina da O.S.)
+        selCC.classList.add('hidden');
+
+        wrapperValor.className = 'sm:col-span-5 flex gap-1.5';
+        inputValor.placeholder = 'Valor do Serviço (R$)';
+    } else {
+        if (tituloCustos) {
+            tituloCustos.innerHTML = `<i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-600"></i><span>Peças, Materiais & Custos</span>`;
+        }
+        inputDesc.placeholder = 'Item / Peça utilizada';
+        inputDesc.className = 'sm:col-span-5 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none';
+
+        selCC.classList.remove('hidden');
+        selCC.className = 'sm:col-span-4 px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none';
+
+        wrapperValor.className = 'sm:col-span-3 flex gap-1.5';
+        inputValor.placeholder = 'R$ 0,00';
+    }
 }
 
 function fecharModalDetalhesOS() {
@@ -96,7 +135,9 @@ async function atualizarStatusRapidoOS() {
     if (ehColunaFinal && os && !os.encerrada) {
         document.getElementById('det-os-coluna-select').value = os.colunaId;
         mostrarFormularioEncerramento();
-        mostrarNotificacaoOSync('Preencha os dados abaixo e clique em Confirmar Encerramento.', 'aviso');
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Preencha os dados abaixo e clique em Confirmar Encerramento.', 'aviso');
+        }
         return;
     }
 
@@ -172,15 +213,16 @@ function removerAnexoOS(idx) {
 }
 
 // ==========================================
-// ITENS DE CUSTO & CENTROS DE CUSTO (MÁQUINA)
+// ITENS DE CUSTO & CENTROS DE CUSTO
 // ==========================================
 function adicionarItemCustoOS() {
     const osId = document.getElementById('det-os-id').value;
     const os = cacheOrdensServico.find(o => o.id === osId);
     const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
 
-    const desc = document.getElementById('item-custo-desc').value.trim();
-    const cc = document.getElementById('item-custo-cc')?.value || padraoMaquina;
+    const descInput = document.getElementById('item-custo-desc');
+    const desc = descInput.value.trim() || (osAtualEhExterna ? 'Serviço de Manutenção Externa' : '');
+    const cc = osAtualEhExterna ? padraoMaquina : (document.getElementById('item-custo-cc')?.value || padraoMaquina);
     const valor = parseFloat(document.getElementById('item-custo-valor').value) || 0;
 
     if (!desc) {
@@ -188,9 +230,19 @@ function adicionarItemCustoOS() {
         return;
     }
 
-    itensCustoOSAtual.push({ descricao: desc, centroCusto: cc || padraoMaquina, valor });
+    if (valor <= 0 && osAtualEhExterna) {
+        alert('Informe o valor do serviço externo.');
+        return;
+    }
 
-    document.getElementById('item-custo-desc').value = '';
+    itensCustoOSAtual.push({
+        descricao: desc,
+        centroCusto: cc,
+        valor,
+        tipoCusto: osAtualEhExterna ? 'Serviço Externo' : 'Peça/Material'
+    });
+
+    descInput.value = '';
     document.getElementById('item-custo-valor').value = '';
     renderizarItensCustoOS();
 }
@@ -208,7 +260,7 @@ function renderizarItensCustoOS() {
     if (totalLabel) totalLabel.textContent = total.toFixed(2).replace('.', ',');
 
     if (itensCustoOSAtual.length === 0) {
-        lista.innerHTML = '<p class="text-[11px] text-slate-400">Nenhum item de custo lançado.</p>';
+        lista.innerHTML = `<p class="text-[11px] text-slate-400">${osAtualEhExterna ? 'Nenhum valor de serviço lançado.' : 'Nenhum item de custo lançado.'}</p>`;
         return;
     }
 
@@ -238,6 +290,20 @@ async function confirmarEncerramentoOS(e) {
     try {
         const osId = document.getElementById('det-os-id').value;
         const os = cacheOrdensServico.find(o => o.id === osId);
+        const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
+
+        // Caso o usuário tenha digitado o valor do serviço/item e esquecido de clicar no "+"
+        const descPendente = document.getElementById('item-custo-desc')?.value.trim();
+        const valorPendente = parseFloat(document.getElementById('item-custo-valor')?.value) || 0;
+        if (valorPendente > 0) {
+            itensCustoOSAtual.push({
+                descricao: descPendente || (osAtualEhExterna ? 'Serviço de Manutenção Externa' : 'Material / Peça'),
+                centroCusto: osAtualEhExterna ? padraoMaquina : (document.getElementById('item-custo-cc')?.value || padraoMaquina),
+                valor: valorPendente,
+                tipoCusto: osAtualEhExterna ? 'Serviço Externo' : 'Peça/Material'
+            });
+        }
+
         const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
         const dataHoraEncerramento = document.getElementById('enc-data-hora').value;
         const observacoes = document.getElementById('enc-observacoes').value.trim();
@@ -251,7 +317,7 @@ async function confirmarEncerramentoOS(e) {
             itensCusto: itensCustoOSAtual,
             custoTotal,
             centroCustoId: os?.ativoId || '',
-            centroCustoNome: os ? `${os.ativoTag} - ${os.ativoNome}` : '',
+            centroCustoNome: padraoMaquina,
             dataHoraEncerramento,
             observacoes,
             encerrada: true,
@@ -265,7 +331,6 @@ async function confirmarEncerramentoOS(e) {
 
         await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
 
-        // Atualiza status da máquina de volta para Operacional
         if (os?.ativoId) {
             await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
         }
