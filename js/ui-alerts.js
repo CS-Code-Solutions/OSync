@@ -33,13 +33,15 @@ function mostrarNotificacaoOSync(mensagem, tipo = 'info') {
         document.body.appendChild(container);
     }
 
+    const textoSeguro = typeof escaparHTML === 'function' ? escaparHTML(texto) : texto.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
     const toast = document.createElement('div');
     toast.className = `pointer-events-auto bg-[#0B1120]/95 backdrop-blur-md text-white border-l-4 ${cfg.borda} border border-slate-700/80 rounded-xl shadow-2xl p-3.5 flex items-start gap-3 transition-all duration-300 translate-y-[-10px] opacity-0`;
     toast.innerHTML = `
         <div class="w-8 h-8 rounded-lg ${cfg.iconeBg} flex items-center justify-center shrink-0 mt-0.5">
             <i data-lucide="${cfg.icone}" class="w-4 h-4"></i>
         </div>
-        <div class="flex-1 text-xs leading-relaxed text-slate-100 font-medium pt-0.5">${texto}</div>
+        <div class="flex-1 text-xs leading-relaxed text-slate-100 font-medium pt-0.5">${textoSeguro}</div>
         <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white p-0.5 shrink-0">
             <i data-lucide="x" class="w-4 h-4"></i>
         </button>
@@ -68,7 +70,7 @@ function confirmarAcaoOSync(mensagem, opcoes = {}) {
         const titulo = opcoes.titulo || 'Confirmar Ação';
         const textoConfirmar = opcoes.textoConfirmar || 'Confirmar';
         const textoCancelar = opcoes.textoCancelar || 'Cancelar';
-        const perigo = opcoes.perigo !== false; // Padrão vermelho para exclusões
+        const perigo = opcoes.perigo !== false;
 
         const corBtnConfirmar = perigo
             ? 'bg-rose-600 hover:bg-rose-700 text-white'
@@ -80,6 +82,8 @@ function confirmarAcaoOSync(mensagem, opcoes = {}) {
 
         const iconeNome = perigo ? 'alert-triangle' : 'help-circle';
 
+        const escapeFn = typeof escaparHTML === 'function' ? escaparHTML : (v) => String(v || '');
+
         const modal = document.createElement('div');
         modal.id = 'osync-confirm-modal';
         modal.className = 'fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-[10000] flex items-center justify-center p-4 animate-fade-in';
@@ -89,17 +93,17 @@ function confirmarAcaoOSync(mensagem, opcoes = {}) {
                     <div class="w-12 h-12 rounded-2xl border ${corIcone} flex items-center justify-center mx-auto">
                         <i data-lucide="${iconeNome}" class="w-6 h-6"></i>
                     </div>
-                    <h3 class="text-base font-extrabold text-white tracking-tight">${titulo}</h3>
+                    <h3 class="text-base font-extrabold text-white tracking-tight">${escapeFn(titulo)}</h3>
                     <p class="text-xs text-slate-300 leading-relaxed">${mensagem}</p>
                 </div>
                 <div class="px-5 pb-5 flex items-center gap-2.5">
                     <button type="button" id="osync-btn-cancelar"
                         class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition">
-                        ${textoCancelar}
+                        ${escapeFn(textoCancelar)}
                     </button>
                     <button type="button" id="osync-btn-confirmar"
                         class="flex-1 py-2.5 px-4 rounded-xl ${corBtnConfirmar} font-extrabold text-xs shadow-sm transition">
-                        ${textoConfirmar}
+                        ${escapeFn(textoConfirmar)}
                     </button>
                 </div>
             </div>
@@ -121,7 +125,6 @@ function confirmarAcaoOSync(mensagem, opcoes = {}) {
     });
 }
 
-// Sobrescreve o alert() nativo do navegador pelo Toast elegante do OSync
 window.alert = function(msg) {
     mostrarNotificacaoOSync(msg);
 };
