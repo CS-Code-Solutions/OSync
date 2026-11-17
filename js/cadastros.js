@@ -57,36 +57,39 @@ function renderizarListaAtivos(ativos) {
         'Parada': 'bg-rose-100 text-rose-700'
     };
 
-    lista.innerHTML = ativos.map(ativo => `
+    lista.innerHTML = ativos.map(ativo => {
+        const ativoIdSeguro = escaparHTML(ativo.id);
+        const ativoNomeSeguro = escaparHTML(ativo.nome);
+        return `
         <div class="osync-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="space-y-1">
                 <div class="flex items-center gap-2.5 flex-wrap">
-                    <span class="font-extrabold text-base text-slate-900">${ativo.codigoTag} - ${ativo.nome}</span>
+                    <span class="font-extrabold text-base text-slate-900">${escaparHTML(ativo.codigoTag)} - ${ativoNomeSeguro}</span>
                     <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-700 flex items-center gap-1">
-                        <i data-lucide="settings" class="w-3 h-3"></i> ${ativo.setor || 'Geral'}
+                        <i data-lucide="settings" class="w-3 h-3"></i> ${escaparHTML(ativo.setor || 'Geral')}
                     </span>
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${badgeStatus[ativo.status] || 'bg-slate-100 text-slate-700'}">
-                        ${ativo.status}
+                        ${escaparHTML(ativo.status)}
                     </span>
                 </div>
                 <div class="text-xs text-slate-500 flex items-center gap-3">
-                    <span><i data-lucide="factory" class="w-3.5 h-3.5 inline mr-1"></i>${ativo.fabricante || 'Fabricante N/I'}</span>
+                    <span><i data-lucide="factory" class="w-3.5 h-3.5 inline mr-1"></i>${escaparHTML(ativo.fabricante || 'Fabricante N/I')}</span>
                     <span>•</span>
-                    <span>Modelo: ${ativo.modelo || 'N/I'}</span>
+                    <span>Modelo: ${escaparHTML(ativo.modelo || 'N/I')}</span>
                 </div>
             </div>
 
             <div class="flex items-center gap-2 self-end sm:self-center">
-                <button onclick="abrirProntuarioAtivo('${ativo.id}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition">
+                <button onclick="abrirProntuarioAtivo('${ativoIdSeguro}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition">
                     <i data-lucide="qr-code" class="w-4 h-4"></i>
                     <span>QR Code & Prontuário</span>
                 </button>
-                <button onclick="excluirAtivo('${ativo.id}', '${ativo.nome}')" title="Excluir Máquina" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                <button data-nome="${ativoNomeSeguro}" onclick="excluirAtivo('${ativoIdSeguro}', this.getAttribute('data-nome'))" title="Excluir Máquina" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 
     lucide.createIcons();
 }
@@ -150,7 +153,7 @@ async function salvarNovoAtivo(e) {
 }
 
 async function excluirAtivo(ativoId, nome) {
-    if (!await confirmarAcaoOSync(`Deseja excluir a máquina <strong>"${nome}"</strong>?`, { titulo: 'Excluir Máquina', textoConfirmar: 'Excluir' })) return;
+    if (!await confirmarAcaoOSync(`Deseja excluir a máquina <strong>"${escaparHTML(nome)}"</strong>?`, { titulo: 'Excluir Máquina', textoConfirmar: 'Excluir' })) return;
     await db.collection('ativos').doc(ativoId).delete();
     await db.collection('centros_custo').doc(ativoId).delete().catch(() => {});
     carregarAtivos();
@@ -169,7 +172,7 @@ async function abrirProntuarioAtivo(ativoId) {
 
     const qrContainer = document.getElementById('qrcode-container');
     qrContainer.innerHTML = '';
-    const urlMaquina = `${window.location.origin}${window.location.pathname}?ativo=${ativo.id}`;
+    const urlMaquina = `${window.location.origin}${window.location.pathname}?ativo=${encodeURIComponent(ativo.id)}`;
     new QRCode(qrContainer, {
         text: urlMaquina,
         width: 110,
@@ -199,9 +202,9 @@ async function abrirProntuarioAtivo(ativoId) {
             return `
             <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs flex justify-between items-start gap-3">
                 <div>
-                    <div class="font-bold text-slate-800">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${os.tipoNome || 'Manutenção'}</div>
-                    <p class="text-slate-600 mt-1">${os.descricao}</p>
-                    <span class="text-[11px] text-slate-400 block mt-1">Técnico: ${os.manutentorNome || 'N/A'} • Data: ${dataFormatada}</span>
+                    <div class="font-bold text-slate-800">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${escaparHTML(os.tipoNome || 'Manutenção')}</div>
+                    <p class="text-slate-600 mt-1">${escaparHTML(os.descricao)}</p>
+                    <span class="text-[11px] text-slate-400 block mt-1">Técnico: ${escaparHTML(os.manutentorNome || 'N/A')} • Data: ${escaparHTML(dataFormatada)}</span>
                 </div>
                 <span class="font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shrink-0">
                     R$ ${Number(os.custoTotal || 0).toFixed(2)}
@@ -311,13 +314,13 @@ async function abrirModalFlutuanteQRMaquina(ativoId) {
             histBox.innerHTML = ordensAtivoQRAtual.map(os => `
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${os.tipoNome || 'Manutenção'}</span>
-                        <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">${os.statusTitulo}</span>
+                        <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${escaparHTML(os.tipoNome || 'Manutenção')}</span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">${escaparHTML(os.statusTitulo)}</span>
                     </div>
-                    <p class="text-slate-700">${os.servicoRealizado || os.descricao || '-'}</p>
+                    <p class="text-slate-700">${escaparHTML(os.servicoRealizado || os.descricao || '-')}</p>
                     <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-                        <span>Data: ${os.dataBR}</span>
-                        <span>Técnico: ${os.manutentorNome || 'N/I'}</span>
+                        <span>Data: ${escaparHTML(os.dataBR)}</span>
+                        <span>Técnico: ${escaparHTML(os.manutentorNome || 'N/I')}</span>
                     </div>
                 </div>
             `).join('');
@@ -364,7 +367,7 @@ function abrirModalQRPeriodoPDF(tipo, titulo) {
     document.getElementById('qr-pdf-tipo').value = tipo;
     document.getElementById('qr-pdf-modal-titulo').innerHTML = `
         <i data-lucide="file-down" class="w-4 h-4 text-[#00E5B0]"></i>
-        <span>${titulo}</span>
+        <span>${escaparHTML(titulo)}</span>
     `;
 
     const anoAtual = new Date().getFullYear();
@@ -640,6 +643,8 @@ async function carregarUsuariosPorPerfil(perfil) {
     }
 
     grid.innerHTML = cacheUsuariosPerfil.map(u => {
+        const uIdSeguro = escaparHTML(u.id);
+        const uNomeSeguro = escaparHTML(u.nome);
         const paginasPermitidas = Array.isArray(u.paginasPermitidas) && u.paginasPermitidas.length > 0
             ? u.paginasPermitidas
             : ['os', 'solicitacoes'];
@@ -648,7 +653,7 @@ async function carregarUsuariosPorPerfil(perfil) {
             ? `<div class="flex flex-wrap gap-1 mt-2">
                 ${paginasPermitidas.map(p => `
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                        ${ROTULOS_PAGINAS_MANUTENTOR[p] || p}
+                        ${escaparHTML(ROTULOS_PAGINAS_MANUTENTOR[p] || p)}
                     </span>
                 `).join('')}
                </div>`
@@ -658,23 +663,23 @@ async function carregarUsuariosPorPerfil(perfil) {
         <div class="osync-card p-4 flex items-start justify-between gap-3">
             <div class="flex items-start gap-3 min-w-0">
                 <div class="w-11 h-11 shrink-0 rounded-full bg-[#0B1120] text-[#00E5B0] font-bold flex items-center justify-center text-sm border border-slate-700">
-                    ${(u.nome || 'US').substring(0, 2).toUpperCase()}
+                    ${escaparHTML((u.nome || 'US').substring(0, 2).toUpperCase())}
                 </div>
                 <div class="min-w-0">
-                    <h4 class="font-bold text-slate-900 text-sm truncate">${u.nome}</h4>
-                    <p class="text-xs text-slate-500 truncate">${u.email}</p>
+                    <h4 class="font-bold text-slate-900 text-sm truncate">${uNomeSeguro}</h4>
+                    <p class="text-xs text-slate-500 truncate">${escaparHTML(u.email)}</p>
                     <span class="inline-flex items-center gap-1 mt-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                        <i data-lucide="wrench" class="w-3 h-3"></i> ${u.setor || 'Geral'}
+                        <i data-lucide="wrench" class="w-3 h-3"></i> ${escaparHTML(u.setor || 'Geral')}
                     </span>
                     ${badgesPaginas}
                 </div>
             </div>
 
             <div class="flex items-center gap-1 shrink-0">
-                <button onclick="abrirModalEditarUsuario('${u.id}')" title="Editar" class="p-2 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition">
+                <button onclick="abrirModalEditarUsuario('${uIdSeguro}')" title="Editar" class="p-2 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition">
                     <i data-lucide="pencil" class="w-4 h-4"></i>
                 </button>
-                <button onclick="excluirUsuarioPerfil('${u.id}', '${u.nome}')" title="Excluir" class="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
+                <button data-nome="${uNomeSeguro}" onclick="excluirUsuarioPerfil('${uIdSeguro}', this.getAttribute('data-nome'))" title="Excluir" class="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
             </div>
@@ -836,7 +841,7 @@ async function salvarNovoUsuario(e) {
 }
 
 async function excluirUsuarioPerfil(userId, nome) {
-    if (!await confirmarAcaoOSync(`Deseja realmente excluir <strong>"${nome}"</strong> da equipe?`, { titulo: 'Remover Colaborador', textoConfirmar: 'Excluir' })) return;
+    if (!await confirmarAcaoOSync(`Deseja realmente excluir <strong>"${escaparHTML(nome)}"</strong> da equipe?`, { titulo: 'Remover Colaborador', textoConfirmar: 'Excluir' })) return;
     try {
         await db.collection('usuarios').doc(userId).delete();
         carregarUsuariosPorPerfil(perfilAtualCadastro);
