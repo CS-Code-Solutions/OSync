@@ -14,7 +14,22 @@ function formatarDuracaoParadaOS(minutos) {
     return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+function ajustarLarguraContainerKanban(expandir) {
+    const main = document.getElementById('app-content');
+    if (!main) return;
+
+    if (expandir) {
+        main.classList.remove('max-w-7xl', 'md:p-6');
+        main.classList.add('max-w-[1720px]', 'md:px-4', 'md:py-4');
+    } else {
+        main.classList.remove('max-w-[1720px]', 'md:px-4', 'md:py-4');
+        main.classList.add('max-w-7xl', 'md:p-6');
+    }
+}
+
 async function initKanbanOS() {
+    ajustarLarguraContainerKanban(true);
+
     const isGestor = usuarioAtual?.perfil === 'Admin' || usuarioAtual?.perfil === 'SuperAdmin';
     if (isGestor) {
         document.getElementById('btn-editar-kanban-os')?.classList.remove('hidden');
@@ -60,6 +75,16 @@ function iniciarListenerOrdensServico() {
     unsubscribeOS = db.collection('ordens_servico')
         .where('empresaId', '==', usuarioAtual.empresaId)
         .onSnapshot((snap) => {
+            // Se o usuário saiu da tela de O.S., restaura a largura padrão do container e encerra o listener
+            if (!document.getElementById('kanban-board')) {
+                ajustarLarguraContainerKanban(false);
+                if (unsubscribeOS) {
+                    unsubscribeOS();
+                    unsubscribeOS = null;
+                }
+                return;
+            }
+
             cacheOrdensServico = snap.docs
                 .map(d => ({ id: d.id, ...d.data() }))
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
@@ -147,7 +172,7 @@ function renderizarKanbanDesktop(ordens) {
     const board = document.getElementById('os-kanban-board') || document.getElementById('kanban-board');
     if (!board) return;
 
-    board.classList.add('items-stretch', 'h-[calc(100vh-210px)]', 'min-h-[520px]');
+    board.className = 'hidden md:flex items-stretch gap-3 overflow-x-auto pb-3 h-[calc(100vh-190px)] min-h-[520px] kanban-scroll';
 
     if (cacheColunasOS.length === 0) {
         board.innerHTML = `<div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 w-full text-center flex items-center justify-center">Clique em "Editar Kanban" no topo para criar suas colunas.</div>`;
@@ -157,37 +182,37 @@ function renderizarKanbanDesktop(ordens) {
     board.innerHTML = cacheColunasOS.map(col => {
         const cardsColuna = ordens.filter(o => o.colunaId === col.id);
         return `
-        <div class="kanban-column w-[340px] min-w-[340px] max-w-[340px] shrink-0 h-full bg-slate-200/75 rounded-2xl border border-slate-300/80 flex flex-col overflow-hidden"
+        <div class="kanban-column flex-1 basis-0 min-w-[245px] max-w-[350px] h-full bg-slate-200/75 rounded-2xl border border-slate-300/80 flex flex-col overflow-hidden"
              ondragover="event.preventDefault()" ondrop="soltarCardKanban(event, '${col.id}')">
 
-            <div class="p-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0"
+            <div class="px-3 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0"
                  style="border-top: 4px solid ${col.corTopo || '#00E5B0'}">
-                <h3 class="font-bold text-sm text-slate-800 truncate" title="${col.titulo}">${col.titulo}</h3>
-                <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">${cardsColuna.length}</span>
+                <h3 class="font-bold text-[13px] text-slate-800 truncate" title="${col.titulo}">${col.titulo}</h3>
+                <span class="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">${cardsColuna.length}</span>
             </div>
 
-            <div class="p-3 space-y-2.5 flex-1 overflow-y-auto">
+            <div class="p-2.5 space-y-2 flex-1 overflow-y-auto kanban-scroll">
                 ${cardsColuna.length > 0 ? cardsColuna.map(os => {
                     const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
                     const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
                     return `
                 <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${os.id}')" onclick="abrirDetalhesOS('${os.id}')"
-                     class="osync-card p-3.5 cursor-pointer hover:shadow-md transition" style="border-left-color: ${col.corTopo}">
-                    <div class="flex items-center justify-between text-[11px] mb-1 gap-1">
-                        <span class="font-extrabold text-slate-500">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
-                        <span class="font-bold px-2 py-0.5 rounded text-white" style="background-color: ${col.corTopo}">${col.titulo}</span>
+                     class="osync-card p-3 cursor-pointer hover:shadow-md transition" style="border-left-color: ${col.corTopo}">
+                    <div class="flex items-center justify-between text-[10.5px] mb-1 gap-1.5">
+                        <span class="font-extrabold text-slate-500 shrink-0">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
+                        <span class="font-bold px-2 py-0.5 rounded text-white truncate max-w-[130px]" style="background-color: ${col.corTopo}" title="${col.titulo}">${col.titulo}</span>
                     </div>
-                    <h4 class="font-bold text-slate-900 text-sm">${os.ativoTag} - ${os.ativoNome}</h4>
-                    ${ehParada ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Máquina Parada${os.tempoParadaMinutos ? ` • ${formatarDuracaoParadaOS(os.tempoParadaMinutos)}` : ''}</span>` : ''}
-                    ${ehParcial ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Parcialmente Funcional</span>` : ''}
-                    <p class="text-xs text-slate-500 line-clamp-2 mt-1">${os.descricao}</p>
-                    <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 text-[11px]">
-                        <span class="font-semibold text-slate-600">${os.tipoNome || 'Geral'}</span>
-                        <span class="font-semibold text-blue-700">${os.manutentorNome || 'Sem técnico'}</span>
+                    <h4 class="font-bold text-slate-900 text-[13px] leading-snug">${os.ativoTag} - ${os.ativoNome}</h4>
+                    ${ehParada ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Máquina Parada${os.tempoParadaMinutos ? ` • ${formatarDuracaoParadaOS(os.tempoParadaMinutos)}` : ''}</span>` : ''}
+                    ${ehParcial ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Parcialmente Funcional</span>` : ''}
+                    <p class="text-[11.5px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">${os.descricao}</p>
+                    <div class="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-slate-100 text-[10.5px]">
+                        <span class="font-semibold text-slate-600 truncate">${os.tipoNome || 'Geral'}</span>
+                        <span class="font-semibold text-blue-700 truncate text-right">${os.manutentorNome || 'Sem técnico'}</span>
                     </div>
                 </div>`;
                 }).join('') : `
-                <div class="h-32 border-2 border-dashed border-slate-300/80 rounded-xl flex items-center justify-center text-xs text-slate-400 select-none">
+                <div class="h-28 border-2 border-dashed border-slate-300/80 rounded-xl flex items-center justify-center text-[11px] text-slate-400 select-none text-center px-2">
                     Arraste uma O.S. para cá
                 </div>`}
             </div>
