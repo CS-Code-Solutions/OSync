@@ -17,39 +17,42 @@ async function navegarPara(pagina) {
         }
     }
 
+    // Proteção contra Path Traversal no nome da página
+    const paginaSegura = String(pagina || 'os').replace(/[^a-z0-9\-]/gi, '');
+
     document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
 
-    if (pagina.startsWith('cad-')) {
+    if (paginaSegura.startsWith('cad-')) {
         document.getElementById('btn-menu-cadastros')?.classList.add('active');
         document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
-    } else if (pagina === 'centros-custo' || pagina.startsWith('relatorios-')) {
+    } else if (paginaSegura === 'centros-custo' || paginaSegura.startsWith('relatorios-')) {
         document.getElementById('btn-menu-relatorios')?.classList.add('active');
         document.querySelector('.mobile-nav-btn[data-page="relatorios"]')?.classList.add('active');
     } else {
-        document.querySelectorAll(`[data-page="${pagina}"]`).forEach(btn => btn.classList.add('active'));
+        document.querySelectorAll(`[data-page="${paginaSegura}"]`).forEach(btn => btn.classList.add('active'));
     }
 
     try {
-        const resposta = await fetch(`pages/${pagina}.html`);
+        const resposta = await fetch(`pages/${paginaSegura}.html`);
         if (!resposta.ok) throw new Error('Página não encontrada');
         const html = await resposta.text();
         container.innerHTML = html;
         lucide.createIcons();
 
-        if (pagina === 'dashboard' && typeof initDashboard === 'function') initDashboard();
-        if (pagina === 'os' && typeof initKanbanOS === 'function') initKanbanOS();
-        if (pagina === 'solicitacoes' && typeof initSolicitacoes === 'function') initSolicitacoes();
-        if (pagina === 'configuracoes' && typeof initConfiguracoes === 'function') initConfiguracoes();
-        if (pagina === 'saas-empresas' && typeof initSaaSEmpresas === 'function') initSaaSEmpresas();
-        if (pagina === 'centros-custo' && typeof initCentrosCusto === 'function') initCentrosCusto();
-        if (pagina === 'relatorios-os' && typeof initRelatoriosOS === 'function') initRelatoriosOS();
-        if (pagina === 'relatorios-maquinas' && typeof initRelatoriosMaquinas === 'function') initRelatoriosMaquinas();
-        if (pagina === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
-        if (pagina === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
-        if (pagina === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
+        if (paginaSegura === 'dashboard' && typeof initDashboard === 'function') initDashboard();
+        if (paginaSegura === 'os' && typeof initKanbanOS === 'function') initKanbanOS();
+        if (paginaSegura === 'solicitacoes' && typeof initSolicitacoes === 'function') initSolicitacoes();
+        if (paginaSegura === 'configuracoes' && typeof initConfiguracoes === 'function') initConfiguracoes();
+        if (paginaSegura === 'saas-empresas' && typeof initSaaSEmpresas === 'function') initSaaSEmpresas();
+        if (paginaSegura === 'centros-custo' && typeof initCentrosCusto === 'function') initCentrosCusto();
+        if (paginaSegura === 'relatorios-os' && typeof initRelatoriosOS === 'function') initRelatoriosOS();
+        if (paginaSegura === 'relatorios-maquinas' && typeof initRelatoriosMaquinas === 'function') initRelatoriosMaquinas();
+        if (paginaSegura === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
+        if (paginaSegura === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
+        if (paginaSegura === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
 
     } catch (err) {
-        container.innerHTML = `<div class="p-8 text-center text-slate-500">Tela <b>${pagina}.html</b> não encontrada.</div>`;
+        container.innerHTML = `<div class="p-8 text-center text-slate-500">Tela <b>${escaparHTML(paginaSegura)}.html</b> não encontrada.</div>`;
     }
 }
 
@@ -87,7 +90,6 @@ async function abrirLeitorQRCodeCamera() {
         video.srcObject = streamCameraQR;
         await video.play();
 
-        // Verifica suporte ao detector nativo de código de barras
         if (window.BarcodeDetector) {
             const detector = new BarcodeDetector({ formats: ['qr_code'] });
             scannerIntervalQR = setInterval(async () => {
@@ -105,7 +107,6 @@ async function abrirLeitorQRCodeCamera() {
         }
     } catch (err) {
         console.warn('Acesso direto à câmera indisponível ou negado:', err);
-        // O usuário ainda pode usar o botão de tirar foto/arquivo como fallback
     }
 }
 
@@ -148,7 +149,6 @@ async function processarArquivoQRCode(e) {
         }
     }
 
-    // Fallback: se não conseguiu decodificar automaticamente, tenta ler via URL caso o texto compartilhado contenha o ID do ativo
     const leitorLeituraManual = prompt('Digite ou cole o link/ID da máquina lida no QR Code:');
     if (leitorLeituraManual) {
         tratarTextoQRLido(leitorLeituraManual);
