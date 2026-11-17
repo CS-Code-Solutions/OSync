@@ -5,11 +5,16 @@ function aplicarPermissoesInterface(perfil) {
     const cargo = (perfil || '').trim();
     const isGestor = cargo === 'Admin' || cargo === 'SuperAdmin';
 
-    // Esconde Cadastros e Configurações de Manutentores e Líderes
+    // Esconde Dashboard, Cadastros, Relatórios e Configurações de Manutentores e Líderes
     if (!isGestor) {
+        document.getElementById('nav-dashboard')?.classList.add('hidden');
         document.getElementById('nav-cadastros-group')?.classList.add('hidden');
+        document.getElementById('nav-relatorios-group')?.classList.add('hidden');
         document.getElementById('nav-configuracoes')?.classList.add('hidden');
+
+        document.getElementById('mob-dashboard')?.classList.add('hidden');
         document.getElementById('mob-cadastros')?.classList.add('hidden');
+        document.getElementById('mob-relatorios')?.classList.add('hidden');
         document.getElementById('mob-configuracoes')?.classList.add('hidden');
     }
 
@@ -27,7 +32,6 @@ function aplicarPermissoesInterface(perfil) {
 }
 
 function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
-    // Remove modal anterior caso exista
     document.getElementById('modal-licenca-expirada')?.remove();
 
     const labelContrato = tipoContrato === 'teste_7d' ? '7 dias (Teste)' : '1 ano (Renovável)';
@@ -45,7 +49,6 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
     const modalHTML = `
     <div id="modal-licenca-expirada" class="fixed inset-0 bg-[#0B1120]/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-in">
-            <!-- Topo -->
             <div class="bg-[#0B1120] px-6 py-5 text-center border-b-2 border-rose-500">
                 <div class="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-500 flex items-center justify-center mx-auto mb-3">
                     <i data-lucide="shield-alert" class="w-8 h-8"></i>
@@ -54,7 +57,6 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                 <p class="text-xs text-slate-400 mt-1">O acesso ao ambiente desta empresa está temporariamente bloqueado.</p>
             </div>
 
-            <!-- Corpo -->
             <div class="p-6 space-y-4">
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5">
                     <div class="flex justify-between">
@@ -75,7 +77,6 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                     Para liberar novamente o acesso de toda a equipe e renovar sua assinatura, fale diretamente com o suporte comercial da <strong>CS Code Solutions</strong>.
                 </p>
 
-                <!-- Botão WhatsApp -->
                 <a href="${linkWhatsApp}" target="_blank" rel="noopener noreferrer"
                     class="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2.5 text-sm">
                     <svg class="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -100,7 +101,6 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
 auth.onAuthStateChanged(async (user) => {
     if (!user) {
         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
-        // Não redireciona imediatamente se o modal de licença expirada estiver aberto na tela
         if (!document.getElementById('modal-licenca-expirada')) {
             window.location.href = 'pages/login.html';
         }
@@ -121,7 +121,6 @@ auth.onAuthStateChanged(async (user) => {
         usuarioAtual = { id: doc.id, ...doc.data() };
         usuarioAtual.perfil = (usuarioAtual.perfil || '').trim();
 
-        // Valida se a empresa cliente está ativa e dentro do prazo do contrato (exceto SuperAdmin)
         if (usuarioAtual.perfil !== 'SuperAdmin' && usuarioAtual.empresaId) {
             try {
                 const empDoc = await db.collection('empresas').doc(usuarioAtual.empresaId).get();
@@ -156,6 +155,8 @@ auth.onAuthStateChanged(async (user) => {
                 navegarPara('solicitacoes');
             } else if (usuarioAtual.perfil === 'SuperAdmin') {
                 navegarPara('saas-empresas');
+            } else if (usuarioAtual.perfil === 'Admin') {
+                navegarPara('dashboard');
             } else {
                 navegarPara('os');
             }
