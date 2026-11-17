@@ -36,13 +36,11 @@ async function initRelatoriosMaquinas() {
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
             totalOSGeral += ordensMaquina.length;
-            const custoTotal = ordensMaquina.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
 
             return {
                 ...ativo,
                 ordens: ordensMaquina,
-                qtdOS: ordensMaquina.length,
-                custoTotal
+                qtdOS: ordensMaquina.length
             };
         })
         .sort((a, b) => (a.codigoTag || '').localeCompare(b.codigoTag || ''));
@@ -143,7 +141,7 @@ function abrirModalHistoricoMaquina(ativoId) {
     document.getElementById('det-rel-maq-fab').textContent = m.fabricante || '-';
     document.getElementById('det-rel-maq-mod').textContent = m.modelo || '-';
     document.getElementById('det-rel-maq-status').textContent = m.status || 'Operacional';
-    document.getElementById('det-rel-maq-qtd-os').textContent = `${m.qtdOS} O.S. (${m.custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`;
+    document.getElementById('det-rel-maq-qtd-os').textContent = `${m.qtdOS} O.S.`;
 
     document.getElementById('btn-abrir-pdf-maquina').onclick = () => abrirModalFiltroPDF_Maquina(m.id);
 
@@ -160,8 +158,8 @@ function abrirModalHistoricoMaquina(ativoId) {
                 <p class="text-slate-700"><strong>Problema:</strong> ${os.descricao || '-'}</p>
                 ${os.servicoRealizado ? `<p class="text-emerald-800 bg-emerald-50/70 p-2 rounded border border-emerald-100"><strong>Serviço Executado:</strong> ${os.servicoRealizado}</p>` : ''}
                 <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                    <span>Data: ${os.dataBR} • Técnico: ${os.manutentorNome || 'N/I'}</span>
-                    <span class="font-extrabold text-emerald-700">${Number(os.custoTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <span>Data: ${os.dataBR}</span>
+                    <span>Técnico: ${os.manutentorNome || 'N/I'}</span>
                 </div>
             </div>
         `).join('');
@@ -252,7 +250,6 @@ async function gerarPDFIndividualMaquina(e) {
         !prefixoFiltro || (os.dataISO && os.dataISO.startsWith(prefixoFiltro))
     );
 
-    const custoTotal = ordensFiltradas.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
     const logoObj = typeof carregarImagemLogoBase64 === 'function'
         ? await carregarImagemLogoBase64('images/cabe.png')
         : null;
@@ -299,37 +296,37 @@ async function gerarPDFIndividualMaquina(e) {
     doc.text(`Fabricante: ${m.fabricante || '-'}`, 85, 48);
     doc.text(`Modelo: ${m.modelo || '-'}`, 145, 48);
     doc.text(`Status Atual: ${m.status || 'Operacional'}`, 18, 55);
-    doc.text(`Total de O.S. no Período: ${ordensFiltradas.length}`, 145, 55);
+    doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 55);
 
     const linhas = ordensFiltradas.map(os => [
         `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
         os.dataBR,
         os.tipoNome || 'Geral',
         os.manutentorNome || '-',
-        os.servicoRealizado || os.descricao || '-',
-        Number(os.custoTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        os.statusTitulo,
+        os.servicoRealizado || os.descricao || '-'
     ]);
 
     if (linhas.length === 0) {
-        linhas.push(['-', '-', '-', '-', 'Nenhuma O.S. aplicada nesta máquina no período.', 'R$ 0,00']);
+        linhas.push(['-', '-', '-', '-', '-', 'Nenhuma O.S. aplicada nesta máquina no período.']);
     }
 
     doc.autoTable({
         startY: 67,
-        head: [['Nº O.S.', 'Data', 'Tipo', 'Técnico', 'Problema / Serviço Realizado', 'Custo']],
+        head: [['Nº O.S.', 'Data', 'Tipo', 'Técnico', 'Status', 'Problema / Serviço Realizado']],
         body: linhas,
-        foot: [['', '', '', '', 'CUSTO TOTAL NO PERÍODO', custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })]],
+        foot: [['', '', '', '', 'TOTAL DE O.S.', `${ordensFiltradas.length} O.S.`]],
         theme: 'grid',
         headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
-        footStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], fontStyle: 'bold', fontSize: 9.5 },
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 9 },
         styles: { fontSize: 8, cellPadding: 2.8 },
         columnStyles: {
             0: { cellWidth: 22, fontStyle: 'bold' },
             1: { cellWidth: 22 },
             2: { cellWidth: 28 },
             3: { cellWidth: 26 },
-            4: { cellWidth: 'auto' },
-            5: { cellWidth: 26, halign: 'right', fontStyle: 'bold' }
+            4: { cellWidth: 24 },
+            5: { cellWidth: 'auto' }
         }
     });
 
