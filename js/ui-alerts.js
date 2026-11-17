@@ -1,12 +1,11 @@
 /**
  * Notificações Toast e Diálogos Modernos OSync
- * Substitui automaticamente os alertas nativos (window.alert)
+ * Substitui automaticamente os alertas nativos (window.alert) e fornece confirmação modal
  */
 function mostrarNotificacaoOSync(mensagem, tipo = 'info') {
     const texto = String(mensagem || '');
     const lower = texto.toLowerCase();
 
-    // Detecta automaticamente o tipo se não for informado explicitamente
     if (tipo === 'info') {
         if (lower.includes('erro') || lower.includes('falha') || lower.includes('bloquead') || lower.includes('restrito') || lower.includes('expir')) {
             tipo = 'erro';
@@ -57,6 +56,69 @@ function mostrarNotificacaoOSync(mensagem, tipo = 'info') {
         toast.classList.add('opacity-0', 'translate-y-[-10px]');
         setTimeout(() => toast.remove(), 300);
     }, 4500);
+}
+
+/**
+ * Modal de Confirmação no padrão visual OSync (substitui window.confirm)
+ */
+function confirmarAcaoOSync(mensagem, opcoes = {}) {
+    return new Promise((resolve) => {
+        document.getElementById('osync-confirm-modal')?.remove();
+
+        const titulo = opcoes.titulo || 'Confirmar Ação';
+        const textoConfirmar = opcoes.textoConfirmar || 'Confirmar';
+        const textoCancelar = opcoes.textoCancelar || 'Cancelar';
+        const perigo = opcoes.perigo !== false; // Padrão vermelho para exclusões
+
+        const corBtnConfirmar = perigo
+            ? 'bg-rose-600 hover:bg-rose-700 text-white'
+            : 'bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120]';
+
+        const corIcone = perigo
+            ? 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+            : 'bg-[#00E5B0]/15 border-[#00E5B0]/40 text-[#00E5B0]';
+
+        const iconeNome = perigo ? 'alert-triangle' : 'help-circle';
+
+        const modal = document.createElement('div');
+        modal.id = 'osync-confirm-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-[10000] flex items-center justify-center p-4 animate-fade-in';
+        modal.innerHTML = `
+            <div class="bg-[#0B1120] w-full max-w-sm rounded-2xl shadow-2xl border border-slate-700/80 overflow-hidden">
+                <div class="p-5 text-center space-y-3">
+                    <div class="w-12 h-12 rounded-2xl border ${corIcone} flex items-center justify-center mx-auto">
+                        <i data-lucide="${iconeNome}" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-base font-extrabold text-white tracking-tight">${titulo}</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">${mensagem}</p>
+                </div>
+                <div class="px-5 pb-5 flex items-center gap-2.5">
+                    <button type="button" id="osync-btn-cancelar"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition">
+                        ${textoCancelar}
+                    </button>
+                    <button type="button" id="osync-btn-confirmar"
+                        class="flex-1 py-2.5 px-4 rounded-xl ${corBtnConfirmar} font-extrabold text-xs shadow-sm transition">
+                        ${textoConfirmar}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        const fechar = (resposta) => {
+            modal.remove();
+            resolve(resposta);
+        };
+
+        document.getElementById('osync-btn-cancelar').onclick = () => fechar(false);
+        document.getElementById('osync-btn-confirmar').onclick = () => fechar(true);
+        modal.onclick = (e) => {
+            if (e.target === modal) fechar(false);
+        };
+    });
 }
 
 // Sobrescreve o alert() nativo do navegador pelo Toast elegante do OSync
