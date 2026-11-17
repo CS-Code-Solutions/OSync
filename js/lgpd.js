@@ -47,17 +47,17 @@ function exibirModalBloqueioLGPD(user) {
                 </p>
 
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-[11px] text-slate-600">
-                    <div class="font-bold text-slate-800">Resumo do Tratamento de Dados:</div>
-                    <p>• <strong>Dados tratados:</strong> Nome, e-mail, setor, registros técnicos de O.S., fotos de equipamentos e assinatura digital de encerramento.</p>
-                    <p>• <strong>Finalidade:</strong> Rastreabilidade operacional e auditoria de manutenção da sua empresa.</p>
-                    <p>• <strong>Segurança:</strong> Dados isolados por empresa, sem compartilhamento publicitário com terceiros.</p>
+                    <div class="font-bold text-slate-800">Resumo dos Termos e Tratamento de Dados:</div>
+                    <p>• <strong>Dados tratados:</strong> Nome, e-mail, setor, registros técnicos de O.S., apontamentos de execução e fotos de equipamentos.</p>
+                    <p>• <strong>Finalidade e Segurança:</strong> Rastreabilidade operacional da sua empresa, com dados isolados e sem compartilhamento publicitário.</p>
+                    <p>• <strong>Responsabilidade pelos Registros:</strong> O sistema não se responsabiliza pelo uso indevido nem pelo preenchimento de informações falsas, como concluir ou apontar a execução de uma tarefa sem tê-la realmente executado.</p>
                 </div>
 
                 <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-300 bg-white cursor-pointer hover:border-blue-600 transition select-none">
                     <input type="checkbox" id="chk-aceite-lgpd-modal" onchange="alternarBotaoAceiteLGPD()"
                         class="mt-0.5 w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0">
                     <span class="text-xs text-slate-700 font-medium">
-                        Li e concordo com a <a href="pages/privacidade.html" target="_blank" class="text-blue-600 font-bold underline hover:text-blue-800">Política de Privacidade e Termos de Uso</a> e autorizo o tratamento dos meus dados para gestão de manutenção.
+                        Li e concordo com a <a href="pages/privacidade.html" target="_blank" class="text-blue-600 font-bold underline hover:text-blue-800">Política de Privacidade e Termos de Uso</a>, assumindo a veracidade dos registros lançados por mim no sistema.
                     </span>
                 </label>
 
