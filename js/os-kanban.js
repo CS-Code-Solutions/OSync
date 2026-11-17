@@ -31,7 +31,6 @@ async function initKanbanOS() {
     ajustarLarguraContainerKanban(true);
 
     const isGestor = usuarioAtual?.perfil === 'Admin' || usuarioAtual?.perfil === 'SuperAdmin';
-    // Exibe o botão "Editar Kanban" apenas para gestores em telas desktop/tablet (a partir de 768px)
     if (isGestor && window.innerWidth >= 768) {
         document.getElementById('btn-editar-kanban-os')?.classList.remove('hidden');
     }
@@ -57,13 +56,13 @@ async function carregarColunasEModaisOS() {
         const filtroCol = document.getElementById('filtro-os-coluna');
         if (filtroCol) {
             filtroCol.innerHTML = '<option value="">Todos Status / Colunas</option>' +
-                cacheColunasOS.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+                cacheColunasOS.map(c => `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`).join('');
         }
 
         const filtroManut = document.getElementById('filtro-os-manutentor');
         if (filtroManut) {
             filtroManut.innerHTML = '<option value="">Todos Manutentores</option>' +
-                manutSnap.docs.map(d => `<option value="${d.id}">${d.data().nome}</option>`).join('');
+                manutSnap.docs.map(d => `<option value="${escaparHTML(d.id)}">${escaparHTML(d.data().nome)}</option>`).join('');
         }
     } catch (err) {
         console.error('Erro ao carregar colunas:', err);
@@ -76,7 +75,6 @@ function iniciarListenerOrdensServico() {
     unsubscribeOS = db.collection('ordens_servico')
         .where('empresaId', '==', usuarioAtual.empresaId)
         .onSnapshot((snap) => {
-            // Se o usuário saiu da tela de O.S., restaura a largura padrão do container e encerra o listener
             if (!document.getElementById('kanban-board')) {
                 ajustarLarguraContainerKanban(false);
                 if (unsubscribeOS) {
@@ -130,13 +128,15 @@ function renderizarCardsMobile(ordens) {
 
     container.innerHTML = ordens.map(os => {
         const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
-        const corStatus = coluna.corTopo || '#00E5B0';
-        const numFormatado = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
+        const corStatus = sanitizarCorHex(coluna.corTopo, '#00E5B0');
+        const corTipo = sanitizarCorHex(os.tipoCor, '#1D4ED8');
+        const osIdSeguro = escaparHTML(os.id);
+        const numFormatado = `#OS-${String(Number(os.numeroOs) || 0).padStart(4, '0')}`;
         const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
         const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
 
         return `
-        <div onclick="abrirDetalhesOS('${os.id}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
+        <div onclick="abrirDetalhesOS('${osIdSeguro}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-xs font-extrabold text-slate-500">${numFormatado}</span>
@@ -144,24 +144,24 @@ function renderizarCardsMobile(ordens) {
                     ${ehParcial ? `<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-500 text-white">Parcial</span>` : ''}
                 </div>
                 <span class="text-[11px] font-extrabold px-3 py-0.5 rounded-full text-white shadow-2xs" style="background-color: ${corStatus}">
-                    ${coluna.titulo}
+                    ${escaparHTML(coluna.titulo)}
                 </span>
             </div>
 
             <h3 class="font-bold text-slate-900 text-base leading-snug">
-                ${os.ativoTag || ''} - ${os.ativoNome || 'Equipamento'}
+                ${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome || 'Equipamento')}
             </h3>
 
             <div class="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
                 <span class="inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700">
-                    <span class="w-2 h-2 rounded-full" style="background-color: ${os.tipoCor || '#1D4ED8'}"></span>
-                    ${os.tipoNome || 'Manutenção'}
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${corTipo}"></span>
+                    ${escaparHTML(os.tipoNome || 'Manutenção')}
                 </span>
 
                 ${os.manutentorNome ? `
                 <span class="inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
                     <i data-lucide="wrench" class="w-3 h-3"></i>
-                    ${os.manutentorNome}
+                    ${escaparHTML(os.manutentorNome)}
                 </span>` : `
                 <span class="text-slate-400 italic">Sem técnico definido</span>`}
             </div>
@@ -182,34 +182,39 @@ function renderizarKanbanDesktop(ordens) {
 
     board.innerHTML = cacheColunasOS.map(col => {
         const cardsColuna = ordens.filter(o => o.colunaId === col.id);
+        const corCol = sanitizarCorHex(col.corTopo, '#00E5B0');
+        const colIdSeguro = escaparHTML(col.id);
+        const tituloColSeguro = escaparHTML(col.titulo);
+
         return `
         <div class="kanban-column flex-1 basis-0 min-w-[245px] max-w-[350px] h-full bg-slate-200/75 rounded-2xl border border-slate-300/80 flex flex-col overflow-hidden"
-             ondragover="event.preventDefault()" ondrop="soltarCardKanban(event, '${col.id}')">
+             ondragover="event.preventDefault()" ondrop="soltarCardKanban(event, '${colIdSeguro}')">
 
             <div class="px-3 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0"
-                 style="border-top: 4px solid ${col.corTopo || '#00E5B0'}">
-                <h3 class="font-bold text-[13px] text-slate-800 truncate" title="${col.titulo}">${col.titulo}</h3>
+                 style="border-top: 4px solid ${corCol}">
+                <h3 class="font-bold text-[13px] text-slate-800 truncate" title="${tituloColSeguro}">${tituloColSeguro}</h3>
                 <span class="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">${cardsColuna.length}</span>
             </div>
 
             <div class="p-2.5 space-y-2 flex-1 overflow-y-auto kanban-scroll">
                 ${cardsColuna.length > 0 ? cardsColuna.map(os => {
+                    const osIdSeguro = escaparHTML(os.id);
                     const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
                     const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
                     return `
-                <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${os.id}')" onclick="abrirDetalhesOS('${os.id}')"
-                     class="osync-card p-3 cursor-pointer hover:shadow-md transition" style="border-left-color: ${col.corTopo}">
+                <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${osIdSeguro}')" onclick="abrirDetalhesOS('${osIdSeguro}')"
+                     class="osync-card p-3 cursor-pointer hover:shadow-md transition" style="border-left-color: ${corCol}">
                     <div class="flex items-center justify-between text-[10.5px] mb-1 gap-1.5">
-                        <span class="font-extrabold text-slate-500 shrink-0">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
-                        <span class="font-bold px-2 py-0.5 rounded text-white truncate max-w-[130px]" style="background-color: ${col.corTopo}" title="${col.titulo}">${col.titulo}</span>
+                        <span class="font-extrabold text-slate-500 shrink-0">#OS-${String(Number(os.numeroOs) || 0).padStart(4, '0')}</span>
+                        <span class="font-bold px-2 py-0.5 rounded text-white truncate max-w-[130px]" style="background-color: ${corCol}" title="${tituloColSeguro}">${tituloColSeguro}</span>
                     </div>
-                    <h4 class="font-bold text-slate-900 text-[13px] leading-snug">${os.ativoTag} - ${os.ativoNome}</h4>
+                    <h4 class="font-bold text-slate-900 text-[13px] leading-snug">${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome)}</h4>
                     ${ehParada ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Máquina Parada${os.tempoParadaMinutos ? ` • ${formatarDuracaoParadaOS(os.tempoParadaMinutos)}` : ''}</span>` : ''}
                     ${ehParcial ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Parcialmente Funcional</span>` : ''}
-                    <p class="text-[11.5px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">${os.descricao}</p>
+                    <p class="text-[11.5px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">${escaparHTML(os.descricao)}</p>
                     <div class="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-slate-100 text-[10.5px]">
-                        <span class="font-semibold text-slate-600 truncate">${os.tipoNome || 'Geral'}</span>
-                        <span class="font-semibold text-blue-700 truncate text-right">${os.manutentorNome || 'Sem técnico'}</span>
+                        <span class="font-semibold text-slate-600 truncate">${escaparHTML(os.tipoNome || 'Geral')}</span>
+                        <span class="font-semibold text-blue-700 truncate text-right">${escaparHTML(os.manutentorNome || 'Sem técnico')}</span>
                     </div>
                 </div>`;
                 }).join('') : `
@@ -269,12 +274,15 @@ function renderizarListaColunasModalOS() {
         inputOrdem.value = maiorOrdem + 1;
     }
 
-    lista.innerHTML = cacheColunasOS.map((col, idx) => `
+    lista.innerHTML = cacheColunasOS.map((col, idx) => {
+        const corCol = sanitizarCorHex(col.corTopo, '#1D4ED8');
+        const colIdSeguro = escaparHTML(col.id);
+        return `
         <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200 gap-2">
             <div class="flex items-center gap-2 min-w-0">
-                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${col.corTopo}"></span>
-                <span class="text-xs font-bold text-slate-400 shrink-0">#${col.ordem}</span>
-                <span class="text-sm font-medium text-slate-700 truncate">${col.titulo}</span>
+                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${corCol}"></span>
+                <span class="text-xs font-bold text-slate-400 shrink-0">#${Number(col.ordem) || 0}</span>
+                <span class="text-sm font-medium text-slate-700 truncate">${escaparHTML(col.titulo)}</span>
             </div>
 
             <div class="flex items-center gap-0.5 shrink-0">
@@ -286,17 +294,17 @@ function renderizarListaColunasModalOS() {
                     class="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-25 transition">
                     <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
                 </button>
-                <button type="button" onclick="prepararEdicaoColunaModalOS('${col.id}')" title="Editar coluna"
+                <button type="button" onclick="prepararEdicaoColunaModalOS('${colIdSeguro}')" title="Editar coluna"
                     class="p-1.5 rounded text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                 </button>
-                <button type="button" onclick="excluirColunaModalOS('${col.id}')" title="Excluir coluna"
+                <button type="button" onclick="excluirColunaModalOS('${colIdSeguro}')" title="Excluir coluna"
                     class="p-1.5 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
             </div>
-        </div>
-    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhuma coluna cadastrada.</p>';
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhuma coluna cadastrada.</p>';
 
     lucide.createIcons();
 }
@@ -306,7 +314,7 @@ async function salvarColunaModalOS(e) {
     const editId = document.getElementById('os-col-edit-id').value;
     const titulo = document.getElementById('os-col-titulo').value.trim();
     const ordem = parseInt(document.getElementById('os-col-ordem').value) || 1;
-    const corTopo = document.getElementById('os-col-cor').value;
+    const corTopo = sanitizarCorHex(document.getElementById('os-col-cor').value, '#1D4ED8');
 
     if (editId) {
         await db.collection('kanban_colunas').doc(editId).update({ titulo, ordem, corTopo });
@@ -352,7 +360,7 @@ function prepararEdicaoColunaModalOS(colId) {
     document.getElementById('os-col-edit-id').value = col.id;
     document.getElementById('os-col-titulo').value = col.titulo;
     document.getElementById('os-col-ordem').value = col.ordem;
-    document.getElementById('os-col-cor').value = col.corTopo || '#1D4ED8';
+    document.getElementById('os-col-cor').value = sanitizarCorHex(col.corTopo, '#1D4ED8');
 
     const btnSalvar = document.getElementById('btn-os-salvar-coluna');
     btnSalvar.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>Salvar Alteração</span>';
@@ -440,26 +448,27 @@ async function abrirModalNovaOS() {
 
     document.getElementById('os-ativo').innerHTML = ativosSnap.docs.map(d => {
         const a = d.data();
-        return `<option value="${d.id}" data-tag="${a.codigoTag}" data-nome="${a.nome}">${a.codigoTag} - ${a.nome}</option>`;
+        return `<option value="${escaparHTML(d.id)}" data-tag="${escaparHTML(a.codigoTag)}" data-nome="${escaparHTML(a.nome)}">${escaparHTML(a.codigoTag)} - ${escaparHTML(a.nome)}</option>`;
     }).join('');
 
     document.getElementById('os-tipo').innerHTML = tiposSnap.docs.map(d => {
         const t = d.data();
-        return `<option value="${t.nome}" data-cor="${t.cor}">${t.nome}</option>`;
+        const cor = sanitizarCorHex(t.cor, '#1D4ED8');
+        return `<option value="${escaparHTML(t.nome)}" data-cor="${cor}">${escaparHTML(t.nome)}</option>`;
     }).join('');
 
     document.getElementById('os-coluna-inicial').innerHTML = cacheColunasOS.map(c =>
-        `<option value="${c.id}">${c.titulo}</option>`
+        `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`
     ).join('');
 
     const selectManut = document.getElementById('os-manutentor');
     if (usuarioAtual.perfil === 'Manutentor') {
-        selectManut.innerHTML = `<option value="${usuarioAtual.id}" data-nome="${usuarioAtual.nome}" selected>${usuarioAtual.nome}</option>`;
+        selectManut.innerHTML = `<option value="${escaparHTML(usuarioAtual.id)}" data-nome="${escaparHTML(usuarioAtual.nome)}" selected>${escaparHTML(usuarioAtual.nome)}</option>`;
         selectManut.disabled = true;
     } else {
         selectManut.disabled = false;
         selectManut.innerHTML = '<option value="">-- Não atribuído --</option>' +
-            manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}">${d.data().nome}</option>`).join('');
+            manutSnap.docs.map(d => `<option value="${escaparHTML(d.id)}" data-nome="${escaparHTML(d.data().nome)}">${escaparHTML(d.data().nome)}</option>`).join('');
     }
 }
 
@@ -496,7 +505,7 @@ async function salvarNovaOS(e) {
             ativoTag: optAtivo?.getAttribute('data-tag') || '',
             ativoNome: optAtivo?.getAttribute('data-nome') || '',
             tipoNome: selTipo.value,
-            tipoCor: optTipo?.getAttribute('data-cor') || '#1D4ED8',
+            tipoCor: sanitizarCorHex(optTipo?.getAttribute('data-cor'), '#1D4ED8'),
             colunaId: document.getElementById('os-coluna-inicial').value,
             prioridade: document.getElementById('os-prioridade').value,
             condicaoMaquina,
@@ -512,7 +521,6 @@ async function salvarNovaOS(e) {
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Atualiza status operacional do equipamento conforme a condição informada
         if (selAtivo.value) {
             const novoStatusAtivo = ehMaquinaParada
                 ? 'Parada'
