@@ -82,6 +82,19 @@ function mostrarFormularioEncerramento() {
 async function atualizarStatusRapidoOS() {
     const osId = document.getElementById('det-os-id').value;
     const novaColId = document.getElementById('det-os-coluna-select').value;
+    const os = cacheOrdensServico.find(o => o.id === osId);
+
+    const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
+    const ehColunaFinal = ultimaColuna && ultimaColuna.id === novaColId;
+
+    if (ehColunaFinal && os && !os.encerrada) {
+        // Volta o select para a coluna atual até que o botão "Confirmar Encerramento" seja salvo
+        document.getElementById('det-os-coluna-select').value = os.colunaId;
+        mostrarFormularioEncerramento();
+        mostrarNotificacaoOSync('Preencha os dados abaixo e clique em Confirmar Encerramento.', 'aviso');
+        return;
+    }
+
     await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColId });
 
     const col = cacheColunasOS.find(c => c.id === novaColId);
@@ -91,6 +104,7 @@ async function atualizarStatusRapidoOS() {
         badge.style.backgroundColor = col.corTopo;
     }
 }
+
 
 async function atualizarManutentorRapidoOS() {
     const osId = document.getElementById('det-os-id').value;
