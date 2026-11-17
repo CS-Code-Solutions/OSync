@@ -1,6 +1,25 @@
 let cacheRelatorioOS = [];
 let cacheColunasRelOS = [];
 
+function calcularMinutosParadaRelOS(os) {
+    if (Number(os.tempoParadaMinutos) > 0) return Number(os.tempoParadaMinutos);
+    if (os.inicioParada && os.terminoParada) {
+        const d1 = new Date(os.inicioParada);
+        const d2 = new Date(os.terminoParada);
+        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
+            return Math.round((d2.getTime() - d1.getTime()) / 60000);
+        }
+    }
+    return 0;
+}
+
+function formatarHorasParadasRelOS(minutos) {
+    const mins = Math.max(0, Math.round(Number(minutos) || 0));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
 async function initRelatoriosOS() {
     const tbody = document.getElementById('tabela-relatorios-os');
     if (tbody) {
@@ -23,18 +42,20 @@ async function initRelatoriosOS() {
             const data = d.data();
             const col = cacheColunasRelOS.find(c => c.id === data.colunaId);
             const dataISO = extrairDataISO_OS(data);
+            const minutosParada = calcularMinutosParadaRelOS(data);
             return {
                 id: d.id,
                 ...data,
                 statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
                 statusCor: col ? col.corTopo : '#00E5B0',
                 dataISO,
-                dataBR: formatarDataBR_OS(dataISO)
+                dataBR: formatarDataBR_OS(dataISO),
+                minutosParada,
+                paradaLabel: minutosParada > 0 ? formatarHorasParadasRelOS(minutosParada) : (data.maquinaParada || data.condicaoMaquina === 'Maquina parada' ? 'Em aberto' : '-')
             };
         })
         .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
-    // Preenche filtros
     const selStatus = document.getElementById('rel-os-status');
     if (selStatus) {
         selStatus.innerHTML = '<option value="">Todos Status</option>' +
@@ -109,7 +130,10 @@ function filtrarRelatorioOS() {
 
     tbody.innerHTML = lista.map(os => `
         <tr class="hover:bg-slate-50 transition">
-            <td class="py-3 px-4 font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</td>
+            <td class="py-3 px-4 font-extrabold text-slate-900">
+                <div>#OS-${String(os.numeroOs || 0).padStart(4, '0')}</div>
+                ${os.minutosParada > 0 ? `<span class="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">Parada: ${os.paradaLabel}</span>` : ''}
+            </td>
             <td class="py-3 px-4 text-slate-500">${os.dataBR}</td>
             <td class="py-3 px-4">
                 <div class="font-bold text-slate-900">${os.ativoTag} - ${os.ativoNome}</div>
@@ -191,14 +215,15 @@ async function gerarPDFGeralOS(e) {
     );
 
     const custoTotal = baseFiltrada.reduce((acc, o) => acc + (Number(o.custoTotal) || 0), 0);
+    const minutosParadosTotal = baseFiltrada.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
+
     const logoObj = typeof carregarImagemLogoBase64 === 'function'
         ? await carregarImagemLogoBase64('images/cabe.png')
         : null;
 
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'mm', 'a4'); // Paisagem para caber todas as colunas com folga
+    const doc = new jsPDF('l', 'mm', 'a4');
 
-    // Cabeçalho Escuro OSync
     doc.setFillColor(11, 17, 32);
     doc.rect(0, 0, 297, 26, 'F');
     doc.setFillColor(0, 229, 176);
@@ -222,7 +247,11 @@ async function gerarPDFGeralOS(e) {
 
     doc.setTextColor(71, 85, 105);
     doc.setFontSize(8.5);
-    doc.text(`Total de O.S. listadas: ${baseFiltrada.length} • Emitido em ${new Date().toLocaleDateString('pt-BR')}`, 14, 33);
+    doc.text(
+        `Total de O.S. listadas: ${baseFiltrada.length} • Total Horas Paradas: ${formatarHorasParadasRelOS(minutosParadosTotal)} • Emitido em ${new Date().toLocaleDateString('pt-BR')}`,
+        14,
+        33
+    );
 
     const linhas = baseFiltrada.map(os => [
         `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
@@ -230,35 +259,95 @@ async function gerarPDFGeralOS(e) {
         `${os.ativoTag} - ${os.ativoNome}`,
         os.tipoNome || 'Geral',
         os.manutentorNome || '-',
+        os.paradaLabel,
         os.statusTitulo,
         os.servicoRealizado || os.descricao || '-',
         Number(os.custoTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     ]);
 
     if (linhas.length === 0) {
-        linhas.push(['-', '-', 'Nenhuma Ordem de Serviço encontrada no período.', '-', '-', '-', '-', 'R$ 0,00']);
+        linhas.push(['-', '-', 'Nenhuma Ordem de Serviço encontrada no período.', '-', '-', '-', '-', '-', 'R$ 0,00']);
     }
 
     doc.autoTable({
         startY: 37,
-        head: [['Nº O.S.', 'Data', 'Máquina', 'Tipo', 'Técnico', 'Status', 'Descrição / Serviço', 'Custo']],
+        head: [['Nº O.S.', 'Data', 'Máquina', 'Tipo', 'Técnico', 'Parada', 'Status', 'Descrição / Serviço', 'Custo']],
         body: linhas,
-        foot: [['', '', '', '', '', '', 'CUSTO TOTAL DO PERÍODO', custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })]],
+        foot: [[
+            '', '', '', '',
+            'TOTAL PARADO:',
+            formatarHorasParadasRelOS(minutosParadosTotal),
+            '',
+            'CUSTO TOTAL DO PERÍODO',
+            custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]],
         theme: 'grid',
-        headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        footStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], fontStyle: 'bold', fontSize: 9 },
-        styles: { fontSize: 7.8, cellPadding: 2.5 },
+        headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8 },
+        footStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], fontStyle: 'bold', fontSize: 8.5 },
+        styles: { fontSize: 7.5, cellPadding: 2.3 },
         columnStyles: {
-            0: { cellWidth: 20, fontStyle: 'bold' },
-            1: { cellWidth: 21 },
-            2: { cellWidth: 42, fontStyle: 'bold' },
-            3: { cellWidth: 28 },
-            4: { cellWidth: 28 },
-            5: { cellWidth: 24 },
-            6: { cellWidth: 'auto' },
-            7: { cellWidth: 26, halign: 'right', fontStyle: 'bold' }
+            0: { cellWidth: 19, fontStyle: 'bold' },
+            1: { cellWidth: 20 },
+            2: { cellWidth: 38, fontStyle: 'bold' },
+            3: { cellWidth: 25 },
+            4: { cellWidth: 25 },
+            5: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+            6: { cellWidth: 22 },
+            7: { cellWidth: 'auto' },
+            8: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
         }
     });
+
+    // Se for relatório geral (Total), adiciona resumo mensal de horas paradas e custos por mês
+    if (modo === 'total' && baseFiltrada.length > 0) {
+        const mapaMensal = {};
+        baseFiltrada.forEach(os => {
+            const ym = (os.dataISO || '').slice(0, 7);
+            if (!ym || ym.length < 7) return;
+            if (!mapaMensal[ym]) mapaMensal[ym] = { qtd: 0, minutosParada: 0, custo: 0 };
+            mapaMensal[ym].qtd += 1;
+            mapaMensal[ym].minutosParada += Number(os.minutosParada) || 0;
+            mapaMensal[ym].custo += Number(os.custoTotal) || 0;
+        });
+
+        const mesesOrdenados = Object.keys(mapaMensal).sort();
+        if (mesesOrdenados.length > 0) {
+            const linhasResumoMensal = mesesOrdenados.map(ym => {
+                const [anoM, mesM] = ym.split('-');
+                const nomeMes = `${nomesMeses[mesM] || mesM}/${anoM}`;
+                const item = mapaMensal[ym];
+                return [
+                    nomeMes,
+                    `${item.qtd} O.S.`,
+                    formatarHorasParadasRelOS(item.minutosParada),
+                    item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                ];
+            });
+
+            const posY = (doc.lastAutoTable?.finalY || 120) + 10;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(15, 23, 42);
+            doc.text('RESUMO MENSAL — HORAS PARADAS E CUSTOS POR MÊS', 14, posY);
+
+            doc.autoTable({
+                startY: posY + 3,
+                head: [['Mês / Ano', 'Qtd. de O.S.', 'Total Horas Paradas no Mês', 'Custo Total no Mês']],
+                body: linhasResumoMensal,
+                foot: [[
+                    'TOTAL ACUMULADO',
+                    `${baseFiltrada.length} O.S.`,
+                    formatarHorasParadasRelOS(minutosParadosTotal),
+                    custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                ]],
+                theme: 'grid',
+                headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                footStyles: { fillColor: [254, 242, 242], textColor: [185, 28, 28], fontStyle: 'bold', fontSize: 8.5 },
+                styles: { fontSize: 8, cellPadding: 2.5 },
+                tableWidth: 180
+            });
+        }
+    }
 
     const sufixo = prefixoFiltro || 'Total';
     doc.save(`Relatorio_Geral_OS_${sufixo}.pdf`);
