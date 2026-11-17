@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSync | Gestão de Manutenção</title>
+    <link rel="icon" type="image/png" href="images/ico.png">
+    <link rel="apple-touch-icon" href="images/ico.png">
     <style>body.auth-loading { opacity: 0; }</style>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -21,10 +23,7 @@
     <header class="osync-navbar sticky top-0 z-40 px-4 h-16 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-6">
             <a href="#" onclick="navegarPara('os')" class="flex items-center gap-2 shrink-0">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-[#00E5B0] flex items-center justify-center text-[#0B1120]">
-                    <i data-lucide="refresh-cw" class="w-5 h-5 stroke-[2.5]"></i>
-                </div>
-                <span class="text-xl font-extrabold tracking-tight text-white">OS<span class="text-[#00E5B0]">ync</span></span>
+                <img src="images/log.png" alt="OSync" class="h-9 w-auto object-contain">
             </a>
 
             <!-- Menu Superior Desktop (Sem duplicação) -->
@@ -125,7 +124,6 @@
         </button>
     </nav>
 
-
     <!-- GAVETA MOBILE DE CADASTROS -->
     <div id="mobile-cadastros-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
         <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-2">
@@ -160,5 +158,4 @@
     <script src="js/os-kanban.js?v=2"></script>
     <script src="js/os-execucao.js?v=2"></script>
 </body>
-
 </html>
