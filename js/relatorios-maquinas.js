@@ -121,17 +121,19 @@ function renderizarCardsRelatorioMaquinas(lista) {
         'Parada': 'bg-rose-100 text-rose-700'
     };
 
-    grid.innerHTML = lista.map(m => `
+    grid.innerHTML = lista.map(m => {
+        const mIdSeguro = escaparHTML(m.id);
+        return `
         <div class="osync-card p-5 flex flex-col justify-between gap-4 hover:shadow-md transition">
             <div>
                 <div class="flex items-center justify-between gap-2 mb-1">
-                    <span class="text-xs font-extrabold px-2.5 py-0.5 rounded bg-slate-900 text-[#00E5B0]">${m.codigoTag}</span>
+                    <span class="text-xs font-extrabold px-2.5 py-0.5 rounded bg-slate-900 text-[#00E5B0]">${escaparHTML(m.codigoTag)}</span>
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${badgeStatus[m.status] || 'bg-slate-100 text-slate-700'}">
-                        ${m.status || 'Operacional'}
+                        ${escaparHTML(m.status || 'Operacional')}
                     </span>
                 </div>
-                <h3 class="font-bold text-slate-900 text-base mt-1.5">${m.nome}</h3>
-                <p class="text-xs text-slate-500 mt-0.5">${m.setor || 'Geral'} • ${m.fabricante || 'Fab. N/I'}</p>
+                <h3 class="font-bold text-slate-900 text-base mt-1.5">${escaparHTML(m.nome)}</h3>
+                <p class="text-xs text-slate-500 mt-0.5">${escaparHTML(m.setor || 'Geral')} • ${escaparHTML(m.fabricante || 'Fab. N/I')}</p>
             </div>
 
             <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -140,17 +142,17 @@ function renderizarCardsRelatorioMaquinas(lista) {
                     <span class="text-sm font-extrabold text-slate-900">${m.qtdOS} O.S. <span class="text-rose-600">(${formatarHorasParadasMaq(m.totalMinutosParada)})</span></span>
                 </div>
                 <div class="flex items-center gap-1.5">
-                    <button onclick="abrirModalHistoricoMaquina('${m.id}')" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1">
+                    <button onclick="abrirModalHistoricoMaquina('${mIdSeguro}')" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1">
                         <i data-lucide="list" class="w-3.5 h-3.5"></i>
                         <span>Histórico</span>
                     </button>
-                    <button onclick="abrirModalFiltroPDF_Maquina('${m.id}')" title="Gerar PDF da Máquina" class="p-2 rounded-lg bg-[#0B1120] hover:bg-slate-800 text-[#00E5B0] transition">
+                    <button onclick="abrirModalFiltroPDF_Maquina('${mIdSeguro}')" title="Gerar PDF da Máquina" class="p-2 rounded-lg bg-[#0B1120] hover:bg-slate-800 text-[#00E5B0] transition">
                         <i data-lucide="file-down" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 
     lucide.createIcons();
 }
@@ -176,17 +178,17 @@ function abrirModalHistoricoMaquina(ativoId) {
         listaContainer.innerHTML = m.ordens.map(os => `
             <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${os.tipoNome || 'Manutenção'}</span>
+                    <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${escaparHTML(os.tipoNome || 'Manutenção')}</span>
                     <div class="flex items-center gap-1.5">
-                        ${os.minutosParada > 0 ? `<span class="font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded">Parada: ${os.paradaLabel}</span>` : ''}
-                        <span class="font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${os.statusTitulo}</span>
+                        ${os.minutosParada > 0 ? `<span class="font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded">Parada: ${escaparHTML(os.paradaLabel)}</span>` : ''}
+                        <span class="font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${escaparHTML(os.statusTitulo)}</span>
                     </div>
                 </div>
-                <p class="text-slate-700"><strong>Problema:</strong> ${os.descricao || '-'}</p>
-                ${os.servicoRealizado ? `<p class="text-emerald-800 bg-emerald-50/70 p-2 rounded border border-emerald-100"><strong>Serviço Executado:</strong> ${os.servicoRealizado}</p>` : ''}
+                <p class="text-slate-700"><strong>Problema:</strong> ${escaparHTML(os.descricao || '-')}</p>
+                ${os.servicoRealizado ? `<p class="text-emerald-800 bg-emerald-50/70 p-2 rounded border border-emerald-100"><strong>Serviço Executado:</strong> ${escaparHTML(os.servicoRealizado)}</p>` : ''}
                 <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                    <span>Data: ${os.dataBR}</span>
-                    <span>Técnico: ${os.manutentorNome || 'N/I'}</span>
+                    <span>Data: ${escaparHTML(os.dataBR)}</span>
+                    <span>Técnico: ${escaparHTML(os.manutentorNome || 'N/I')}</span>
                 </div>
             </div>
         `).join('');
@@ -210,7 +212,7 @@ function abrirModalFiltroPDF_Maquina(ativoId) {
     document.getElementById('pdf-maq-ativo-id').value = ativoId;
     document.getElementById('titulo-modal-pdf-maq').innerHTML = `
         <i data-lucide="file-text" class="w-4 h-4 text-[#00E5B0]"></i>
-        <span>PDF Máquina • ${m.codigoTag}</span>
+        <span>PDF Máquina • ${escaparHTML(m.codigoTag)}</span>
     `;
 
     const anoAtual = new Date().getFullYear();
