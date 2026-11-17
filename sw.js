@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osync-pwa-v1';
+const CACHE_NAME = 'osync-pwa-v1.1.0';
 const ASSETS_ESSENCIAIS = [
     './',
     './index.html',
