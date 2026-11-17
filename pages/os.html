@@ -1,10 +1,20 @@
 <div class="space-y-5">
     <!-- Cabeçalho -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900">Ordens de Serviço</h1>
-            <p class="text-xs sm:text-sm text-slate-500">Toque em um cartão para ver detalhes, lançar custos ou encerrar a O.S.</p>
+        <div class="flex items-center gap-3 flex-wrap">
+            <!-- Botão Flutuante de Edição do Kanban (Visível para Gestores) -->
+            <button id="btn-editar-kanban-os" onclick="abrirModalEditarKanbanOS()" title="Gerenciar Colunas do Kanban"
+                class="hidden bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition flex items-center gap-2 text-xs">
+                <i data-lucide="columns" class="w-4 h-4 text-blue-600"></i>
+                <span>Editar Kanban</span>
+            </button>
+
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">Ordens de Serviço</h1>
+                <p class="text-xs sm:text-sm text-slate-500">Toque em um cartão para ver detalhes, lançar custos ou encerrar a O.S.</p>
+            </div>
         </div>
+
         <button onclick="abrirModalNovaOS()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
             <i data-lucide="plus-circle" class="w-5 h-5"></i>
             <span>+ Nova Ordem</span>
@@ -33,13 +43,49 @@
     </div>
 
     <!-- VISÃO MOBILE: LISTA DE CARDS LIMPA -->
-    <div id="os-mobile-list" class="md:hidden space-y-3">
-        <!-- Preenchido via js/os-kanban.js -->
-    </div>
+    <div id="os-mobile-list" class="md:hidden space-y-3"></div>
 
     <!-- VISÃO DESKTOP: QUADRO KANBAN -->
-    <div id="kanban-board" class="hidden md:flex items-stretch gap-4 overflow-x-auto pb-4 h-[calc(100vh-195px)] min-h-[520px]">
-        <!-- Colunas renderizadas dinamicamente via js/os-kanban.js -->
+    <div id="kanban-board" class="hidden md:flex items-stretch gap-4 overflow-x-auto pb-4 h-[calc(100vh-195px)] min-h-[520px]"></div>
+</div>
+
+<!-- MODAL FLUTUANTE: EDITAR COLUNAS DO KANBAN -->
+<div id="modal-editar-kanban-os" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+        <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="columns" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span>Colunas do Kanban (O.S.)</span>
+            </h3>
+            <button onclick="fecharModalEditarKanbanOS()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="p-5 flex flex-col overflow-y-auto">
+            <form id="form-kanban-modal-os" onsubmit="salvarColunaModalOS(event)" class="space-y-3 mb-4">
+                <input type="hidden" id="os-col-edit-id" value="">
+                <div class="flex items-center gap-1.5">
+                    <input type="text" id="os-col-titulo" required placeholder="Ex: Aguardando Peça"
+                        class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
+                    <input type="number" id="os-col-ordem" required value="1" min="1" title="Posição"
+                        class="w-12 shrink-0 px-1 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-center focus:border-blue-600 outline-none">
+                    <input type="color" id="os-col-cor" value="#1D4ED8" title="Cor de destaque"
+                        class="w-10 h-10 shrink-0 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" id="btn-os-salvar-coluna" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Adicionar Coluna</span>
+                    </button>
+                    <button type="button" id="btn-os-cancelar-edit-coluna" onclick="cancelarEdicaoColunaModalOS()" class="hidden px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-lg text-xs transition">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+
+            <div id="lista-colunas-modal-os" class="space-y-2 overflow-y-auto max-h-72">
+                <!-- Preenchido via js/os-kanban.js -->
+            </div>
+        </div>
     </div>
 </div>
 
@@ -103,7 +149,6 @@
 <!-- MODAL 2: DETALHES E ENCERRAMENTO DA O.S. -->
 <div id="modal-detalhes-os" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4">
     <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] flex flex-col">
-        <!-- Cabeçalho do Modal -->
         <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
             <div class="flex items-center gap-2.5 flex-wrap">
                 <span id="det-os-numero" class="text-base font-extrabold text-white">#OS-0001</span>
@@ -112,11 +157,9 @@
             <button onclick="fecharModalDetalhesOS()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
 
-        <!-- Corpo Rolável -->
         <div class="p-5 space-y-5 overflow-y-auto flex-1">
             <input type="hidden" id="det-os-id">
 
-            <!-- Bloco de Informações da O.S. -->
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -131,7 +174,6 @@
 
                 <p id="det-os-descricao" class="text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-200"></p>
 
-                <!-- Troca Rápida de Status e Manutentor -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 mb-1">Status / Etapa Atual</label>
@@ -146,7 +188,6 @@
                 </div>
             </div>
 
-            <!-- Botão para Abrir Área de Encerramento -->
             <div id="box-botao-abrir-encerramento" class="flex justify-end">
                 <button type="button" onclick="mostrarFormularioEncerramento()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
                     <i data-lucide="check-circle-2" class="w-5 h-5"></i>
@@ -154,21 +195,18 @@
                 </button>
             </div>
 
-            <!-- FORMULÁRIO DE ENCERRAMENTO E CUSTOS -->
             <form id="form-encerramento-os" class="hidden space-y-4 border-t-2 border-slate-200 pt-4">
                 <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
                     <i data-lucide="wrench" class="w-4 h-4 text-emerald-600"></i>
                     <span>Relatório Técnico de Encerramento</span>
                 </h4>
 
-                <!-- Serviço Realizado -->
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Serviço Realizado *</label>
                     <textarea id="enc-servico-realizado" rows="3" required placeholder="Descreva detalhadamente o que foi reparado, ajustado ou substituído..."
                         class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-600"></textarea>
                 </div>
 
-                <!-- Anexos de Fotos -->
                 <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
                         <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -185,7 +223,6 @@
                     <div id="enc-lista-anexos" class="flex gap-2 overflow-x-auto py-1"></div>
                 </div>
 
-                <!-- Custos (Adaptável se for Manutenção Externa) -->
                 <div id="bloco-custos-os" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
                     <div class="flex items-center justify-between">
                         <label id="label-titulo-custos" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -213,7 +250,6 @@
                     <div id="enc-lista-custos" class="space-y-1.5"></div>
                 </div>
 
-                <!-- Data/Hora do Encerramento + Observações -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Data e Hora do Encerramento *</label>
