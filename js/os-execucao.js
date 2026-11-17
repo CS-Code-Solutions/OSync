@@ -1,162 +1,256 @@
-let osSelecionadaExecucao = null;
+let anexosOSAtual = [];
+let itensCustoOSAtual = [];
+let cacheCentrosCustoOS = [];
 
-function abrirModalExecucaoOS(osId) {
-    const os = cacheOrdens.find(item => item.id === osId);
+async function abrirDetalhesOS(osId) {
+    const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
 
-    osSelecionadaExecucao = os;
+    const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
 
-    document.getElementById('exec-os-id').value = os.id;
-    document.getElementById('exec-ativo-id').value = os.ativoId || '';
-    document.getElementById('exec-os-numero').textContent = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
-    document.getElementById('exec-os-ativo').textContent = os.ativoTag ? `${os.ativoTag} - ${os.ativoNome}` : 'Equipamento';
-    document.getElementById('exec-os-tipo').textContent = os.tipoNome || 'Geral';
-    document.getElementById('exec-os-prioridade').textContent = os.prioridade;
-    document.getElementById('exec-os-tecnico').textContent = os.manutentorNome || 'Não atribuído';
-    document.getElementById('exec-os-descricao').textContent = os.descricao;
+    document.getElementById('det-os-id').value = os.id;
+    document.getElementById('det-os-numero').textContent = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
 
-    document.getElementById('exec-parecer').value = os.parecerTecnico || '';
-    document.getElementById('exec-custo').value = os.custoTotal > 0 ? os.custoTotal : '';
-    document.getElementById('exec-foto-input').value = '';
-    document.getElementById('exec-foto-nome').textContent = 'Clique para selecionar ou tirar foto (Compactação automática)';
+    const badge = document.getElementById('det-os-status-badge');
+    badge.textContent = coluna.titulo;
+    badge.style.backgroundColor = coluna.corTopo || '#00E5B0';
 
-    const previewBox = document.getElementById('exec-foto-preview-box');
-    const previewImg = document.getElementById('exec-foto-preview');
-    if (os.imagemConclusaoUrl) {
-        previewImg.src = os.imagemConclusaoUrl;
-        previewBox.classList.remove('hidden');
-    } else {
-        previewBox.classList.add('hidden');
-    }
+    document.getElementById('det-os-maquina').textContent = `${os.ativoTag} - ${os.ativoNome}`;
+    document.getElementById('det-os-tipo').textContent = os.tipoNome || 'Manutenção';
+    document.getElementById('det-os-prioridade').textContent = `Prioridade: ${os.prioridade || 'Normal'}`;
+    document.getElementById('det-os-descricao').textContent = os.descricao;
 
-    atualizarEstadoBotoesExecucao(os);
-    document.getElementById('modal-execucao-os').classList.remove('hidden');
-    lucide.createIcons();
-}
+    // Preenche seletor de Status/Coluna e Manutentor para troca rápida no mobile
+    const selCol = document.getElementById('det-os-coluna-select');
+    selCol.innerHTML = cacheColunasOS.map(c =>
+        `<option value="${c.id}" ${c.id === os.colunaId ? 'selected' : ''}>${c.titulo}</option>`
+    ).join('');
 
-function fecharModalExecucaoOS() {
-    document.getElementById('modal-execucao-os').classList.add('hidden');
-    osSelecionadaExecucao = null;
-}
+    const [manutSnap, ccSnap] = await Promise.all([
+        db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get(),
+        db.collection('centros_custo').where('empresaId', '==', usuarioAtual.empresaId).get()
+    ]);
 
-function atualizarEstadoBotoesExecucao(os) {
-    const btnIniciar = document.getElementById('btn-iniciar-os');
-    const infoHorarios = document.getElementById('exec-info-horarios');
-    const badgeStatus = document.getElementById('exec-os-badge-status');
-    const btnEncerrar = document.getElementById('btn-encerrar-os');
+    const selManut = document.getElementById('det-os-manutentor-select');
+    selManut.innerHTML = '<option value="">-- Sem técnico --</option>' +
+        manutSnap.docs.map(d => `<option value="${d.id}" data-nome="${d.data().nome}" ${d.id === os.manutentorId ? 'selected' : ''}>${d.data().nome}</option>`).join('');
+    selManut.disabled = usuarioAtual.perfil === 'Manutentor';
 
+    // Preenche Centros de Custo
+    cacheCentrosCustoOS = ccSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const selCC = document.getElementById('item-custo-cc');
+    selCC.innerHTML = '<option value="">Centro de Custo (Opcional)</option>' +
+        cacheCentrosCustoOS.map(cc => `<option value="${cc.codigo} - ${cc.nome}">${cc.codigo} - ${cc.nome}</option>`).join('');
+
+    // Carrega dados de encerramento se já existirem
+    anexosOSAtual = Array.isArray(os.anexos) ? [...os.anexos] : [];
+    itensCustoOSAtual = Array.isArray(os.itensCusto) ? [...os.itensCusto] : [];
+
+    document.getElementById('enc-servico-realizado').value = os.servicoRealizado || '';
+    document.getElementById('enc-observacoes').value = os.observacoes || '';
+
+    // Preenche data e hora atual por padrão (formato YYYY-MM-DDTHH:mm)
+    const agora = new Date();
+    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+    document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agora.toISOString().slice(0, 16);
+
+    renderizarAnexosOS();
+    renderizarItensCustoOS();
+
+    // Se a O.S. já tiver encerramento salvo, já mostra o formulário aberto para consulta/edição
     if (os.encerrada) {
-        badgeStatus.textContent = 'Encerrada';
-        badgeStatus.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-[#00E5B0]';
-        btnIniciar.classList.add('hidden');
-        btnEncerrar.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>Atualizar Registro</span>';
-        const inicio = os.dataInicio ? new Date(os.dataInicio).toLocaleString('pt-BR') : '-';
-        const fim = os.dataFim ? new Date(os.dataFim).toLocaleString('pt-BR') : '-';
-        infoHorarios.textContent = `Início: ${inicio} | Fim: ${fim}`;
-    } else if (os.dataInicio) {
-        badgeStatus.textContent = 'Em Execução';
-        badgeStatus.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300';
-        btnIniciar.classList.add('hidden');
-        btnEncerrar.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4"></i><span>Encerrar Ordem de Serviço</span>';
-        infoHorarios.textContent = `Iniciado em: ${new Date(os.dataInicio).toLocaleString('pt-BR')}`;
+        mostrarFormularioEncerramento();
     } else {
-        badgeStatus.textContent = 'Aguardando Início';
-        badgeStatus.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300';
-        btnIniciar.classList.remove('hidden');
-        infoHorarios.textContent = 'Clique em Iniciar Atendimento para registrar o horário.';
+        document.getElementById('form-encerramento-os').classList.add('hidden');
+        document.getElementById('box-botao-abrir-encerramento').classList.remove('hidden');
     }
-}
 
-async function iniciarAtendimentoOS() {
-    if (!osSelecionadaExecucao) return;
-    const agora = new Date().toISOString();
-
-    const colAndamento = cacheColunas.find(c => c.titulo.toLowerCase().includes('andamento'));
-    const updatePayload = { dataInicio: agora };
-    if (colAndamento) updatePayload.colunaId = colAndamento.id;
-
-    await db.collection('ordens_servico').doc(osSelecionadaExecucao.id).update(updatePayload);
-
-    osSelecionadaExecucao.dataInicio = agora;
-    atualizarEstadoBotoesExecucao(osSelecionadaExecucao);
+    document.getElementById('modal-detalhes-os').classList.remove('hidden');
     lucide.createIcons();
 }
 
-function previewFotoExecucao(input) {
-    if (input.files && input.files[0]) {
-        document.getElementById('exec-foto-nome').textContent = input.files[0].name;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            document.getElementById('exec-foto-preview').src = e.target.result;
-            document.getElementById('exec-foto-preview-box').classList.remove('hidden');
-        };
-        reader.readAsDataURL(input.files[0]);
+function fecharModalDetalhesOS() {
+    document.getElementById('modal-detalhes-os').classList.add('hidden');
+}
+
+function mostrarFormularioEncerramento() {
+    document.getElementById('box-botao-abrir-encerramento').classList.add('hidden');
+    document.getElementById('form-encerramento-os').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+async function atualizarStatusRapidoOS() {
+    const osId = document.getElementById('det-os-id').value;
+    const novaColId = document.getElementById('det-os-coluna-select').value;
+    await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColId });
+
+    const col = cacheColunasOS.find(c => c.id === novaColId);
+    if (col) {
+        const badge = document.getElementById('det-os-status-badge');
+        badge.textContent = col.titulo;
+        badge.style.backgroundColor = col.corTopo;
     }
 }
 
-async function processarUploadFotoOS(osId) {
-    const fileInput = document.getElementById('exec-foto-input');
-    if (!fileInput.files || fileInput.files.length === 0) return osSelecionadaExecucao?.imagemConclusaoUrl || null;
+async function atualizarManutentorRapidoOS() {
+    const osId = document.getElementById('det-os-id').value;
+    const sel = document.getElementById('det-os-manutentor-select');
+    const opt = sel.options[sel.selectedIndex];
+
+    await db.collection('ordens_servico').doc(osId).update({
+        manutentorId: sel.value || '',
+        manutentorNome: sel.value ? (opt?.getAttribute('data-nome') || '') : ''
+    });
+}
+
+// ==========================================
+// ANEXOS OTIMIZADOS (COMPACTAÇÃO + URL)
+// ==========================================
+async function processarUploadFotosOS(event) {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const osId = document.getElementById('det-os-id').value;
+    const statusEl = document.getElementById('enc-upload-status');
+    statusEl.classList.remove('hidden');
 
     try {
-        const arquivoComprimido = await comprimirImagem(fileInput.files[0], 1024, 0.72);
-        const ref = storage.ref(`os-anexos/${usuarioAtual.empresaId}/${osId}_${Date.now()}.jpg`);
-        await ref.put(arquivoComprimido);
-        return await ref.getDownloadURL();
+        for (const file of files) {
+            const url = await compactarEEnviarImagemOS(file, usuarioAtual.empresaId, osId);
+            anexosOSAtual.push(url);
+        }
+        renderizarAnexosOS();
     } catch (err) {
-        console.warn('Erro no upload de imagem:', err.message);
-        return null;
+        alert('Erro ao enviar imagem: ' + err.message);
+    } finally {
+        statusEl.classList.add('hidden');
+        event.target.value = '';
     }
 }
 
-async function salvarApontamentoParcial() {
-    if (!osSelecionadaExecucao) return;
-    const btn = document.getElementById('btn-salvar-parcial');
-    btn.disabled = true;
+function renderizarAnexosOS() {
+    const container = document.getElementById('enc-lista-anexos');
+    if (!container) return;
 
-    const imagemUrl = await processarUploadFotoOS(osSelecionadaExecucao.id);
-    await db.collection('ordens_servico').doc(osSelecionadaExecucao.id).update({
-        parecerTecnico: document.getElementById('exec-parecer').value.trim(),
-        custoTotal: parseFloat(document.getElementById('exec-custo').value) || 0,
-        imagemConclusaoUrl: imagemUrl
-    });
+    if (anexosOSAtual.length === 0) {
+        container.innerHTML = '<span class="text-[11px] text-slate-400">Nenhuma foto anexada.</span>';
+        return;
+    }
 
-    btn.disabled = false;
-    alert('Progresso salvo com sucesso!');
+    container.innerHTML = anexosOSAtual.map((url, idx) => `
+        <div class="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-slate-300 bg-white">
+            <a href="${url}" target="_blank">
+                <img src="${url}" class="w-full h-full object-cover">
+            </a>
+            <button type="button" onclick="removerAnexoOS(${idx})"
+                class="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">×</button>
+        </div>
+    `).join('');
 }
 
-document.addEventListener('submit', async (e) => {
-    if (e.target.id !== 'form-execucao-os') return;
+function removerAnexoOS(idx) {
+    anexosOSAtual.splice(idx, 1);
+    renderizarAnexosOS();
+}
+
+// ==========================================
+// ITENS DE CUSTO & CENTROS DE CUSTO
+// ==========================================
+function adicionarItemCustoOS() {
+    const desc = document.getElementById('item-custo-desc').value.trim();
+    const cc = document.getElementById('item-custo-cc').value;
+    const valor = parseFloat(document.getElementById('item-custo-valor').value) || 0;
+
+    if (!desc) {
+        alert('Informe o nome do item ou peça.');
+        return;
+    }
+
+    itensCustoOSAtual.push({ descricao: desc, centroCusto: cc || 'Geral', valor });
+
+    document.getElementById('item-custo-desc').value = '';
+    document.getElementById('item-custo-valor').value = '';
+    renderizarItensCustoOS();
+}
+
+function removerItemCustoOS(idx) {
+    itensCustoOSAtual.splice(idx, 1);
+    renderizarItensCustoOS();
+}
+
+function renderizarItensCustoOS() {
+    const lista = document.getElementById('enc-lista-custos');
+    const totalLabel = document.getElementById('enc-custo-total-label');
+
+    const total = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
+    if (totalLabel) totalLabel.textContent = total.toFixed(2).replace('.', ',');
+
+    if (itensCustoOSAtual.length === 0) {
+        lista.innerHTML = '<p class="text-[11px] text-slate-400">Nenhum item de custo lançado.</p>';
+        return;
+    }
+
+    lista.innerHTML = itensCustoOSAtual.map((item, idx) => `
+        <div class="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
+            <div class="min-w-0 pr-2">
+                <span class="font-bold text-slate-800">${item.descricao}</span>
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ml-1">${item.centroCusto}</span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="font-bold text-emerald-700">R$ ${Number(item.valor).toFixed(2).replace('.', ',')}</span>
+                <button type="button" onclick="removerItemCustoOS(${idx})" class="text-rose-500 hover:text-rose-700 font-bold px-1">×</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ==========================================
+// SALVAR ENCERRAMENTO FINAL DA O.S.
+// ==========================================
+async function confirmarEncerramentoOS(e) {
     e.preventDefault();
-
-    if (!osSelecionadaExecucao) return;
-    const btn = document.getElementById('btn-encerrar-os');
+    const btn = document.getElementById('btn-confirmar-encerramento');
     btn.disabled = true;
-    btn.innerHTML = '<span>Salvando e Encerrando...</span>';
+    btn.textContent = 'Salvando...';
 
-    const imagemUrl = await processarUploadFotoOS(osSelecionadaExecucao.id);
-    const agora = new Date().toISOString();
+    try {
+        const osId = document.getElementById('det-os-id').value;
+        const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
+        const dataHoraEncerramento = document.getElementById('enc-data-hora').value;
+        const observacoes = document.getElementById('enc-observacoes').value.trim();
+        const custoTotal = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
 
-    const colConcluida = cacheColunas.find(c =>
-        c.titulo.toLowerCase().includes('conclu') || c.titulo.toLowerCase().includes('finaliz')
-    ) || cacheColunas[cacheColunas.length - 1];
+        // Move automaticamente para a última coluna configurada (ex: Fechadas / Concluída)
+        const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
 
-    await db.collection('ordens_servico').doc(osSelecionadaExecucao.id).update({
-        parecerTecnico: document.getElementById('exec-parecer').value.trim(),
-        custoTotal: parseFloat(document.getElementById('exec-custo').value) || 0,
-        imagemConclusaoUrl: imagemUrl,
-        dataInicio: osSelecionadaExecucao.dataInicio || agora,
-        dataFim: osSelecionadaExecucao.dataFim || agora,
-        encerrada: true,
-        colunaId: colConcluida ? colConcluida.id : osSelecionadaExecucao.colunaId
-    });
+        const dadosAtualizacao = {
+            servicoRealizado,
+            anexos: anexosOSAtual, // Salva apenas o array de URLs leves
+            itensCusto: itensCustoOSAtual,
+            custoTotal,
+            dataHoraEncerramento,
+            observacoes,
+            encerrada: true,
+            encerradoPor: usuarioAtual.nome
+        };
 
-    const ativoId = document.getElementById('exec-ativo-id').value;
-    const novoStatusMaquina = document.getElementById('exec-status-maquina').value;
-    if (ativoId) {
-        await db.collection('ativos').doc(ativoId).update({ status: novoStatusMaquina });
+        if (ultimaColuna) {
+            dadosAtualizacao.colunaId = ultimaColuna.id;
+        }
+
+        await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
+
+        // Atualiza status da máquina de volta para Operacional
+        const os = cacheOrdensServico.find(o => o.id === osId);
+        if (os?.ativoId) {
+            await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
+        }
+
+        fecharModalDetalhesOS();
+    } catch (err) {
+        alert('Erro ao encerrar O.S.: ' + err.message);
     }
 
     btn.disabled = false;
-    fecharModalExecucaoOS();
-});
+    btn.textContent = 'Confirmar Encerramento';
+}
