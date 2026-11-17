@@ -20,8 +20,14 @@ async function carregarEmpresasSaaS() {
     const grid = document.getElementById('lista-empresas-saas');
     if (!grid) return;
 
-    const snap = await db.collection('empresas').get();
-    const empresas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Busca todas as empresas e os usuários com perfil Admin (Gestor) em paralelo
+    const [empSnap, gestoresSnap] = await Promise.all([
+        db.collection('empresas').get(),
+        db.collection('usuarios').where('perfil', '==', 'Admin').get()
+    ]);
+
+    const empresas = empSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const gestores = gestoresSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     if (empresas.length === 0) {
         grid.innerHTML = `<div class="col-span-full bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">Nenhuma empresa cadastrada no SaaS.</div>`;
@@ -31,6 +37,23 @@ async function carregarEmpresasSaaS() {
     grid.innerHTML = empresas.map(emp => {
         const ativa = emp.ativa !== false;
         const selecionada = usuarioAtual.empresaId === emp.id;
+
+        // Filtra os gestores cadastrados para esta empresa específica
+        const gestoresDaEmpresa = gestores.filter(g => g.empresaId === emp.id);
+        const htmlGestores = gestoresDaEmpresa.length > 0
+            ? gestoresDaEmpresa.map(g => `
+                <div class="flex items-center justify-between text-xs bg-blue-50/70 border border-blue-100 rounded-lg px-2.5 py-1.5">
+                    <div class="min-w-0">
+                        <span class="font-bold text-slate-800 block truncate">${g.nome}</span>
+                        <span class="text-[11px] text-slate-500 block truncate">${g.email}</span>
+                    </div>
+                    <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0 ml-2">Gestor</span>
+                </div>
+            `).join('')
+            : `<div class="text-[11px] text-amber-600 bg-amber-50 border border-amber-200/80 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0"></i>
+                <span>Nenhum gestor cadastrado ainda</span>
+               </div>`;
 
         const labelContrato = emp.tipoContrato === 'teste_7d' ? '7 dias (Teste)' : '1 ano (Renovável)';
         let infoVencimento = 'Sem vencimento definido';
@@ -74,6 +97,12 @@ async function carregarEmpresasSaaS() {
                 <div class="mt-2.5 p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
                     <code class="text-[11px] font-mono text-slate-700 truncate">${emp.id}</code>
                     <button onclick="copiarTextoSimples('${emp.id}')" class="text-xs font-bold text-blue-600 hover:underline shrink-0">Copiar ID</button>
+                </div>
+
+                <!-- Gestor(es) Cadastrado(s) -->
+                <div class="mt-2.5 space-y-1.5">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Responsável / Gestor</span>
+                    ${htmlGestores}
                 </div>
             </div>
 
@@ -208,6 +237,7 @@ async function salvarUsuarioEmpresaSaaS(e) {
 
         fecharModalUsuarioEmpresaSaaS();
         e.target.reset();
+        await carregarEmpresasSaaS(); // Recarrega os cards para exibir o novo gestor na hora
         alert(`Usuário "${nome}" (${perfil}) criado com sucesso!`);
     } catch (err) {
         alert('Erro ao criar usuário: ' + err.message);
