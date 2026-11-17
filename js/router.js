@@ -3,18 +3,16 @@ async function navegarPara(pagina) {
     const perfil = usuarioAtual?.perfil;
     const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
 
-    const paginasRestritas = ['configuracoes', 'saas-empresas', 'centros-custo', 'relatorios-os', 'relatorios-maquinas'];
+    const paginasRestritas = ['dashboard', 'configuracoes', 'saas-empresas', 'centros-custo', 'relatorios-os', 'relatorios-maquinas'];
 
     if (!isGestor && (pagina.startsWith('cad-') || paginasRestritas.includes(pagina))) {
-        alert('Acesso restrito aos gestores da manutenção.');
-        return;
+        pagina = perfil === 'Lideranca' ? 'solicitacoes' : 'os';
     }
 
     if (perfil === 'Lideranca' && pagina === 'os') {
         pagina = 'solicitacoes';
     }
 
-    // Atualiza estado ativo dos botões Desktop e Mobile
     document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
 
     if (pagina.startsWith('cad-')) {
@@ -34,7 +32,7 @@ async function navegarPara(pagina) {
         container.innerHTML = html;
         lucide.createIcons();
 
-        // Inicializa o controlador específico da tela carregada
+        if (pagina === 'dashboard' && typeof initDashboard === 'function') initDashboard();
         if (pagina === 'os' && typeof initKanbanOS === 'function') initKanbanOS();
         if (pagina === 'solicitacoes' && typeof initSolicitacoes === 'function') initSolicitacoes();
         if (pagina === 'configuracoes' && typeof initConfiguracoes === 'function') initConfiguracoes();
