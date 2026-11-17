@@ -158,6 +158,10 @@ auth.onAuthStateChanged(async (user) => {
                 await navegarPara('os');
             }
 
+            if (typeof verificarAceiteLGPD === 'function') {
+                await verificarAceiteLGPD(usuarioAtual);
+            }
+
             if (typeof verificarQRCodeNaURL === 'function') {
                 verificarQRCodeNaURL();
             }
