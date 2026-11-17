@@ -4,7 +4,7 @@
         <div>
             <span class="text-[11px] font-extrabold uppercase tracking-widest text-[#00B88D]">Painel Master SaaS</span>
             <h1 class="text-2xl font-bold text-slate-900">Empresas Clientes (Tenants)</h1>
-            <p class="text-sm text-slate-500">Crie novas empresas, gere códigos de convite e gerencie planos/acessos.</p>
+            <p class="text-sm text-slate-500">Crie empresas clientes, gere códigos de convite, crie gestores e gerencie planos.</p>
         </div>
         <button onclick="abrirModalNovaEmpresaSaaS()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
             <i data-lucide="building-2" class="w-5 h-5"></i>
@@ -18,7 +18,7 @@
     </div>
 </div>
 
-<!-- MODAL: CRIAR NOVA EMPRESA -->
+<!-- MODAL 1: CRIAR NOVA EMPRESA -->
 <div id="modal-nova-empresa-saas" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
@@ -40,11 +40,11 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">CNPJ (Opcional)</label>
                     <input type="text" id="saas-emp-cnpj" placeholder="00.000.000/0001-00"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Plano Contratado</label>
-                    <select id="saas-emp-plano" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                    <select id="saas-emp-plano" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
                         <option value="Starter">Starter</option>
                         <option value="Pro" selected>Pro</option>
                         <option value="Enterprise">Enterprise</option>
@@ -55,6 +55,62 @@
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onclick="fecharModalNovaEmpresaSaaS()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
                 <button type="submit" id="btn-salvar-empresa-saas" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">Criar Empresa</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 2: CRIAR USUÁRIO PARA A EMPRESA (GESTOR OU TESTE) -->
+<div id="modal-usuario-empresa-saas" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <div>
+                <h3 class="text-base font-bold text-white">Novo Usuário da Empresa</h3>
+                <p id="saas-user-emp-nome" class="text-xs text-[#00E5B0]">Empresa</p>
+            </div>
+            <button onclick="fecharModalUsuarioEmpresaSaaS()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-usuario-empresa-saas" class="p-6 space-y-3.5">
+            <input type="hidden" id="saas-user-emp-id">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Completo *</label>
+                <input type="text" id="saas-user-nome" required placeholder="Ex: Gestor Teste"
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Perfil de Acesso *</label>
+                    <select id="saas-user-perfil" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                        <option value="Admin">Gestor (Admin)</option>
+                        <option value="Manutentor">Manutentor</option>
+                        <option value="Lideranca">Liderança</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Setor *</label>
+                    <input type="text" id="saas-user-setor" required value="Manutenção"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">E-mail de Login (Novo) *</label>
+                <input type="email" id="saas-user-email" required placeholder="teste@empresa.com"
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Senha (mín. 6 caracteres) *</label>
+                <input type="password" id="saas-user-senha" required minlength="6" placeholder="123456"
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="fecharModalUsuarioEmpresaSaaS()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" id="btn-salvar-user-saas" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">Criar Acesso</button>
             </div>
         </form>
     </div>
