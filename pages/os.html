@@ -32,17 +32,16 @@
         </select>
     </div>
 
-    <!-- VISÃO MOBILE: LISTA DE CARDS LIMPA (SEM ARRASTA E SOLTA) -->
+    <!-- VISÃO MOBILE: LISTA DE CARDS LIMPA -->
     <div id="os-mobile-list" class="md:hidden space-y-3">
         <!-- Preenchido via js/os-kanban.js -->
     </div>
 
     <!-- VISÃO DESKTOP: QUADRO KANBAN -->
-    <!-- VISÃO DESKTOP: QUADRO KANBAN COM COLUNAS PADRONIZADAS -->
-<div id="kanban-board" class="hidden md:flex items-stretch gap-4 overflow-x-auto pb-4 h-[calc(100vh-195px)] min-h-[520px]">
-    <!-- Colunas renderizadas dinamicamente via js/os-kanban.js -->
+    <div id="kanban-board" class="hidden md:flex items-stretch gap-4 overflow-x-auto pb-4 h-[calc(100vh-195px)] min-h-[520px]">
+        <!-- Colunas renderizadas dinamicamente via js/os-kanban.js -->
+    </div>
 </div>
-
 
 <!-- MODAL 1: CRIAR NOVA O.S. -->
 <div id="modal-nova-os" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -64,7 +63,7 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Manutenção *</label>
-                    <select id="os-tipo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
+                    <select id="os-tipo" required onchange="verificarTipoManutencaoCriacao()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Prioridade *</label>
@@ -132,7 +131,7 @@
 
                 <p id="det-os-descricao" class="text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-200"></p>
 
-                <!-- Troca Rápida de Status e Manutentor (útil no Mobile sem drag-and-drop) -->
+                <!-- Troca Rápida de Status e Manutentor -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 mb-1">Status / Etapa Atual</label>
@@ -169,7 +168,7 @@
                         class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-600"></textarea>
                 </div>
 
-                <!-- Anexos de Fotos (Compactação + URL) -->
+                <!-- Anexos de Fotos -->
                 <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                     <div class="flex items-center justify-between">
                         <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -183,15 +182,13 @@
                         </label>
                     </div>
                     <p id="enc-upload-status" class="hidden text-xs text-blue-600 font-semibold animate-pulse">Compactando e enviando imagem...</p>
-                    <div id="enc-lista-anexos" class="flex gap-2 overflow-x-auto py-1">
-                        <!-- Miniaturas das URLs -->
-                    </div>
+                    <div id="enc-lista-anexos" class="flex gap-2 overflow-x-auto py-1"></div>
                 </div>
 
-                <!-- Custos: Itens, Valores e Centro de Custo -->
-                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <!-- Custos (Adaptável se for Manutenção Externa) -->
+                <div id="bloco-custos-os" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
                     <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <label id="label-titulo-custos" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                             <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-600"></i>
                             <span>Peças, Materiais & Custos</span>
                         </label>
@@ -213,9 +210,7 @@
                         </div>
                     </div>
 
-                    <div id="enc-lista-custos" class="space-y-1.5">
-                        <!-- Itens adicionados -->
-                    </div>
+                    <div id="enc-lista-custos" class="space-y-1.5"></div>
                 </div>
 
                 <!-- Data/Hora do Encerramento + Observações -->
