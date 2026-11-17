@@ -63,3 +63,48 @@
         </form>
     </div>
 </div>
+
+<!-- MODAL: CANCELAR CHAMADO COM MOTIVO (GESTOR) -->
+<div id="modal-cancelar-solicitacao" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-rose-500">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="x-circle" class="w-5 h-5 text-rose-400"></i>
+                <span>Cancelar Chamado</span>
+            </h3>
+            <button onclick="fecharModalCancelarSolicitacao()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-cancelar-solicitacao" onsubmit="confirmarCancelamentoSolicitacao(event)" class="p-6 space-y-4">
+            <input type="hidden" id="cancelar-sol-id">
+
+            <div id="cancelar-sol-resumo" class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700"></div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Atalhos de Motivo (opcional)</label>
+                <select id="cancelar-sol-atalho" onchange="selecionarAtalhoMotivoCancelamento(this.value)"
+                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-rose-500">
+                    <option value="">-- Selecione um motivo rápido ou digite abaixo --</option>
+                    <option value="Solicitação aberta em duplicidade.">Solicitação aberta em duplicidade</option>
+                    <option value="Equipamento verificado e operando normalmente.">Equipamento verificado e operando normalmente</option>
+                    <option value="Aguardando parada programada de produção.">Aguardando parada programada de produção</option>
+                    <option value="Serviço não pertence ao escopo da manutenção.">Serviço não pertence ao escopo da manutenção</option>
+                    <option value="Cancelado a pedido da liderança de produção.">Cancelado a pedido da liderança de produção</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Motivo do Cancelamento (visível ao solicitante) *</label>
+                <textarea id="cancelar-sol-motivo" rows="3" required placeholder="Descreva o motivo pelo qual este chamado está sendo cancelado..."
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-rose-500"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="fecharModalCancelarSolicitacao()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Voltar</button>
+                <button type="submit" id="btn-confirmar-cancelamento-sol" class="px-5 py-2 text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm">
+                    Confirmar Cancelamento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
