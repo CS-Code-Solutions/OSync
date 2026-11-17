@@ -12,7 +12,7 @@ async function initAtivos() {
     const params = new URLSearchParams(window.location.search);
     const ativoIdUrl = params.get('ativo');
     if (ativoIdUrl) {
-        abrirProntuarioAtivo(ativoIdUrl);
+        abrirModalFlutuanteQRMaquina(ativoIdUrl);
     }
 }
 
@@ -117,7 +117,6 @@ async function salvarNovoAtivo(e) {
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Cria automaticamente o Centro de Custo vinculado à máquina
         await db.collection('centros_custo').doc(ativoRef.id).set({
             empresaId: usuarioAtual.empresaId,
             ativoId: ativoRef.id,
@@ -212,6 +211,349 @@ function imprimirEtiquetaQR() {
     janela.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">${conteudoQR}</body></html>`);
     janela.document.close();
     janela.print();
+}
+
+// ==========================================
+// FLUTUANTE GLOBAL DE LEITURA DO QR CODE DA MÁQUINA
+// ==========================================
+let dadosAtivoQRAtual = null;
+let ordensAtivoQRAtual = [];
+
+async function verificarQRCodeNaURL() {
+    const params = new URLSearchParams(window.location.search);
+    const ativoIdUrl = params.get('ativo');
+    if (!ativoIdUrl) return;
+
+    window.history.replaceState({}, document.title, window.location.pathname);
+    await abrirModalFlutuanteQRMaquina(ativoIdUrl);
+}
+
+async function abrirModalFlutuanteQRMaquina(ativoId) {
+    try {
+        const ativoDoc = await db.collection('ativos').doc(ativoId).get();
+        if (!ativoDoc.exists) {
+            alert('Máquina não encontrada ou removida do sistema.');
+            return;
+        }
+
+        const ativo = { id: ativoDoc.id, ...ativoDoc.data() };
+        if (ativo.empresaId !== usuarioAtual.empresaId && usuarioAtual.perfil !== 'SuperAdmin') {
+            alert('Este equipamento pertence a outra empresa.');
+            return;
+        }
+
+        dadosAtivoQRAtual = ativo;
+
+        document.getElementById('qr-glob-ativo-id').value = ativo.id;
+        document.getElementById('qr-glob-tag').textContent = ativo.codigoTag || 'TAG';
+        document.getElementById('qr-glob-nome').textContent = ativo.nome || 'Equipamento';
+        document.getElementById('qr-glob-setor').textContent = ativo.setor || 'Geral';
+        document.getElementById('qr-glob-fab').textContent = ativo.fabricante || '-';
+        document.getElementById('qr-glob-mod').textContent = ativo.modelo || '-';
+        document.getElementById('qr-glob-status').textContent = ativo.status || 'Operacional';
+
+        const isGestor = usuarioAtual.perfil === 'Admin' || usuarioAtual.perfil === 'SuperAdmin';
+        const isLider = usuarioAtual.perfil === 'Lideranca';
+
+        document.getElementById('qr-glob-btn-nova-os-texto').textContent = isLider ? 'Abrir Solicitação' : 'Nova Ordem (O.S.)';
+        document.getElementById('qr-glob-btn-rel-cc').classList.toggle('hidden', !isGestor);
+        document.getElementById('qr-glob-btn-rel-maquina').classList.toggle('hidden', isLider);
+
+        const histBox = document.getElementById('qr-glob-historico-os');
+        histBox.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">Carregando histórico da máquina...</p>';
+        document.getElementById('modal-qr-maquina-global').classList.remove('hidden');
+        lucide.createIcons();
+
+        const [osSnap, colSnap] = await Promise.all([
+            db.collection('ordens_servico')
+                .where('empresaId', '==', usuarioAtual.empresaId)
+                .where('ativoId', '==', ativo.id)
+                .get(),
+            db.collection('kanban_colunas')
+                .where('empresaId', '==', usuarioAtual.empresaId)
+                .get()
+        ]);
+
+        const colunas = colSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        ordensAtivoQRAtual = osSnap.docs
+            .map(d => {
+                const data = d.data();
+                const col = colunas.find(c => c.id === data.colunaId);
+                const dataISO = data.dataHoraEncerramento
+                    ? data.dataHoraEncerramento.slice(0, 10)
+                    : (data.criadoEm?.toDate ? data.criadoEm.toDate().toISOString().slice(0, 10) : '');
+                return {
+                    id: d.id,
+                    ...data,
+                    statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
+                    dataISO,
+                    dataBR: dataISO ? dataISO.split('-').reverse().join('/') : '-'
+                };
+            })
+            .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
+
+        document.getElementById('qr-glob-qtd-os').textContent = `${ordensAtivoQRAtual.length} O.S.`;
+
+        if (ordensAtivoQRAtual.length === 0) {
+            histBox.innerHTML = '<p class="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl text-center">Nenhuma Ordem de Serviço aplicada nesta máquina ainda.</p>';
+        } else {
+            histBox.innerHTML = ordensAtivoQRAtual.map(os => `
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${os.tipoNome || 'Manutenção'}</span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">${os.statusTitulo}</span>
+                    </div>
+                    <p class="text-slate-700">${os.servicoRealizado || os.descricao || '-'}</p>
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                        <span>Data: ${os.dataBR}</span>
+                        <span>Técnico: ${os.manutentorNome || 'N/I'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        console.error('Erro ao abrir prontuário via QR Code:', err);
+    }
+}
+
+function fecharModalQRMaquinaGlobal() {
+    document.getElementById('modal-qr-maquina-global')?.classList.add('hidden');
+}
+
+async function acaoQR_NovaOrdemOuChamado() {
+    if (!dadosAtivoQRAtual) return;
+    const ativoId = dadosAtivoQRAtual.id;
+    fecharModalQRMaquinaGlobal();
+
+    if (usuarioAtual.perfil === 'Lideranca') {
+        await navegarPara('solicitacoes');
+        await abrirModalNovaSolicitacao();
+        const selSol = document.getElementById('sol-ativo');
+        if (selSol) selSol.value = ativoId;
+        return;
+    }
+
+    await navegarPara('os');
+    await abrirModalNovaOS();
+    const selAtivo = document.getElementById('os-ativo');
+    if (selAtivo) selAtivo.value = ativoId;
+}
+
+function acaoQR_GerarRelatorioMaquina() {
+    if (!dadosAtivoQRAtual) return;
+    abrirModalQRPeriodoPDF('maquina', `Relatório da Máquina • ${dadosAtivoQRAtual.codigoTag}`);
+}
+
+function acaoQR_GerarRelatorioCentroCusto() {
+    if (!dadosAtivoQRAtual) return;
+    abrirModalQRPeriodoPDF('centro_custo', `Centro de Custo • ${dadosAtivoQRAtual.codigoTag}`);
+}
+
+function abrirModalQRPeriodoPDF(tipo, titulo) {
+    document.getElementById('qr-pdf-tipo').value = tipo;
+    document.getElementById('qr-pdf-modal-titulo').innerHTML = `
+        <i data-lucide="file-down" class="w-4 h-4 text-[#00E5B0]"></i>
+        <span>${titulo}</span>
+    `;
+
+    const anoAtual = new Date().getFullYear();
+    const mesAtual = String(new Date().getMonth() + 1).padStart(2, '0');
+    const selAno = document.getElementById('qr-pdf-ano');
+    selAno.innerHTML = '';
+    for (let a = anoAtual; a >= anoAtual - 5; a--) {
+        selAno.innerHTML += `<option value="${a}">${a}</option>`;
+    }
+    document.getElementById('qr-pdf-mes').value = mesAtual;
+
+    const radioTotal = document.querySelector('input[name="qr-pdf-modo"][value="total"]');
+    if (radioTotal) radioTotal.checked = true;
+    alternarPeriodoQRPDF();
+
+    document.getElementById('modal-qr-periodo-pdf').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function fecharModalQRPeriodoPDF() {
+    document.getElementById('modal-qr-periodo-pdf')?.classList.add('hidden');
+}
+
+function alternarPeriodoQRPDF() {
+    const modo = document.querySelector('input[name="qr-pdf-modo"]:checked')?.value;
+    const box = document.getElementById('box-mes-ano-qr-pdf');
+    if (modo === 'mensal') box.classList.remove('hidden');
+    else box.classList.add('hidden');
+}
+
+async function executarPDFDoQRCode(e) {
+    e.preventDefault();
+    if (!window.jspdf || !dadosAtivoQRAtual) return;
+
+    const btn = document.getElementById('btn-qr-baixar-pdf');
+    btn.disabled = true;
+
+    const tipo = document.getElementById('qr-pdf-tipo').value;
+    const modo = document.querySelector('input[name="qr-pdf-modo"]:checked')?.value || 'total';
+    const mes = document.getElementById('qr-pdf-mes').value;
+    const ano = document.getElementById('qr-pdf-ano').value;
+
+    const nomesMeses = {
+        '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+        '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+        '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+    };
+
+    const prefixoFiltro = modo === 'mensal' ? `${ano}-${mes}` : '';
+    const labelPeriodo = modo === 'mensal'
+        ? `Período: ${nomesMeses[mes]} de ${ano}`
+        : 'Período: Total (Histórico Completo)';
+
+    const logoObj = typeof carregarImagemLogoBase64 === 'function'
+        ? await carregarImagemLogoBase64('images/cabe.png')
+        : null;
+
+    const m = dadosAtivoQRAtual;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+
+    doc.setFillColor(11, 17, 32);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setFillColor(0, 229, 176);
+    doc.rect(0, 28, 210, 1.5, 'F');
+
+    if (logoObj) {
+        const alturaLogo = 11;
+        const larguraLogo = alturaLogo * logoObj.ratio;
+        doc.addImage(logoObj.dataUrl, 'PNG', 14, 8.5, larguraLogo, alturaLogo);
+    }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(
+        tipo === 'centro_custo' ? 'RELATÓRIO INDIVIDUAL DE CENTRO DE CUSTO' : 'HISTÓRICO DE MANUTENÇÃO DA MÁQUINA',
+        196, 13, { align: 'right' }
+    );
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 229, 176);
+    doc.text(labelPeriodo, 196, 20, { align: 'right' });
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 34, 182, 28, 2, 2, 'FD');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${m.codigoTag} - ${m.nome}`, 18, 41);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Setor: ${m.setor || 'Não informado'}`, 18, 48);
+    doc.text(`Fabricante: ${m.fabricante || '-'}`, 85, 48);
+    doc.text(`Modelo: ${m.modelo || '-'}`, 145, 48);
+    doc.text(`Status Atual: ${m.status || 'Operacional'}`, 18, 55);
+    doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 55);
+
+    const ordensFiltradas = ordensAtivoQRAtual.filter(os =>
+        !prefixoFiltro || (os.dataISO && os.dataISO.startsWith(prefixoFiltro))
+    );
+
+    if (tipo === 'centro_custo') {
+        const labelAtivo = `${m.codigoTag} - ${m.nome}`;
+        const lancamentos = [];
+
+        ordensFiltradas.forEach(os => {
+            const itens = Array.isArray(os.itensCusto) ? os.itensCusto : [];
+            if (itens.length > 0) {
+                itens.forEach(item => {
+                    if (!item.centroCusto || item.centroCusto.toLowerCase() === labelAtivo.toLowerCase()) {
+                        lancamentos.push([
+                            `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
+                            os.dataBR,
+                            item.descricao,
+                            Number(item.valor || 0)
+                        ]);
+                    }
+                });
+            } else if (Number(os.custoTotal) > 0) {
+                lancamentos.push([
+                    `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
+                    os.dataBR,
+                    os.servicoRealizado || os.descricao || 'Manutenção',
+                    Number(os.custoTotal || 0)
+                ]);
+            }
+        });
+
+        const totalCusto = lancamentos.reduce((acc, l) => acc + l[3], 0);
+        const linhasCC = lancamentos.map(l => [
+            l[0], l[1], l[2],
+            l[3].toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]);
+
+        if (linhasCC.length === 0) {
+            linhasCC.push(['-', '-', 'Nenhum custo registrado no período selecionado.', 'R$ 0,00']);
+        }
+
+        doc.autoTable({
+            startY: 67,
+            head: [['Nº O.S.', 'Data', 'Item / Serviço Realizado', 'Valor do Item']],
+            body: linhasCC,
+            foot: [['', '', 'VALOR TOTAL DO PERÍODO', totalCusto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })]],
+            theme: 'grid',
+            headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+            footStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], fontStyle: 'bold', fontSize: 10 },
+            styles: { fontSize: 8.5, cellPadding: 3 },
+            columnStyles: {
+                0: { cellWidth: 26, fontStyle: 'bold' },
+                1: { cellWidth: 26 },
+                2: { cellWidth: 'auto' },
+                3: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
+            }
+        });
+
+        doc.save(`CentroCusto_${m.codigoTag}_${prefixoFiltro || 'Total'}.pdf`);
+    } else {
+        const linhasMaq = ordensFiltradas.map(os => [
+            `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
+            os.dataBR,
+            os.tipoNome || 'Geral',
+            os.manutentorNome || '-',
+            os.statusTitulo,
+            os.servicoRealizado || os.descricao || '-'
+        ]);
+
+        if (linhasMaq.length === 0) {
+            linhasMaq.push(['-', '-', '-', '-', '-', 'Nenhuma O.S. aplicada nesta máquina no período.']);
+        }
+
+        doc.autoTable({
+            startY: 67,
+            head: [['Nº O.S.', 'Data', 'Tipo', 'Técnico', 'Status', 'Problema / Serviço Realizado']],
+            body: linhasMaq,
+            foot: [['', '', '', '', 'TOTAL DE O.S.', `${ordensFiltradas.length} O.S.`]],
+            theme: 'grid',
+            headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+            footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 9 },
+            styles: { fontSize: 8, cellPadding: 2.8 },
+            columnStyles: {
+                0: { cellWidth: 22, fontStyle: 'bold' },
+                1: { cellWidth: 22 },
+                2: { cellWidth: 28 },
+                3: { cellWidth: 26 },
+                4: { cellWidth: 24 },
+                5: { cellWidth: 'auto' }
+            }
+        });
+
+        doc.save(`Relatorio_Maquina_${m.codigoTag}_${prefixoFiltro || 'Total'}.pdf`);
+    }
+
+    btn.disabled = false;
+    fecharModalQRPeriodoPDF();
 }
 
 // ==========================================
@@ -363,7 +705,6 @@ async function salvarNovoUsuario(e) {
         setor = document.getElementById('user-setor').value.trim();
     }
 
-    // MODO EDIÇÃO
     if (editId) {
         btn.textContent = 'Salvando...';
         try {
@@ -377,7 +718,6 @@ async function salvarNovoUsuario(e) {
         return;
     }
 
-    // MODO CRIAÇÃO
     btn.textContent = 'Criando...';
     const email = document.getElementById('user-email').value.trim();
     const password = document.getElementById('user-senha').value;
