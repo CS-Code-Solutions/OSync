@@ -2,8 +2,19 @@ let cacheColunasOS = [];
 let cacheOrdensServico = [];
 let unsubscribeOS = null;
 
+function obterDataHoraLocalInput(dateObj = new Date()) {
+    const d = new Date(dateObj.getTime() - dateObj.getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 16);
+}
+
+function formatarDuracaoParadaOS(minutos) {
+    const mins = Math.max(0, Math.round(Number(minutos) || 0));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
 async function initKanbanOS() {
-    // Exibe botão "Editar Kanban" no topo à esquerda apenas para Admin/SuperAdmin
     const isGestor = usuarioAtual?.perfil === 'Admin' || usuarioAtual?.perfil === 'SuperAdmin';
     if (isGestor) {
         document.getElementById('btn-editar-kanban-os')?.classList.remove('hidden');
@@ -95,11 +106,17 @@ function renderizarCardsMobile(ordens) {
         const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
         const corStatus = coluna.corTopo || '#00E5B0';
         const numFormatado = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
+        const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
+        const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
 
         return `
         <div onclick="abrirDetalhesOS('${os.id}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
             <div class="flex items-center justify-between gap-2 mb-2">
-                <span class="text-xs font-extrabold text-slate-500">${numFormatado}</span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-xs font-extrabold text-slate-500">${numFormatado}</span>
+                    ${ehParada ? `<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-600 text-white">Parada${os.tempoParadaMinutos ? ` (${formatarDuracaoParadaOS(os.tempoParadaMinutos)})` : ''}</span>` : ''}
+                    ${ehParcial ? `<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-500 text-white">Parcial</span>` : ''}
+                </div>
                 <span class="text-[11px] font-extrabold px-3 py-0.5 rounded-full text-white shadow-2xs" style="background-color: ${corStatus}">
                     ${coluna.titulo}
                 </span>
@@ -150,20 +167,26 @@ function renderizarKanbanDesktop(ordens) {
             </div>
 
             <div class="p-3 space-y-2.5 flex-1 overflow-y-auto">
-                ${cardsColuna.length > 0 ? cardsColuna.map(os => `
+                ${cardsColuna.length > 0 ? cardsColuna.map(os => {
+                    const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
+                    const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
+                    return `
                 <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${os.id}')" onclick="abrirDetalhesOS('${os.id}')"
                      class="osync-card p-3.5 cursor-pointer hover:shadow-md transition" style="border-left-color: ${col.corTopo}">
-                    <div class="flex items-center justify-between text-[11px] mb-1">
+                    <div class="flex items-center justify-between text-[11px] mb-1 gap-1">
                         <span class="font-extrabold text-slate-500">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
                         <span class="font-bold px-2 py-0.5 rounded text-white" style="background-color: ${col.corTopo}">${col.titulo}</span>
                     </div>
                     <h4 class="font-bold text-slate-900 text-sm">${os.ativoTag} - ${os.ativoNome}</h4>
+                    ${ehParada ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Máquina Parada${os.tempoParadaMinutos ? ` • ${formatarDuracaoParadaOS(os.tempoParadaMinutos)}` : ''}</span>` : ''}
+                    ${ehParcial ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Parcialmente Funcional</span>` : ''}
                     <p class="text-xs text-slate-500 line-clamp-2 mt-1">${os.descricao}</p>
                     <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 text-[11px]">
                         <span class="font-semibold text-slate-600">${os.tipoNome || 'Geral'}</span>
                         <span class="font-semibold text-blue-700">${os.manutentorNome || 'Sem técnico'}</span>
                     </div>
-                </div>`).join('') : `
+                </div>`;
+                }).join('') : `
                 <div class="h-32 border-2 border-dashed border-slate-300/80 rounded-xl flex items-center justify-center text-xs text-slate-400 select-none">
                     Arraste uma O.S. para cá
                 </div>`}
@@ -334,7 +357,6 @@ function cancelarEdicaoColunaModalOS() {
 
 async function excluirColunaModalOS(colId) {
     if (!await confirmarAcaoOSync('Deseja excluir esta coluna do Kanban?', { titulo: 'Excluir Coluna', textoConfirmar: 'Excluir' })) return;
-    // ... restante igual
 
     await db.collection('kanban_colunas').doc(colId).delete();
 
@@ -358,8 +380,31 @@ async function excluirColunaModalOS(colId) {
 // ==========================================
 function verificarTipoManutencaoCriacao() {}
 
+function alternarCampoParadaCriacaoOS() {
+    const condicao = document.getElementById('os-condicao-maquina')?.value || 'Operacional';
+    const box = document.getElementById('box-os-inicio-parada');
+    const input = document.getElementById('os-inicio-parada');
+    if (!box || !input) return;
+
+    if (condicao === 'Maquina parada') {
+        box.classList.remove('hidden');
+        input.required = true;
+        if (!input.value) {
+            input.value = obterDataHoraLocalInput();
+        }
+    } else {
+        box.classList.add('hidden');
+        input.required = false;
+        input.value = '';
+    }
+}
+
 async function abrirModalNovaOS() {
     document.getElementById('modal-nova-os').classList.remove('hidden');
+
+    const condSel = document.getElementById('os-condicao-maquina');
+    if (condSel) condSel.value = 'Operacional';
+    alternarCampoParadaCriacaoOS();
 
     const [ativosSnap, tiposSnap, manutSnap] = await Promise.all([
         db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get(),
@@ -412,6 +457,10 @@ async function salvarNovaOS(e) {
         const selManut = document.getElementById('os-manutentor');
         const optManut = selManut.options[selManut.selectedIndex];
 
+        const condicaoMaquina = document.getElementById('os-condicao-maquina')?.value || 'Operacional';
+        const ehMaquinaParada = condicaoMaquina === 'Maquina parada';
+        const inicioParada = ehMaquinaParada ? (document.getElementById('os-inicio-parada')?.value || obterDataHoraLocalInput()) : '';
+
         const maiorNum = cacheOrdensServico.reduce((max, o) => Math.max(max, o.numeroOs || 0), 0);
 
         await db.collection('ordens_servico').add({
@@ -424,6 +473,11 @@ async function salvarNovaOS(e) {
             tipoCor: optTipo?.getAttribute('data-cor') || '#1D4ED8',
             colunaId: document.getElementById('os-coluna-inicial').value,
             prioridade: document.getElementById('os-prioridade').value,
+            condicaoMaquina,
+            maquinaParada: ehMaquinaParada,
+            inicioParada,
+            terminoParada: '',
+            tempoParadaMinutos: 0,
             manutentorId: selManut.value || '',
             manutentorNome: selManut.value ? (optManut?.getAttribute('data-nome') || '') : '',
             descricao: document.getElementById('os-descricao').value.trim(),
@@ -432,8 +486,17 @@ async function salvarNovaOS(e) {
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        // Atualiza status operacional do equipamento conforme a condição informada
+        if (selAtivo.value) {
+            const novoStatusAtivo = ehMaquinaParada
+                ? 'Parada'
+                : (condicaoMaquina === 'Parcialmente funcional' ? 'Manutencao' : 'Operacional');
+            await db.collection('ativos').doc(selAtivo.value).update({ status: novoStatusAtivo });
+        }
+
         fecharModalNovaOS();
         e.target.reset();
+        alternarCampoParadaCriacaoOS();
         if (typeof mostrarNotificacaoOSync === 'function') {
             mostrarNotificacaoOSync('Ordem de Serviço criada com sucesso!', 'sucesso');
         }
