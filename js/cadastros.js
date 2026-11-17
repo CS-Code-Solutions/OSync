@@ -2,6 +2,17 @@ let cacheAtivos = [];
 let cacheUsuariosPerfil = [];
 let perfilAtualCadastro = 'Manutentor';
 
+const ROTULOS_PAGINAS_MANUTENTOR = {
+    'os': 'O.S.',
+    'solicitacoes': 'Chamados',
+    'dashboard': 'Dashboard',
+    'cad-ativos': 'Máquinas',
+    'relatorios-os': 'Rel. O.S.',
+    'relatorios-maquinas': 'Rel. Máquinas',
+    'centros-custo': 'C. Custo',
+    'configuracoes': 'Configurações'
+};
+
 // ==========================================
 // MÓDULO 1: ATIVOS (MÁQUINAS) E QR CODE
 // ==========================================
@@ -144,7 +155,6 @@ async function excluirAtivo(ativoId, nome) {
     await db.collection('centros_custo').doc(ativoId).delete().catch(() => {});
     carregarAtivos();
 }
-
 
 async function abrirProntuarioAtivo(ativoId) {
     const ativo = cacheAtivos.find(a => a.id === ativoId);
@@ -583,6 +593,34 @@ function verificarOutraEspecialidade() {
     }
 }
 
+function alternarTodasPermissoesManutentor() {
+    const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]'));
+    if (checkboxes.length === 0) return;
+
+    const todasMarcadas = checkboxes.every(cb => cb.checked);
+    checkboxes.forEach(cb => {
+        cb.checked = !todasMarcadas;
+    });
+}
+
+function obterPermissoesSelecionadasFormulario() {
+    const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]:checked'));
+    return checkboxes.map(cb => cb.value);
+}
+
+function preencherPermissoesFormulario(permissoesSalvas) {
+    const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]'));
+    if (checkboxes.length === 0) return;
+
+    const lista = Array.isArray(permissoesSalvas) && permissoesSalvas.length > 0
+        ? permissoesSalvas
+        : ['os', 'solicitacoes'];
+
+    checkboxes.forEach(cb => {
+        cb.checked = lista.includes(cb.value);
+    });
+}
+
 async function carregarUsuariosPorPerfil(perfil) {
     const grid = document.getElementById('lista-usuarios-perfil');
     if (!grid) return;
@@ -601,9 +639,24 @@ async function carregarUsuariosPorPerfil(perfil) {
         return;
     }
 
-    grid.innerHTML = cacheUsuariosPerfil.map(u => `
-        <div class="osync-card p-4 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-3 min-w-0">
+    grid.innerHTML = cacheUsuariosPerfil.map(u => {
+        const paginasPermitidas = Array.isArray(u.paginasPermitidas) && u.paginasPermitidas.length > 0
+            ? u.paginasPermitidas
+            : ['os', 'solicitacoes'];
+
+        const badgesPaginas = perfil === 'Manutentor'
+            ? `<div class="flex flex-wrap gap-1 mt-2">
+                ${paginasPermitidas.map(p => `
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                        ${ROTULOS_PAGINAS_MANUTENTOR[p] || p}
+                    </span>
+                `).join('')}
+               </div>`
+            : '';
+
+        return `
+        <div class="osync-card p-4 flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3 min-w-0">
                 <div class="w-11 h-11 shrink-0 rounded-full bg-[#0B1120] text-[#00E5B0] font-bold flex items-center justify-center text-sm border border-slate-700">
                     ${(u.nome || 'US').substring(0, 2).toUpperCase()}
                 </div>
@@ -613,6 +666,7 @@ async function carregarUsuariosPorPerfil(perfil) {
                     <span class="inline-flex items-center gap-1 mt-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                         <i data-lucide="wrench" class="w-3 h-3"></i> ${u.setor || 'Geral'}
                     </span>
+                    ${badgesPaginas}
                 </div>
             </div>
 
@@ -624,8 +678,8 @@ async function carregarUsuariosPorPerfil(perfil) {
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 
     lucide.createIcons();
 }
@@ -644,8 +698,10 @@ function abrirModalNovoUsuario(perfil) {
     if (document.getElementById('user-email')) document.getElementById('user-email').required = true;
     if (document.getElementById('user-senha')) document.getElementById('user-senha').required = true;
 
+    preencherPermissoesFormulario(['os', 'solicitacoes']);
     verificarOutraEspecialidade();
     document.getElementById('modal-novo-usuario')?.classList.remove('hidden');
+    lucide.createIcons();
 }
 
 function abrirModalEditarUsuario(userId) {
@@ -680,7 +736,9 @@ function abrirModalEditarUsuario(userId) {
         document.getElementById('user-setor').value = u.setor || '';
     }
 
+    preencherPermissoesFormulario(u.paginasPermitidas);
     document.getElementById('modal-novo-usuario')?.classList.remove('hidden');
+    lucide.createIcons();
 }
 
 function fecharModalNovoUsuario() {
@@ -696,6 +754,16 @@ async function salvarNovoUsuario(e) {
     const nome = document.getElementById('user-nome').value.trim();
     const perfil = document.getElementById('user-perfil-alvo').value;
 
+    let paginasPermitidas = [];
+    if (perfil === 'Manutentor') {
+        paginasPermitidas = obterPermissoesSelecionadasFormulario();
+        if (paginasPermitidas.length === 0) {
+            alert('Selecione ao menos uma página que o manutentor terá acesso.');
+            btn.disabled = false;
+            return;
+        }
+    }
+
     let setor = '';
     const selectSetor = document.getElementById('user-setor-select');
     if (selectSetor) {
@@ -709,9 +777,16 @@ async function salvarNovoUsuario(e) {
     if (editId) {
         btn.textContent = 'Salvando...';
         try {
-            await db.collection('usuarios').doc(editId).update({ nome, setor });
+            const dadosUpdate = { nome, setor };
+            if (perfil === 'Manutentor') {
+                dadosUpdate.paginasPermitidas = paginasPermitidas;
+            }
+            await db.collection('usuarios').doc(editId).update(dadosUpdate);
             fecharModalNovoUsuario();
             carregarUsuariosPorPerfil(perfil);
+            if (typeof mostrarNotificacaoOSync === 'function') {
+                mostrarNotificacaoOSync('Cadastro e permissões atualizados!', 'sucesso');
+            }
         } catch (err) {
             alert('Erro ao atualizar: ' + err.message);
         }
@@ -729,7 +804,7 @@ async function salvarNovoUsuario(e) {
         const cred = await appSecundario.auth().createUserWithEmailAndPassword(email, password);
         await appSecundario.auth().signOut();
 
-        await db.collection('usuarios').doc(cred.user.uid).set({
+        const novoDoc = {
             empresaId: usuarioAtual.empresaId,
             nome,
             email,
@@ -738,11 +813,20 @@ async function salvarNovoUsuario(e) {
             ativo: true,
             statusAcesso: 'aprovado',
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+
+        if (perfil === 'Manutentor') {
+            novoDoc.paginasPermitidas = paginasPermitidas;
+        }
+
+        await db.collection('usuarios').doc(cred.user.uid).set(novoDoc);
 
         fecharModalNovoUsuario();
         e.target.reset();
         carregarUsuariosPorPerfil(perfil);
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Manutentor cadastrado com as permissões selecionadas!', 'sucesso');
+        }
     } catch (err) {
         alert('Erro ao criar acesso: ' + err.message);
     }
@@ -760,4 +844,3 @@ async function excluirUsuarioPerfil(userId, nome) {
         alert('Erro ao excluir: ' + err.message);
     }
 }
-
