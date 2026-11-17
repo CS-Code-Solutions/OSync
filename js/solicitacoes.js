@@ -145,6 +145,7 @@ async function aprovarEConverterEmOS(solId) {
 }
 
 async function recusarSolicitacao(solId) {
-    if (!confirm('Recusar esta solicitação?')) return;
+    if (!await confirmarAcaoOSync('Deseja recusar esta solicitação de manutenção?', { titulo: 'Recusar Chamado', textoConfirmar: 'Recusar' })) return;
     await db.collection('solicitacoes').doc(solId).update({ status: 'Recusada' });
 }
+
