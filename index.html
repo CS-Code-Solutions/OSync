@@ -63,6 +63,31 @@
                 </button>
             </nav>
         </div>
+<button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+    <i data-lucide="kanban" class="w-4 h-4"></i>
+    <span>O.S.</span>
+</button>
+
+<button id="nav-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+    <i data-lucide="bell-ring" class="w-4 h-4"></i>
+    <span>Solicitações</span>
+</button>
+
+<!-- Dropdown Cadastros (Apenas Gestor/SuperAdmin) -->
+<div id="nav-cadastros-group" class="relative dropdown">
+    <button id="btn-menu-cadastros" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+        <i data-lucide="folder-plus" class="w-4 h-4"></i>
+        <span>Cadastros</span>
+        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
+    </button>
+    <!-- ... manter os sub-botões iguais ... -->
+</div>
+
+<button id="nav-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+    <i data-lucide="settings" class="w-4 h-4"></i>
+    <span>Configurações</span>
+</button>
+
 <button
  id="btn-menu-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm border border-[#00E5B0]/30 text-[#00E5B0]">
     <i data-lucide="building-2" class="w-4 h-4"></i>
