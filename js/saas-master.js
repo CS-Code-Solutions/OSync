@@ -9,6 +9,13 @@ async function initSaaSEmpresas() {
     document.getElementById('form-usuario-empresa-saas')?.addEventListener('submit', salvarUsuarioEmpresaSaaS);
 }
 
+function calcularVencimentoContrato(tipoContrato) {
+    const hoje = new Date();
+    const dias = tipoContrato === 'teste_7d' ? 7 : 365;
+    hoje.setDate(hoje.getDate() + dias);
+    return hoje.toISOString();
+}
+
 async function carregarEmpresasSaaS() {
     const grid = document.getElementById('lista-empresas-saas');
     if (!grid) return;
@@ -25,20 +32,46 @@ async function carregarEmpresasSaaS() {
         const ativa = emp.ativa !== false;
         const selecionada = usuarioAtual.empresaId === emp.id;
 
+        const labelContrato = emp.tipoContrato === 'teste_7d' ? '7 dias (Teste)' : '1 ano (Renovável)';
+        let infoVencimento = 'Sem vencimento definido';
+        let expirado = false;
+
+        if (emp.dataVencimento) {
+            const venc = new Date(emp.dataVencimento);
+            const diffDias = Math.ceil((venc - new Date()) / (1000 * 60 * 60 * 24));
+            const dataBR = venc.toLocaleDateString('pt-BR');
+            expirado = diffDias < 0;
+            infoVencimento = expirado
+                ? `Vencido em ${dataBR} (${Math.abs(diffDias)}d atrás)`
+                : `Vence em ${dataBR} (${diffDias}d restantes)`;
+        }
+
         return `
-        <div class="osync-card p-5 flex flex-col justify-between gap-4" style="border-left-color: ${ativa ? '#00E5B0' : '#F43F5E'}">
+        <div class="osync-card p-5 flex flex-col justify-between gap-4" style="border-left-color: ${ativa && !expirado ? '#00E5B0' : '#F43F5E'}">
             <div>
-                <div class="flex items-center justify-between gap-2 mb-1">
-                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${ativa ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                        ${ativa ? 'Ativa' : 'Suspensa'} • Plano ${emp.plano || 'Pro'}
+                <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${ativa && !expirado ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                        ${!ativa ? 'Suspensa' : (expirado ? 'Contrato Vencido' : 'Ativa')} • ${emp.plano || 'Pro'}
                     </span>
                     ${selecionada ? '<span class="text-[10px] font-extrabold uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Visualizando</span>' : ''}
                 </div>
+
                 <h3 class="font-bold text-base text-slate-900 mt-1">${emp.nome}</h3>
                 <p class="text-xs text-slate-500">${emp.cnpj || 'CNPJ não informado'}</p>
 
+                <!-- Bloco de Contrato -->
+                <div class="mt-2.5 p-2.5 rounded-lg border ${expirado ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-slate-50 border-slate-200 text-slate-700'} text-xs space-y-0.5">
+                    <div class="font-bold flex items-center justify-between">
+                        <span>Contrato: ${labelContrato}</span>
+                        <button onclick="renovarContratoEmpresa('${emp.id}', '${emp.nome}')" class="text-[11px] font-extrabold text-emerald-600 hover:underline">
+                            + Renovar 1 Ano
+                        </button>
+                    </div>
+                    <div class="text-[11px] opacity-80">${infoVencimento}</div>
+                </div>
+
                 <!-- Código de Convite -->
-                <div class="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
+                <div class="mt-2.5 p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
                     <code class="text-[11px] font-mono text-slate-700 truncate">${emp.id}</code>
                     <button onclick="copiarTextoSimples('${emp.id}')" class="text-xs font-bold text-blue-600 hover:underline shrink-0">Copiar ID</button>
                 </div>
@@ -87,11 +120,15 @@ async function salvarNovaEmpresaSaaS(e) {
         const nome = document.getElementById('saas-emp-nome').value.trim();
         const cnpj = document.getElementById('saas-emp-cnpj').value.trim();
         const plano = document.getElementById('saas-emp-plano').value;
+        const tipoContrato = document.getElementById('saas-emp-contrato').value;
+        const dataVencimento = calcularVencimentoContrato(tipoContrato);
 
         const empRef = await db.collection('empresas').add({
             nome,
             cnpj,
             plano,
+            tipoContrato,
+            dataVencimento,
             ativa: true,
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -115,6 +152,18 @@ async function salvarNovaEmpresaSaaS(e) {
 
     btn.disabled = false;
     btn.textContent = 'Criar Empresa';
+}
+
+async function renovarContratoEmpresa(empId, nome) {
+    if (!confirm(`Confirmar renovação de 1 ano (365 dias) para "${nome}"?`)) return;
+
+    const novaData = calcularVencimentoContrato('anual_1a');
+    await db.collection('empresas').doc(empId).update({
+        tipoContrato: 'anual_1a',
+        dataVencimento: novaData,
+        ativa: true
+    });
+    carregarEmpresasSaaS();
 }
 
 function abrirModalUsuarioEmpresaSaaS(empId, empNome) {
