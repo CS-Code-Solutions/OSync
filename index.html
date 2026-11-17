@@ -12,7 +12,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-
     <!-- SDKs Firebase Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -29,7 +28,7 @@
                 <img src="images/cabe.png" alt="OSync" class="h-9 w-auto object-contain">
             </a>
 
-            <!-- Menu Superior Desktop (Sem duplicação) -->
+            <!-- Menu Superior Desktop -->
             <nav class="hidden md:flex items-center gap-1.5" id="desktop-nav">
                 <button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
                     <i data-lucide="kanban" class="w-4 h-4"></i>
@@ -64,10 +63,28 @@
                     </div>
                 </div>
 
-                <button id="nav-centros-custo" onclick="navegarPara('centros-custo')" data-page="centros-custo" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
-                    <i data-lucide="wallet" class="w-4 h-4"></i>
-                    <span>Centros de Custo</span>
-                </button>
+                <!-- Dropdown Relatórios -->
+                <div id="nav-relatorios-group" class="relative dropdown">
+                    <button id="btn-menu-relatorios" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        <span>Relatórios</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
+                    </button>
+                    <div class="dropdown-menu hidden absolute left-0 mt-1 w-60 bg-[#131C31] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+                        <button onclick="navegarPara('centros-custo')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="wallet" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Centros de Custo</span>
+                        </button>
+                        <button onclick="navegarPara('relatorios-os')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="clipboard-list" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Relatórios de O.S.</span>
+                        </button>
+                        <button onclick="navegarPara('relatorios-maquinas')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Relatório de Máquinas</span>
+                        </button>
+                    </div>
+                </div>
 
                 <button id="nav-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
                     <i data-lucide="settings" class="w-4 h-4"></i>
@@ -108,7 +125,7 @@
     </footer>
 
     <!-- MENU INFERIOR MOBILE -->
-    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
+    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-1.5 flex items-center justify-around z-40">
         <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn active flex flex-col items-center justify-center py-1.5 px-2">
             <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">O.S.</span>
@@ -121,6 +138,10 @@
             <i data-lucide="folder-plus" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Cadastros</span>
         </button>
+        <button id="mob-relatorios" onclick="abrirMenuRelatoriosMobile()" data-page="relatorios" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
+            <i data-lucide="bar-chart-3" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[11px] font-medium">Relatórios</span>
+        </button>
         <button id="mob-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-2">
             <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
             <span class="text-[11px] font-medium">Config</span>
@@ -132,11 +153,11 @@
         </button>
     </nav>
 
-    <!-- GAVETA MOBILE DE CADASTROS & CUSTOS -->
+    <!-- GAVETA MOBILE DE CADASTROS -->
     <div id="mobile-cadastros-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
         <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-2">
             <div class="flex justify-between items-center pb-2 border-b border-slate-700">
-                <span class="text-sm font-bold text-white">Selecione o Módulo</span>
+                <span class="text-sm font-bold text-white">Cadastros do Sistema</span>
                 <button onclick="fecharMenuCadastrosMobile()" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <button onclick="navegarPara('cad-manutentores'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
@@ -151,24 +172,44 @@
                 <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
                 <span class="font-medium">Ativos (Máquinas)</span>
             </button>
-            <button onclick="navegarPara('centros-custo'); fecharMenuCadastrosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3 border border-[#00E5B0]/30">
+        </div>
+    </div>
+
+    <!-- GAVETA MOBILE DE RELATÓRIOS -->
+    <div id="mobile-relatorios-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
+        <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-2">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-700">
+                <span class="text-sm font-bold text-white">Relatórios Gerenciais</span>
+                <button onclick="fecharMenuRelatoriosMobile()" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <button onclick="navegarPara('centros-custo'); fecharMenuRelatoriosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
                 <i data-lucide="wallet" class="w-5 h-5 text-[#00E5B0]"></i>
                 <span class="font-medium">Centros de Custo</span>
+            </button>
+            <button onclick="navegarPara('relatorios-os'); fecharMenuRelatoriosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
+                <i data-lucide="clipboard-list" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span class="font-medium">Relatórios de O.S.</span>
+            </button>
+            <button onclick="navegarPara('relatorios-maquinas'); fecharMenuRelatoriosMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] text-white flex items-center gap-3">
+                <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span class="font-medium">Relatório de Máquinas</span>
             </button>
         </div>
     </div>
 
-    <script src="js/firebase-config.js?v=3"></script>
-    <script src="js/ui-alerts.js?v=3"></script>
-    <script src="js/image-utils.js?v=3"></script>
-    <script src="js/auth.js?v=3"></script>
-    <script src="js/router.js?v=3"></script>
-    <script src="js/configuracoes.js?v=3"></script>
-    <script src="js/cadastros.js?v=3"></script>
-    <script src="js/centros-custo.js?v=3"></script>
-    <script src="js/solicitacoes.js?v=3"></script>
-    <script src="js/saas-master.js?v=3"></script>
-    <script src="js/os-kanban.js?v=3"></script>
-    <script src="js/os-execucao.js?v=3"></script>
+    <script src="js/firebase-config.js?v=4"></script>
+    <script src="js/ui-alerts.js?v=4"></script>
+    <script src="js/image-utils.js?v=4"></script>
+    <script src="js/auth.js?v=4"></script>
+    <script src="js/router.js?v=4"></script>
+    <script src="js/configuracoes.js?v=4"></script>
+    <script src="js/cadastros.js?v=4"></script>
+    <script src="js/centros-custo.js?v=4"></script>
+    <script src="js/relatorios-os.js?v=4"></script>
+    <script src="js/relatorios-maquinas.js?v=4"></script>
+    <script src="js/solicitacoes.js?v=4"></script>
+    <script src="js/saas-master.js?v=4"></script>
+    <script src="js/os-kanban.js?v=4"></script>
+    <script src="js/os-execucao.js?v=4"></script>
 </body>
 </html>
