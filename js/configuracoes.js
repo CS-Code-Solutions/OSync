@@ -5,7 +5,7 @@ async function initConfiguracoes() {
     carregarColunasConfig();
     carregarTiposConfig();
     carregarSetoresConfig();
-
+    carregarCentrosCustoConfig();
     // Adicionar ou Editar Coluna
     document.getElementById('form-add-coluna')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -314,4 +314,45 @@ async function deletarItemConfig(colecao, id, callback) {
     if (!confirm('Deseja excluir este item?')) return;
     await db.collection(colecao).doc(id).delete();
     callback();
+}
+// Listener dentro de initConfiguracoes():
+document.getElementById('form-add-centro-custo')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const codigo = document.getElementById('cc-codigo').value.trim().toUpperCase();
+    const nome = document.getElementById('cc-nome').value.trim();
+
+    await db.collection('centros_custo').add({
+        empresaId: usuarioAtual.empresaId,
+        codigo,
+        nome
+    });
+
+    e.target.reset();
+    carregarCentrosCustoConfig();
+});
+
+async function carregarCentrosCustoConfig() {
+    const lista = document.getElementById('lista-centros-custo');
+    if (!lista) return;
+
+    const snap = await db.collection('centros_custo')
+        .where('empresaId', '==', usuarioAtual.empresaId)
+        .get();
+
+    const centros = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.codigo || '').localeCompare(b.codigo || ''));
+
+    lista.innerHTML = centros.map(cc => `
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">${cc.codigo}</span>
+                <span class="text-sm font-medium text-slate-700 truncate">${cc.nome}</span>
+            </div>
+            <button onclick="deletarItemConfig('centros_custo', '${cc.id}', carregarCentrosCustoConfig)" class="text-slate-400 hover:text-rose-600 p-1">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum centro de custo cadastrado.</p>';
+    lucide.createIcons();
 }
