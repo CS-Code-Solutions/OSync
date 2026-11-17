@@ -59,20 +59,20 @@ async function initRelatoriosOS() {
     const selStatus = document.getElementById('rel-os-status');
     if (selStatus) {
         selStatus.innerHTML = '<option value="">Todos Status</option>' +
-            cacheColunasRelOS.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+            cacheColunasRelOS.map(c => `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`).join('');
     }
 
     const selTipo = document.getElementById('rel-os-tipo');
     if (selTipo) {
         const tipos = tiposSnap.docs.map(d => d.data().nome).sort();
         selTipo.innerHTML = '<option value="">Todos Tipos</option>' +
-            tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            tipos.map(t => `<option value="${escaparHTML(t)}">${escaparHTML(t)}</option>`).join('');
     }
 
     const selManut = document.getElementById('rel-os-manutentor');
     if (selManut) {
         selManut.innerHTML = '<option value="">Todos Manutentores</option>' +
-            manutSnap.docs.map(d => `<option value="${d.id}">${d.data().nome}</option>`).join('');
+            manutSnap.docs.map(d => `<option value="${escaparHTML(d.id)}">${escaparHTML(d.data().nome)}</option>`).join('');
     }
 
     filtrarRelatorioOS();
@@ -132,20 +132,20 @@ function filtrarRelatorioOS() {
         <tr class="hover:bg-slate-50 transition align-top">
             <td class="py-3 px-2.5 font-extrabold text-slate-900 whitespace-nowrap">
                 <div>#OS-${String(os.numeroOs || 0).padStart(4, '0')}</div>
-                ${os.minutosParada > 0 ? `<span class="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">Parada: ${os.paradaLabel}</span>` : ''}
+                ${os.minutosParada > 0 ? `<span class="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">Parada: ${escaparHTML(os.paradaLabel)}</span>` : ''}
             </td>
-            <td class="py-3 px-2.5 text-slate-500 whitespace-nowrap">${os.dataBR}</td>
+            <td class="py-3 px-2.5 text-slate-500 whitespace-nowrap">${escaparHTML(os.dataBR)}</td>
             <td class="py-3 px-3 font-bold text-slate-900">
-                ${os.ativoTag} - ${os.ativoNome}
+                ${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome)}
             </td>
-            <td class="py-3 px-3 font-semibold whitespace-nowrap">${os.tipoNome || 'Geral'}</td>
+            <td class="py-3 px-3 font-semibold whitespace-nowrap">${escaparHTML(os.tipoNome || 'Geral')}</td>
             <td class="py-3 px-3 text-slate-700">
-                <div class="font-medium text-slate-800">${os.descricao || '-'}</div>
-                ${os.servicoRealizado ? `<div class="text-[11px] text-emerald-700 mt-0.5"><strong>Solução:</strong> ${os.servicoRealizado}</div>` : ''}
+                <div class="font-medium text-slate-800">${escaparHTML(os.descricao || '-')}</div>
+                ${os.servicoRealizado ? `<div class="text-[11px] text-emerald-700 mt-0.5"><strong>Solução:</strong> ${escaparHTML(os.servicoRealizado)}</div>` : ''}
             </td>
             <td class="py-3 px-3 text-right whitespace-nowrap">
-                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white" style="background-color: ${os.statusCor}">
-                    ${os.statusTitulo}
+                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white" style="background-color: ${sanitizarCorHex(os.statusCor, '#00E5B0')}">
+                    ${escaparHTML(os.statusTitulo)}
                 </span>
             </td>
         </tr>
@@ -297,7 +297,6 @@ async function gerarPDFGeralOS(e) {
         }
     });
 
-    // Se for relatório geral (Total), adiciona resumo mensal de horas paradas por mês
     if (modo === 'total' && baseFiltrada.length > 0) {
         const mapaMensal = {};
         baseFiltrada.forEach(os => {
