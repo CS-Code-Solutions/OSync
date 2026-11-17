@@ -1,0 +1,17 @@
+{
+  "name": "OSync - Gestão de Manutenção",
+  "short_name": "OSync",
+  "description": "Sistema industrial de gestão de ordens de serviço e ativos",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0B1120",
+  "theme_color": "#0B1120",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./images/loginmob.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
