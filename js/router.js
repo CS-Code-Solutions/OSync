@@ -3,14 +3,15 @@ async function navegarPara(pagina) {
     const perfil = usuarioAtual?.perfil;
     const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
 
-    const paginasRestritas = ['dashboard', 'configuracoes', 'saas-empresas', 'centros-custo', 'relatorios-os', 'relatorios-maquinas'];
+    // Verifica permissão de acesso à rota para perfis não-gestores
+    if (!isGestor) {
+        const permitidas = typeof obterPaginasPermitidasUsuario === 'function'
+            ? (obterPaginasPermitidasUsuario(usuarioAtual) || [])
+            : (perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes']);
 
-    if (!isGestor && (pagina.startsWith('cad-') || paginasRestritas.includes(pagina))) {
-        pagina = perfil === 'Lideranca' ? 'solicitacoes' : 'os';
-    }
-
-    if (perfil === 'Lideranca' && pagina === 'os') {
-        pagina = 'solicitacoes';
+        if (!permitidas.includes(pagina)) {
+            pagina = permitidas[0] || (perfil === 'Lideranca' ? 'solicitacoes' : 'os');
+        }
     }
 
     document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
