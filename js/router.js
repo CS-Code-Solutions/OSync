@@ -4,7 +4,7 @@ async function navegarPara(pagina) {
     const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
 
     // Travas de Permissão por Perfil
-    if (!isGestor && (pagina.startsWith('cad-') || pagina === 'configuracoes' || pagina === 'saas-empresas')) {
+    if (!isGestor && (pagina.startsWith('cad-') || pagina === 'configuracoes' || pagina === 'saas-empresas' || pagina === 'centros-custo')) {
         alert('Acesso restrito aos gestores da manutenção.');
         return;
     }
@@ -18,6 +18,9 @@ async function navegarPara(pagina) {
 
     if (pagina.startsWith('cad-')) {
         document.getElementById('btn-menu-cadastros')?.classList.add('active');
+        document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
+    } else if (pagina === 'centros-custo') {
+        document.querySelectorAll(`[data-page="centros-custo"]`).forEach(btn => btn.classList.add('active'));
         document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
     } else {
         document.querySelectorAll(`[data-page="${pagina}"]`).forEach(btn => btn.classList.add('active'));
@@ -35,6 +38,7 @@ async function navegarPara(pagina) {
         if (pagina === 'solicitacoes' && typeof initSolicitacoes === 'function') initSolicitacoes();
         if (pagina === 'configuracoes' && typeof initConfiguracoes === 'function') initConfiguracoes();
         if (pagina === 'saas-empresas' && typeof initSaaSEmpresas === 'function') initSaaSEmpresas();
+        if (pagina === 'centros-custo' && typeof initCentrosCusto === 'function') initCentrosCusto();
         if (pagina === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
         if (pagina === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
         if (pagina === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
