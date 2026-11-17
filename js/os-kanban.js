@@ -333,7 +333,9 @@ function cancelarEdicaoColunaModalOS() {
 }
 
 async function excluirColunaModalOS(colId) {
-    if (!confirm('Deseja excluir esta coluna?')) return;
+    if (!await confirmarAcaoOSync('Deseja excluir esta coluna do Kanban?', { titulo: 'Excluir Coluna', textoConfirmar: 'Excluir' })) return;
+    // ... restante igual
+
     await db.collection('kanban_colunas').doc(colId).delete();
 
     const restantes = cacheColunasOS.filter(c => c.id !== colId);
