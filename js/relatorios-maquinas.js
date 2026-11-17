@@ -1,5 +1,24 @@
 let cacheRelatorioMaquinas = [];
 
+function calcularMinutosParadaMaq(os) {
+    if (Number(os.tempoParadaMinutos) > 0) return Number(os.tempoParadaMinutos);
+    if (os.inicioParada && os.terminoParada) {
+        const d1 = new Date(os.inicioParada);
+        const d2 = new Date(os.terminoParada);
+        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
+            return Math.round((d2.getTime() - d1.getTime()) / 60000);
+        }
+    }
+    return 0;
+}
+
+function formatarHorasParadasMaq(minutos) {
+    const mins = Math.max(0, Math.round(Number(minutos) || 0));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
 async function initRelatoriosMaquinas() {
     const grid = document.getElementById('lista-relatorios-maquinas');
     if (grid) {
@@ -17,12 +36,15 @@ async function initRelatoriosMaquinas() {
         const data = d.data();
         const col = colunas.find(c => c.id === data.colunaId);
         const dataISO = extrairDataISO_Maq(data);
+        const minutosParada = calcularMinutosParadaMaq(data);
         return {
             id: d.id,
             ...data,
             statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
             dataISO,
-            dataBR: formatarDataBR_Maq(dataISO)
+            dataBR: formatarDataBR_Maq(dataISO),
+            minutosParada,
+            paradaLabel: minutosParada > 0 ? formatarHorasParadasMaq(minutosParada) : (data.maquinaParada || data.condicaoMaquina === 'Maquina parada' ? 'Em aberto' : '-')
         };
     });
 
@@ -36,11 +58,13 @@ async function initRelatoriosMaquinas() {
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
             totalOSGeral += ordensMaquina.length;
+            const totalMinutosParada = ordensMaquina.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
 
             return {
                 ...ativo,
                 ordens: ordensMaquina,
-                qtdOS: ordensMaquina.length
+                qtdOS: ordensMaquina.length,
+                totalMinutosParada
             };
         })
         .sort((a, b) => (a.codigoTag || '').localeCompare(b.codigoTag || ''));
@@ -112,8 +136,8 @@ function renderizarCardsRelatorioMaquinas(lista) {
 
             <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <div>
-                    <span class="text-[11px] font-semibold text-slate-400 block">O.S. Registradas</span>
-                    <span class="text-base font-extrabold text-slate-900">${m.qtdOS} O.S.</span>
+                    <span class="text-[11px] font-semibold text-slate-400 block">O.S. • Horas Paradas</span>
+                    <span class="text-sm font-extrabold text-slate-900">${m.qtdOS} O.S. <span class="text-rose-600">(${formatarHorasParadasMaq(m.totalMinutosParada)})</span></span>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button onclick="abrirModalHistoricoMaquina('${m.id}')" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1">
@@ -141,7 +165,7 @@ function abrirModalHistoricoMaquina(ativoId) {
     document.getElementById('det-rel-maq-fab').textContent = m.fabricante || '-';
     document.getElementById('det-rel-maq-mod').textContent = m.modelo || '-';
     document.getElementById('det-rel-maq-status').textContent = m.status || 'Operacional';
-    document.getElementById('det-rel-maq-qtd-os').textContent = `${m.qtdOS} O.S.`;
+    document.getElementById('det-rel-maq-qtd-os').textContent = `${m.qtdOS} O.S. • Parada: ${formatarHorasParadasMaq(m.totalMinutosParada)}`;
 
     document.getElementById('btn-abrir-pdf-maquina').onclick = () => abrirModalFiltroPDF_Maquina(m.id);
 
@@ -151,9 +175,12 @@ function abrirModalHistoricoMaquina(ativoId) {
     } else {
         listaContainer.innerHTML = m.ordens.map(os => `
             <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
                     <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${os.tipoNome || 'Manutenção'}</span>
-                    <span class="font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${os.statusTitulo}</span>
+                    <div class="flex items-center gap-1.5">
+                        ${os.minutosParada > 0 ? `<span class="font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded">Parada: ${os.paradaLabel}</span>` : ''}
+                        <span class="font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${os.statusTitulo}</span>
+                    </div>
                 </div>
                 <p class="text-slate-700"><strong>Problema:</strong> ${os.descricao || '-'}</p>
                 ${os.servicoRealizado ? `<p class="text-emerald-800 bg-emerald-50/70 p-2 rounded border border-emerald-100"><strong>Serviço Executado:</strong> ${os.servicoRealizado}</p>` : ''}
@@ -250,6 +277,8 @@ async function gerarPDFIndividualMaquina(e) {
         !prefixoFiltro || (os.dataISO && os.dataISO.startsWith(prefixoFiltro))
     );
 
+    const minutosParadaTotal = ordensFiltradas.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
+
     const logoObj = typeof carregarImagemLogoBase64 === 'function'
         ? await carregarImagemLogoBase64('images/cabe.png')
         : null;
@@ -257,7 +286,6 @@ async function gerarPDFIndividualMaquina(e) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // Cabeçalho Escuro OSync
     doc.setFillColor(11, 17, 32);
     doc.rect(0, 0, 210, 28, 'F');
     doc.setFillColor(0, 229, 176);
@@ -279,7 +307,6 @@ async function gerarPDFIndividualMaquina(e) {
     doc.setTextColor(0, 229, 176);
     doc.text(labelPeriodo, 196, 20, { align: 'right' });
 
-    // Ficha Técnica Completa da Máquina
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.roundedRect(14, 34, 182, 28, 2, 2, 'FD');
@@ -296,6 +323,7 @@ async function gerarPDFIndividualMaquina(e) {
     doc.text(`Fabricante: ${m.fabricante || '-'}`, 85, 48);
     doc.text(`Modelo: ${m.modelo || '-'}`, 145, 48);
     doc.text(`Status Atual: ${m.status || 'Operacional'}`, 18, 55);
+    doc.text(`Total Horas Paradas: ${formatarHorasParadasMaq(minutosParadaTotal)}`, 85, 55);
     doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 55);
 
     const linhas = ordensFiltradas.map(os => [
@@ -303,30 +331,32 @@ async function gerarPDFIndividualMaquina(e) {
         os.dataBR,
         os.tipoNome || 'Geral',
         os.manutentorNome || '-',
+        os.paradaLabel,
         os.statusTitulo,
         os.servicoRealizado || os.descricao || '-'
     ]);
 
     if (linhas.length === 0) {
-        linhas.push(['-', '-', '-', '-', '-', 'Nenhuma O.S. aplicada nesta máquina no período.']);
+        linhas.push(['-', '-', '-', '-', '-', '-', 'Nenhuma O.S. aplicada nesta máquina no período.']);
     }
 
     doc.autoTable({
         startY: 67,
-        head: [['Nº O.S.', 'Data', 'Tipo', 'Técnico', 'Status', 'Problema / Serviço Realizado']],
+        head: [['Nº O.S.', 'Data', 'Tipo', 'Técnico', 'Parada', 'Status', 'Problema / Serviço Realizado']],
         body: linhas,
-        foot: [['', '', '', '', 'TOTAL DE O.S.', `${ordensFiltradas.length} O.S.`]],
+        foot: [['', '', '', 'TOTAL PARADO:', formatarHorasParadasMaq(minutosParadaTotal), 'TOTAL O.S.:', `${ordensFiltradas.length} O.S.`]],
         theme: 'grid',
-        headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
-        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 9 },
-        styles: { fontSize: 8, cellPadding: 2.8 },
+        headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
+        styles: { fontSize: 7.5, cellPadding: 2.5 },
         columnStyles: {
-            0: { cellWidth: 22, fontStyle: 'bold' },
-            1: { cellWidth: 22 },
-            2: { cellWidth: 28 },
-            3: { cellWidth: 26 },
-            4: { cellWidth: 24 },
-            5: { cellWidth: 'auto' }
+            0: { cellWidth: 20, fontStyle: 'bold' },
+            1: { cellWidth: 20 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 24 },
+            4: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+            5: { cellWidth: 22 },
+            6: { cellWidth: 'auto' }
         }
     });
 
