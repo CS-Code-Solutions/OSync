@@ -82,13 +82,13 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Código da Empresa *</label>
-                    <input type="text" id="reg-empresa-id" required placeholder="Cole o código fornecido pelo gestor"
+                    <input type="text" id="reg-empresa-id" required maxlength="60" placeholder="Cole o código fornecido pelo gestor"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Seu Nome Completo *</label>
-                    <input type="text" id="reg-nome" required placeholder="Ex: João Silva"
+                    <input type="text" id="reg-nome" required maxlength="100" placeholder="Ex: João Silva"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
 
@@ -102,20 +102,20 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 mb-1">Setor / Área *</label>
-                        <input type="text" id="reg-setor" required placeholder="Ex: Mecânica"
+                        <input type="text" id="reg-setor" required maxlength="80" placeholder="Ex: Mecânica"
                             class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Seu E-mail *</label>
-                    <input type="email" id="reg-email" required placeholder="seu.email@empresa.com"
+                    <input type="email" id="reg-email" required maxlength="120" placeholder="seu.email@empresa.com"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Crie uma Senha (mín. 6 dígitos) *</label>
-                    <input type="password" id="reg-senha" required minlength="6" placeholder="••••••••"
+                    <input type="password" id="reg-senha" required minlength="6" maxlength="128" placeholder="••••••••"
                         class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                 </div>
 
@@ -124,7 +124,7 @@
                     <input type="checkbox" id="reg-lgpd-aceite" required
                         class="mt-0.5 w-4 h-4 accent-[#00E5B0] rounded cursor-pointer shrink-0">
                     <span class="text-[11px] text-slate-300 leading-relaxed">
-                        Li e concordo com a <a href="privacidade.html" target="_blank" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
+                        Li e concordo com a <a href="privacidade.html" target="_blank" rel="noopener noreferrer" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
                     </span>
                 </label>
 
@@ -148,7 +148,7 @@
             <a href="privacidade.html" class="text-slate-300 hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a>
         </div>
         <div>
-            © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
+            © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
         </div>
     </footer>
 
@@ -222,8 +222,13 @@
                 }
 
                 const empresaId = document.getElementById('reg-empresa-id').value.trim();
+                if (!/^[a-zA-Z0-9_-]{6,60}$/.test(empresaId)) {
+                    throw new Error('Formato de Código da Empresa inválido.');
+                }
+
                 const nome = document.getElementById('reg-nome').value.trim();
-                const perfil = document.getElementById('reg-perfil').value;
+                const perfilSelecionado = document.getElementById('reg-perfil').value;
+                const perfil = (perfilSelecionado === 'Manutentor' || perfilSelecionado === 'Lideranca') ? perfilSelecionado : 'Manutentor';
                 const setor = document.getElementById('reg-setor').value.trim();
                 const email = document.getElementById('reg-email').value.trim();
                 const senha = document.getElementById('reg-senha').value;
