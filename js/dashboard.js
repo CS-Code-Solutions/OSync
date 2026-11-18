@@ -835,3 +835,50 @@ async function salvarConfiguracaoDashboard() {
         lucide.createIcons();
     }
 }
+// ==========================================
+// FILTRAGEM DE PERÍODO E LIMPEZA DE GRÁFICOS
+// ==========================================
+function destruirGraficosAnteriores() {
+    Object.values(instanciasGraficosDash).forEach(chart => {
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+        }
+    });
+    instanciasGraficosDash = {};
+}
+
+function obterOrdensFiltradasDashboard() {
+    const periodo = document.getElementById('dash-filtro-periodo')?.value || 'mes_atual';
+    if (periodo === 'total') return cacheDashOrdens;
+
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
+
+    return cacheDashOrdens.filter(os => {
+        if (!os.dataISO) return periodo === 'mes_atual' ? !os.encerrada : false;
+
+        if (periodo === 'mes_atual') {
+            return os.dataISO.startsWith(`${anoAtual}-${mesAtual}`);
+        }
+        if (periodo === 'mes_anterior') {
+            const dAnt = new Date(anoAtual, hoje.getMonth() - 1, 1);
+            const chaveAnt = `${dAnt.getFullYear()}-${String(dAnt.getMonth() + 1).padStart(2, '0')}`;
+            return os.dataISO.startsWith(chaveAnt);
+        }
+        if (periodo === '30_dias' || periodo === 'ultimos_30_dias') {
+            const limite = new Date();
+            limite.setDate(limite.getDate() - 30);
+            return new Date(os.dataISO) >= limite;
+        }
+        if (periodo === 'trimestre' || periodo === 'ultimos_90_dias') {
+            const limite = new Date();
+            limite.setDate(limite.getDate() - 90);
+            return new Date(os.dataISO) >= limite;
+        }
+        if (periodo === 'ano_atual') {
+            return os.dataISO.startsWith(`${anoAtual}-`);
+        }
+        return true;
+    });
+}
