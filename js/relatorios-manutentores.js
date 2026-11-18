@@ -47,20 +47,26 @@ async function initRelatoriosManutentores() {
     const [ordens, colunas, manutSnap] = await Promise.all([
         OSyncDataStore.getOrdensServico({ completo: true }),
         OSyncDataStore.getColunasKanban(),
-        db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
+        db.collection('usuarios')
+            .where('empresaId', '==', usuarioAtual.empresaId)
+            .where('perfil', 'in', ['Manutentor', 'Admin'])
+            .get()
     ]);
 
     cacheListaManutentoresRel = manutSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => u.ativo !== false)
         .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
     const selTec = document.getElementById('rel-manut-tecnico');
     if (selTec) {
-        selTec.innerHTML = '<option value="">Todos os Manutentores</option>' +
-            cacheListaManutentoresRel.map(m => `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`).join('');
+        selTec.innerHTML = '<option value="">Todos os Manutentores / Gestão</option>' +
+            cacheListaManutentoresRel.map(m => {
+                const rotulo = m.perfil === 'Admin' ? `${m.nome} (Gestão)` : m.nome;
+                return `<option value="${escaparHTML(m.id)}">${escaparHTML(rotulo)}</option>`;
+            }).join('');
 
-        // Se o próprio manutentor abrir a tela, já seleciona o nome dele por padrão (podendo trocar se quiser)
-        if (usuarioAtual?.perfil === 'Manutentor') {
+        if (usuarioAtual?.perfil === 'Manutentor' || usuarioAtual?.perfil === 'Admin') {
             selTec.value = usuarioAtual.id;
         }
     }
