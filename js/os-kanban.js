@@ -112,14 +112,16 @@ async function initKanbanOS() {
 
 async function carregarDadosBaseOS() {
     const empId = usuarioAtual.empresaId;
+    const ehGestor = usuarioAtual.perfil === 'Admin' || usuarioAtual.perfil === 'SuperAdmin';
 
     const btnEditarKanban = document.getElementById('btn-editar-kanban-os');
     if (btnEditarKanban) {
-        if (usuarioAtual.perfil === 'Admin' || usuarioAtual.perfil === 'SuperAdmin') {
-            btnEditarKanban.classList.add('md:flex');
-        } else {
-            btnEditarKanban.classList.remove('md:flex');
-        }
+        btnEditarKanban.classList.toggle('md:flex', ehGestor);
+    }
+
+    const btnLixeiraKanban = document.getElementById('btn-lixeira-kanban-os');
+    if (btnLixeiraKanban) {
+        btnLixeiraKanban.classList.toggle('md:flex', ehGestor);
     }
 
     const [colSnap, ativoSnap, tipoSnap, manSnap] = await Promise.all([
@@ -327,7 +329,7 @@ function renderizarKanbanOS(ordens) {
                         ? os.manutentoresNomes.join(', ')
                         : (os.manutentorNome || 'Livre');
                     return `
-                    <div draggable="true" ondragstart="iniciarDragOS(event, '${osIdSeguro}')" onclick="abrirDetalhesOS('${osIdSeguro}')"
+                    <div draggable="true" ondragstart="iniciarDragOS(event, '${osIdSeguro}')" ondragend="finalizarDragOS()" onclick="abrirDetalhesOS('${osIdSeguro}')"
                         class="bg-white p-3 rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-400 transition cursor-pointer space-y-1.5">
                         <div class="flex items-center justify-between gap-1">
                             <div class="flex items-center gap-1 flex-wrap">
@@ -352,6 +354,18 @@ function renderizarKanbanOS(ordens) {
 function iniciarDragOS(e, osId) {
     osArrastadaId = osId;
     e.dataTransfer.setData('text/plain', osId);
+
+    const btnLixeira = document.getElementById('btn-lixeira-kanban-os');
+    if (btnLixeira) {
+        btnLixeira.classList.add('border-rose-400', 'text-rose-600', 'bg-rose-50/70');
+    }
+}
+
+function finalizarDragOS() {
+    const btnLixeira = document.getElementById('btn-lixeira-kanban-os');
+    if (btnLixeira) {
+        btnLixeira.classList.remove('border-rose-400', 'text-rose-600', 'bg-rose-50/70', 'bg-rose-600', 'text-white', 'scale-110');
+    }
 }
 
 function permitirDropOS(e) {
@@ -361,6 +375,8 @@ function permitirDropOS(e) {
 async function soltarCardOS(e, novaColunaId) {
     e.preventDefault();
     const osId = osArrastadaId || e.dataTransfer.getData('text/plain');
+    osArrastadaId = null;
+    finalizarDragOS();
     if (!osId) return;
 
     const colDestino = cacheColunasOS.find(c => c.id === novaColunaId);
@@ -378,7 +394,104 @@ async function soltarCardOS(e, novaColunaId) {
         colunaId: novaColunaId,
         encerrada: false
     });
+}
+
+// ==========================================
+// LIXEIRA DRAG & DROP (EXCLUSÃO COM MOTIVO)
+// ==========================================
+function avisarUsoLixeiraOS() {
+    if (typeof mostrarNotificacaoOSync === 'function') {
+        mostrarNotificacaoOSync('Arraste o cartão de uma O.S. até a lixeira para excluí-la.', 'aviso');
+    }
+}
+
+function permitirDropLixeiraOS(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-lixeira-kanban-os');
+    if (btn) {
+        btn.classList.add('bg-rose-600', 'text-white', 'border-rose-600', 'scale-110');
+        btn.classList.remove('bg-white', 'text-slate-500');
+    }
+}
+
+function sairDropLixeiraOS(e) {
+    const btn = document.getElementById('btn-lixeira-kanban-os');
+    if (btn) {
+        btn.classList.remove('bg-rose-600', 'text-white', 'border-rose-600', 'scale-110');
+        btn.classList.add('bg-white');
+    }
+}
+
+function soltarCardNaLixeiraOS(e) {
+    e.preventDefault();
+    const osId = osArrastadaId || e.dataTransfer.getData('text/plain');
     osArrastadaId = null;
+    finalizarDragOS();
+    if (!osId) return;
+
+    abrirModalExcluirOSLixeira(osId);
+}
+
+function abrirModalExcluirOSLixeira(osId) {
+    const os = cacheOrdensServico.find(o => o.id === osId);
+    if (!os) return;
+
+    document.getElementById('excluir-os-id').value = os.id;
+    document.getElementById('excluir-os-numero').textContent = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
+    document.getElementById('excluir-os-maquina').textContent = formatarRotuloAtivoOS(os.ativoTag, os.ativoNome);
+    document.getElementById('excluir-os-motivo').value = '';
+
+    document.getElementById('modal-excluir-os-lixeira')?.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => document.getElementById('excluir-os-motivo')?.focus(), 100);
+}
+
+function fecharModalExcluirOSLixeira() {
+    document.getElementById('excluir-os-id').value = '';
+    document.getElementById('excluir-os-motivo').value = '';
+    document.getElementById('modal-excluir-os-lixeira')?.classList.add('hidden');
+}
+
+async function confirmarExclusaoOSLixeira(e) {
+    e.preventDefault();
+    const osId = document.getElementById('excluir-os-id').value;
+    const motivo = document.getElementById('excluir-os-motivo').value.trim();
+    const btn = document.getElementById('btn-confirmar-exclusao-os');
+
+    if (!osId || !motivo) return;
+
+    const os = cacheOrdensServico.find(o => o.id === osId);
+    btn.disabled = true;
+    btn.textContent = 'Excluindo...';
+
+    try {
+        // Registra log de auditoria da exclusão caso a coleção esteja liberada nas regras
+        if (os) {
+            await db.collection('logs_exclusao_os').add({
+                empresaId: usuarioAtual.empresaId,
+                osId: os.id,
+                numeroOs: os.numeroOs || 0,
+                ativoNome: formatarRotuloAtivoOS(os.ativoTag, os.ativoNome),
+                descricaoOriginal: os.descricao || '',
+                motivoExclusao: motivo,
+                excluidoPor: usuarioAtual.nome,
+                excluidoEm: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(() => {});
+        }
+
+        await db.collection('ordens_servico').doc(osId).delete();
+
+        fecharModalExcluirOSLixeira();
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Ordem de Serviço excluída com sucesso!', 'sucesso');
+        }
+    } catch (err) {
+        alert('Erro ao excluir O.S.: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i><span>Confirmar Exclusão</span>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
 }
 
 // ==========================================
@@ -455,7 +568,6 @@ function removerManutentorNovaOS(manId) {
 }
 
 async function abrirModalNovaOS() {
-    // Limpa 100% de qualquer preenchimento anterior antes de abrir
     resetarFormularioNovaOS();
 
     if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0) {
