@@ -746,12 +746,16 @@ async function executarPDFDoQRCode(e) {
 }
 
 // ==========================================
-// MÓDULO 2: MANUTENTORES E LIDERANÇA
+// MÓDULO 2: MANUTENTORES, GESTÃO E LIDERANÇA
 // ==========================================
 async function initUsuariosCadastro(perfil) {
     perfilAtualCadastro = perfil;
     await carregarUsuariosPorPerfil(perfil);
-    document.getElementById('form-novo-usuario')?.addEventListener('submit', salvarNovoUsuario);
+    const form = document.getElementById('form-novo-usuario');
+    if (form && !form.dataset.bound) {
+        form.addEventListener('submit', salvarNovoUsuario);
+        form.dataset.bound = 'true';
+    }
 }
 
 function verificarOutraEspecialidade() {
@@ -790,6 +794,13 @@ function preencherPermissoesFormulario(permissoesSalvas, perfil = 'Manutentor') 
     const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]'));
     if (checkboxes.length === 0) return;
 
+    if (perfil === 'Admin' && (!Array.isArray(permissoesSalvas) || permissoesSalvas.length === 0)) {
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+        });
+        return;
+    }
+
     const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
     const lista = Array.isArray(permissoesSalvas) && permissoesSalvas.length > 0
         ? permissoesSalvas
@@ -804,13 +815,20 @@ async function carregarUsuariosPorPerfil(perfil) {
     const grid = document.getElementById('lista-usuarios-perfil');
     if (!grid) return;
 
-    const snap = await db.collection('usuarios')
-        .where('empresaId', '==', usuarioAtual.empresaId)
-        .where('perfil', '==', perfil)
-        .get();
+    let query = db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId);
+
+    // Na aba de Equipe de Manutenção, inclui tanto Manutentores quanto Gestão (Admin)
+    if (perfil === 'Manutentor') {
+        query = query.where('perfil', 'in', ['Manutentor', 'Admin']);
+    } else {
+        query = query.where('perfil', '==', perfil);
+    }
+
+    const snap = await query.get();
 
     cacheUsuariosPerfil = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => u.ativo !== false)
         .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
     if (cacheUsuariosPerfil.length === 0) {
@@ -821,19 +839,25 @@ async function carregarUsuariosPorPerfil(perfil) {
     grid.innerHTML = cacheUsuariosPerfil.map(u => {
         const uIdSeguro = escaparHTML(u.id);
         const uNomeSeguro = escaparHTML(u.nome);
-        const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
+        const ehGestao = u.perfil === 'Admin';
+        const padraoPerfil = u.perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
         const paginasPermitidas = Array.isArray(u.paginasPermitidas) && u.paginasPermitidas.length > 0
             ? u.paginasPermitidas
             : padraoPerfil;
 
-        const badgesPaginas = `
-            <div class="flex flex-wrap gap-1 mt-2">
-                ${paginasPermitidas.map(p => `
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                        ${escaparHTML(ROTULOS_PAGINAS_PERFIL[p] || p)}
-                    </span>
-                `).join('')}
-            </div>`;
+        const badgesPaginas = ehGestao && (!Array.isArray(u.paginasPermitidas) || u.paginasPermitidas.length === 0)
+            ? `<div class="flex flex-wrap gap-1 mt-2">
+                   <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                       Acesso Total (Gestão)
+                   </span>
+               </div>`
+            : `<div class="flex flex-wrap gap-1 mt-2">
+                   ${paginasPermitidas.map(p => `
+                       <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                           ${escaparHTML(ROTULOS_PAGINAS_PERFIL[p] || p)}
+                       </span>
+                   `).join('')}
+               </div>`;
 
         return `
         <div class="osync-card p-4 flex items-start justify-between gap-3">
@@ -842,10 +866,13 @@ async function carregarUsuariosPorPerfil(perfil) {
                     ${escaparHTML((u.nome || 'US').substring(0, 2).toUpperCase())}
                 </div>
                 <div class="min-w-0">
-                    <h4 class="font-bold text-slate-900 text-sm truncate">${uNomeSeguro}</h4>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <h4 class="font-bold text-slate-900 text-sm truncate">${uNomeSeguro}</h4>
+                        ${ehGestao ? `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">Gestão</span>` : ''}
+                    </div>
                     <p class="text-xs text-slate-500 truncate">${escaparHTML(u.email)}</p>
                     <span class="inline-flex items-center gap-1 mt-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                        <i data-lucide="wrench" class="w-3 h-3"></i> ${escaparHTML(u.setor || 'Geral')}
+                        <i data-lucide="wrench" class="w-3 h-3"></i> ${escaparHTML(u.setor || (ehGestao ? 'Gestão / Manutenção' : 'Geral'))}
                     </span>
                     ${badgesPaginas}
                 </div>
@@ -893,7 +920,7 @@ function abrirModalEditarUsuario(userId) {
     document.getElementById('user-edit-id').value = u.id;
     document.getElementById('user-perfil-alvo').value = u.perfil;
     document.getElementById('user-nome').value = u.nome;
-    document.getElementById('modal-usuario-titulo').textContent = 'Editar Cadastro';
+    document.getElementById('modal-usuario-titulo').textContent = u.perfil === 'Admin' ? 'Editar Usuário (Gestão)' : 'Editar Cadastro';
     document.getElementById('btn-salvar-usuario').textContent = 'Salvar Alterações';
 
     document.getElementById('grupo-user-email')?.classList.add('hidden');
@@ -962,7 +989,7 @@ async function salvarNovoUsuario(e) {
                 paginasPermitidas
             });
             fecharModalNovoUsuario();
-            carregarUsuariosPorPerfil(perfil);
+            carregarUsuariosPorPerfil(perfilAtualCadastro);
             if (typeof mostrarNotificacaoOSync === 'function') {
                 mostrarNotificacaoOSync('Cadastro e permissões atualizados!', 'sucesso');
             }
@@ -997,7 +1024,7 @@ async function salvarNovoUsuario(e) {
 
         fecharModalNovoUsuario();
         e.target.reset();
-        carregarUsuariosPorPerfil(perfil);
+        carregarUsuariosPorPerfil(perfilAtualCadastro);
         if (typeof mostrarNotificacaoOSync === 'function') {
             mostrarNotificacaoOSync('Cadastro criado com as permissões selecionadas!', 'sucesso');
         }
