@@ -4,15 +4,11 @@ async function initCentrosCusto() {
     await carregarDadosCentrosCusto();
 }
 
-function formatarMoedaBR(valor) {
-    return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
 async function carregarDadosCentrosCusto() {
     const grid = document.getElementById('lista-centros-custo-cards');
     if (!grid) return;
 
-    grid.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400 text-sm">Calculando custos por máquina...</div>';
+    grid.innerHTML = OSyncUtils.gerarSkeletonCards(6);
 
     const [ativosSnap, osSnap] = await Promise.all([
         db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get(),
@@ -32,7 +28,7 @@ async function carregarDadosCentrosCusto() {
 
         ordens.forEach(os => {
             const itens = Array.isArray(os.itensCusto) ? os.itensCusto : [];
-            const dataBase = obterDataISOOrdenacao(os);
+            const dataBase = OSyncUtils.extrairDataISO(os);
 
             if (itens.length > 0) {
                 itens.forEach(item => {
@@ -45,7 +41,7 @@ async function carregarDadosCentrosCusto() {
                             osId: os.id,
                             numeroOs: os.numeroOs || 0,
                             dataISO: dataBase,
-                            dataFormatada: formatarDataCurtaBR(dataBase),
+                            dataFormatada: OSyncUtils.formatarDataBR(dataBase),
                             descricao: item.descricao,
                             tipoCusto: item.tipoCusto || os.tipoNome || 'Manutenção',
                             valor: Number(item.valor) || 0
@@ -58,7 +54,7 @@ async function carregarDadosCentrosCusto() {
                     osId: os.id,
                     numeroOs: os.numeroOs || 0,
                     dataISO: dataBase,
-                    dataFormatada: formatarDataCurtaBR(dataBase),
+                    dataFormatada: OSyncUtils.formatarDataBR(dataBase),
                     descricao: os.servicoRealizado || os.descricao || 'Manutenção registrada',
                     tipoCusto: os.tipoNome || 'Manutenção',
                     valor: Number(os.custoTotal) || 0
@@ -84,22 +80,9 @@ async function carregarDadosCentrosCusto() {
 
     document.getElementById('cc-kpi-qtd-maquinas').textContent = cacheCentrosCustoDetalhado.length;
     document.getElementById('cc-kpi-qtd-os').textContent = totalOSComCusto;
-    document.getElementById('cc-kpi-custo-total').textContent = formatarMoedaBR(totalGeralFabrica);
+    document.getElementById('cc-kpi-custo-total').textContent = OSyncUtils.formatarMoedaBR(totalGeralFabrica);
 
     renderizarCardsCentrosCusto(cacheCentrosCustoDetalhado);
-}
-
-function obterDataISOOrdenacao(os) {
-    if (os.dataHoraEncerramento) return os.dataHoraEncerramento.slice(0, 10);
-    if (os.encerradaEm?.toDate) return os.encerradaEm.toDate().toISOString().slice(0, 10);
-    if (os.criadoEm?.toDate) return os.criadoEm.toDate().toISOString().slice(0, 10);
-    return new Date().toISOString().slice(0, 10);
-}
-
-function formatarDataCurtaBR(isoDate) {
-    if (!isoDate || isoDate.length < 10) return '-';
-    const [ano, mes, dia] = isoDate.slice(0, 10).split('-');
-    return `${dia}/${mes}/${ano}`;
 }
 
 function renderizarCardsCentrosCusto(lista) {
@@ -126,7 +109,7 @@ function renderizarCardsCentrosCusto(lista) {
                 <div>
                     <span class="text-[11px] font-semibold text-slate-400 block">Custo Acumulado (${cc.qtdOS} O.S.)</span>
                     <span class="text-lg font-extrabold ${cc.custoAcumulado > 0 ? 'text-emerald-700' : 'text-slate-600'}">
-                        ${formatarMoedaBR(cc.custoAcumulado)}
+                        ${OSyncUtils.formatarMoedaBR(cc.custoAcumulado)}
                     </span>
                 </div>
                 <button onclick="abrirDetalheCentroCusto('${escaparHTML(cc.id)}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1.5">
@@ -158,7 +141,7 @@ function abrirDetalheCentroCusto(ativoId) {
     document.getElementById('det-cc-fabricante').textContent = cc.fabricante || '-';
     document.getElementById('det-cc-modelo').textContent = cc.modelo || '-';
     document.getElementById('det-cc-status').textContent = cc.status || 'Operacional';
-    document.getElementById('det-cc-total').textContent = formatarMoedaBR(cc.custoAcumulado);
+    document.getElementById('det-cc-total').textContent = OSyncUtils.formatarMoedaBR(cc.custoAcumulado);
 
     const btnPdf = document.getElementById('btn-pdf-individual-cc');
     btnPdf.onclick = () => abrirModalFiltroPDF('individual', cc.id);
@@ -176,7 +159,7 @@ function abrirDetalheCentroCusto(ativoId) {
                     <span class="text-[11px] text-slate-500">Data: ${escaparHTML(item.dataFormatada)} • ${escaparHTML(item.tipoCusto)}</span>
                 </div>
                 <span class="font-extrabold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
-                    ${formatarMoedaBR(item.valor)}
+                    ${OSyncUtils.formatarMoedaBR(item.valor)}
                 </span>
             </div>
         `).join('');
@@ -233,30 +216,12 @@ function alternarCamposPeriodoPDF() {
     }
 }
 
-function carregarImagemLogoBase64(url) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-            resolve({
-                dataUrl: canvas.toDataURL('image/png'),
-                ratio: img.width / img.height
-            });
-        };
-        img.onerror = () => resolve(null);
-        img.src = url;
-    });
-}
-
 async function executarGeracaoPDF(e) {
     e.preventDefault();
     if (!window.jspdf) {
-        alert('Biblioteca de PDF ainda carregando. Aguarde 2 segundos e tente novamente.');
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Biblioteca de PDF ainda carregando. Aguarde 2 segundos.', 'aviso');
+        }
         return;
     }
 
@@ -280,7 +245,7 @@ async function executarGeracaoPDF(e) {
         ? `Período: ${nomesMeses[mes]} de ${ano}`
         : 'Período: Total (Histórico Completo)';
 
-    const logoObj = await carregarImagemLogoBase64('images/cabe.png');
+    const logoObj = await OSyncUtils.carregarImagemLogoBase64('images/cabe.png');
 
     if (tipo === 'individual') {
         await gerarPDFIndividualCentroCusto(ativoId, prefixoFiltro, labelPeriodo, logoObj);
@@ -351,7 +316,7 @@ async function gerarPDFIndividualCentroCusto(ativoId, prefixoFiltro, labelPeriod
         `#OS-${String(item.numeroOs).padStart(4, '0')}`,
         item.dataFormatada,
         item.descricao,
-        formatarMoedaBR(item.valor)
+        OSyncUtils.formatarMoedaBR(item.valor)
     ]);
 
     if (linhasTabela.length === 0) {
@@ -362,7 +327,7 @@ async function gerarPDFIndividualCentroCusto(ativoId, prefixoFiltro, labelPeriod
         startY: 67,
         head: [['Nº O.S.', 'Data', 'Item / Serviço Realizado', 'Valor do Item']],
         body: linhasTabela,
-        foot: [['', '', 'VALOR TOTAL DO PERÍODO', formatarMoedaBR(valorTotal)]],
+        foot: [['', '', 'VALOR TOTAL DO PERÍODO', OSyncUtils.formatarMoedaBR(valorTotal)]],
         theme: 'grid',
         headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
         footStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], fontStyle: 'bold', fontSize: 10 },
@@ -434,7 +399,7 @@ async function gerarPDFGeralCentrosCusto(prefixoFiltro, labelPeriodo, logoObj) {
         m.nome,
         m.setor,
         String(m.qtdOS),
-        formatarMoedaBR(m.totalMaquina)
+        OSyncUtils.formatarMoedaBR(m.totalMaquina)
     ]);
 
     if (linhasTabela.length === 0) {
@@ -445,7 +410,7 @@ async function gerarPDFGeralCentrosCusto(prefixoFiltro, labelPeriodo, logoObj) {
         startY: 41,
         head: [['TAG', 'Máquina / Equipamento', 'Setor', 'Qtd. O.S.', 'Custo Total']],
         body: linhasTabela,
-        foot: [['', '', '', 'TOTAL GERAL', formatarMoedaBR(totalGeral)]],
+        foot: [['', '', '', 'TOTAL GERAL', OSyncUtils.formatarMoedaBR(totalGeral)]],
         theme: 'grid',
         headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
         footStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], fontStyle: 'bold', fontSize: 10 },
