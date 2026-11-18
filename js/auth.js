@@ -41,10 +41,15 @@ function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
     if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
     
-    // Líder tem acesso a solicitações e ativos (para escanear/consultar QR Code e máquinas)
-    if (cargo === 'Lideranca') return ['solicitacoes', 'cad-ativos'];
+    // Líder: respeita as telas marcadas no cadastro (padrão: Solicitações)
+    if (cargo === 'Lideranca') {
+        if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
+            return userObj.paginasPermitidas;
+        }
+        return ['solicitacoes'];
+    }
 
-    // Para Manutentor: usa a lista personalizada salva no cadastro (padrão: O.S. e Chamados)
+    // Manutentor: respeita as telas marcadas no cadastro (padrão: O.S. e Solicitações)
     if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
         return userObj.paginasPermitidas;
     }
@@ -75,13 +80,13 @@ function aplicarPermissoesInterface(perfil) {
         });
 
         // Submenus de Cadastros (Desktop e Gaveta Mobile)
-        const temAtivos = permitidas.includes('cad-ativos');
-        const exibirGrupoCadastros = temAtivos || cargo === 'Lideranca';
+        const rotasCadastros = ['cad-manutentores', 'cad-lideranca', 'cad-ativos'];
+        const exibirGrupoCadastros = rotasCadastros.some(r => permitidas.includes(r));
         document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !exibirGrupoCadastros);
         document.getElementById('drawer-group-cadastros')?.classList.toggle('hidden', !exibirGrupoCadastros);
 
-        ['cad-manutentores', 'cad-lideranca', 'cad-ativos'].forEach(rota => {
-            const liberado = permitidas.includes(rota) || (cargo === 'Lideranca' && rota === 'cad-ativos');
+        rotasCadastros.forEach(rota => {
+            const liberado = permitidas.includes(rota);
             document.querySelectorAll(`[onclick*="navegarPara('${rota}')"]`).forEach(btn => {
                 btn.classList.toggle('hidden', !liberado);
             });
@@ -171,6 +176,7 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                 </button>
             </div>
         </div>
+    </div>
     `;
 
     document.body.classList.remove('auth-loading');
@@ -234,7 +240,9 @@ auth.onAuthStateChanged(async (user) => {
             document.body.classList.remove('auth-loading');
 
             if (usuarioAtual.perfil === 'Lideranca') {
-                await navegarPara('solicitacoes');
+                const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || ['solicitacoes'];
+                const paginaInicial = permitidas.includes('solicitacoes') ? 'solicitacoes' : permitidas[0];
+                await navegarPara(paginaInicial);
             } else if (usuarioAtual.perfil === 'SuperAdmin') {
                 await navegarPara('saas-empresas');
             } else if (usuarioAtual.perfil === 'Admin') {
