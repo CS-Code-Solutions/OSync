@@ -18,13 +18,13 @@
 
 <!-- MODAL DE CADASTRO OU EDIÇÃO DE LIDERANÇA -->
 <div id="modal-novo-usuario" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
             <h3 id="modal-usuario-titulo" class="text-base font-bold text-white">Cadastrar Líder de Setor</h3>
             <button onclick="fecharModalNovoUsuario()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
 
-        <form id="form-novo-usuario" class="p-6 space-y-4">
+        <form id="form-novo-usuario" class="p-6 space-y-4 overflow-y-auto">
             <input type="hidden" id="user-perfil-alvo" value="Lideranca">
             <input type="hidden" id="user-edit-id" value="">
             
@@ -50,6 +50,42 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Setor Sob Responsabilidade *</label>
                 <input type="text" id="user-setor" required placeholder="Ex: Linha de Montagem 01"
                     class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-600">
+            </div>
+
+            <!-- Permissões de Telas Visíveis para o Líder -->
+            <div class="pt-1">
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-xs font-semibold text-slate-600">Telas Liberadas no Menu *</label>
+                    <button type="button" onclick="alternarTodasPermissoesManutentor()" class="text-[11px] font-bold text-blue-600 hover:underline">
+                        Marcar / Desmarcar todas
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                        <input type="checkbox" name="user-perm-pagina" value="solicitacoes" checked class="rounded accent-blue-600">
+                        <span>Solicitações</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                        <input type="checkbox" name="user-perm-pagina" value="dashboard" class="rounded accent-blue-600">
+                        <span>Dashboard</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                        <input type="checkbox" name="user-perm-pagina" value="cad-ativos" class="rounded accent-blue-600">
+                        <span>Máquinas (Ativos)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                        <input type="checkbox" name="user-perm-pagina" value="relatorios-maquinas" class="rounded accent-blue-600">
+                        <span>Rel. Máquinas</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                        <input type="checkbox" name="user-perm-pagina" value="relatorios-os" class="rounded accent-blue-600">
+                        <span>Rel. O.S.</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                        <input type="checkbox" name="user-perm-pagina" value="centros-custo" class="rounded accent-blue-600">
+                        <span>Centros de Custo</span>
+                    </label>
+                </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
