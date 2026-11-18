@@ -1,4 +1,5 @@
 let cacheAtivos = [];
+let cacheTiposEquipamento = [];
 let cacheUsuariosPerfil = [];
 let perfilAtualCadastro = 'Manutentor';
 
@@ -13,17 +14,59 @@ const ROTULOS_PAGINAS_PERFIL = {
     'configuracoes': 'Configurações'
 };
 
+function formatarRotuloAtivo(ativo) {
+    const tag = (ativo?.codigoTag || '').trim();
+    const nome = (ativo?.nome || 'Equipamento').trim();
+    return tag ? `${tag} - ${nome}` : nome;
+}
+
 // ==========================================
 // MÓDULO 1: ATIVOS (MÁQUINAS) E QR CODE
 // ==========================================
 async function initAtivos() {
-    await carregarAtivos();
-    document.getElementById('form-novo-ativo')?.addEventListener('submit', salvarNovoAtivo);
+    await Promise.all([
+        carregarTiposEquipamentoSelect(),
+        carregarAtivos()
+    ]);
+
+    const form = document.getElementById('form-novo-ativo');
+    if (form && !form.dataset.bound) {
+        form.addEventListener('submit', salvarNovoAtivo);
+        form.dataset.bound = 'true';
+    }
 
     const params = new URLSearchParams(window.location.search);
     const ativoIdUrl = params.get('ativo');
     if (ativoIdUrl) {
         abrirModalFlutuanteQRMaquina(ativoIdUrl);
+    }
+}
+
+async function carregarTiposEquipamentoSelect(valorSelecionado = '') {
+    const select = document.getElementById('ativo-tipo-equipamento');
+    if (!select) return;
+
+    try {
+        const snap = await db.collection('tipos_equipamento')
+            .where('empresaId', '==', usuarioAtual.empresaId)
+            .get();
+
+        cacheTiposEquipamento = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+        let opcoesHtml = '<option value="">Selecione o tipo (Opcional)...</option>' +
+            cacheTiposEquipamento.map(t => `<option value="${escaparHTML(t.nome)}">${escaparHTML(t.nome)}</option>`).join('');
+
+        // Garante que um tipo antigo continue visível na edição caso tenha sido removido das configurações
+        if (valorSelecionado && !cacheTiposEquipamento.some(t => t.nome === valorSelecionado)) {
+            opcoesHtml += `<option value="${escaparHTML(valorSelecionado)}">${escaparHTML(valorSelecionado)}</option>`;
+        }
+
+        select.innerHTML = opcoesHtml;
+        if (valorSelecionado) select.value = valorSelecionado;
+    } catch (err) {
+        console.error('Erro ao carregar tipos de equipamento:', err);
     }
 }
 
@@ -37,7 +80,7 @@ async function carregarAtivos() {
 
     cacheAtivos = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.codigoTag || '').localeCompare(b.codigoTag || ''));
+        .sort((a, b) => formatarRotuloAtivo(a).localeCompare(formatarRotuloAtivo(b)));
 
     renderizarListaAtivos(cacheAtivos);
 }
@@ -59,32 +102,43 @@ function renderizarListaAtivos(ativos) {
 
     lista.innerHTML = ativos.map(ativo => {
         const ativoIdSeguro = escaparHTML(ativo.id);
-        const ativoNomeSeguro = escaparHTML(ativo.nome);
+        const tituloAtivoSeguro = escaparHTML(formatarRotuloAtivo(ativo));
+        const tipoEquipSeguro = ativo.tipoEquipamento ? escaparHTML(ativo.tipoEquipamento) : '';
+        const serieSeguro = ativo.numeroSerie ? escaparHTML(ativo.numeroSerie) : '';
+
         return `
         <div class="osync-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="space-y-1">
-                <div class="flex items-center gap-2.5 flex-wrap">
-                    <span class="font-extrabold text-base text-slate-900">${escaparHTML(ativo.codigoTag)} - ${ativoNomeSeguro}</span>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-extrabold text-base text-slate-900">${tituloAtivoSeguro}</span>
+                    ${tipoEquipSeguro ? `
+                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        ${tipoEquipSeguro}
+                    </span>` : ''}
                     <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-700 flex items-center gap-1">
-                        <i data-lucide="settings" class="w-3 h-3"></i> ${escaparHTML(ativo.setor || 'Geral')}
+                        <i data-lucide="layers" class="w-3 h-3"></i> ${escaparHTML(ativo.setor || 'Geral')}
                     </span>
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${badgeStatus[ativo.status] || 'bg-slate-100 text-slate-700'}">
                         ${escaparHTML(ativo.status)}
                     </span>
                 </div>
-                <div class="text-xs text-slate-500 flex items-center gap-3">
+                <div class="text-xs text-slate-500 flex flex-wrap items-center gap-2 sm:gap-3">
                     <span><i data-lucide="factory" class="w-3.5 h-3.5 inline mr-1"></i>${escaparHTML(ativo.fabricante || 'Fabricante N/I')}</span>
                     <span>•</span>
                     <span>Modelo: ${escaparHTML(ativo.modelo || 'N/I')}</span>
+                    ${serieSeguro ? `<span>•</span><span>Série: <strong class="text-slate-700">${serieSeguro}</strong></span>` : ''}
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 self-end sm:self-center">
+            <div class="flex items-center gap-1.5 self-end sm:self-center">
                 <button onclick="abrirProntuarioAtivo('${ativoIdSeguro}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition">
                     <i data-lucide="qr-code" class="w-4 h-4"></i>
                     <span>QR Code & Prontuário</span>
                 </button>
-                <button data-nome="${ativoNomeSeguro}" onclick="excluirAtivo('${ativoIdSeguro}', this.getAttribute('data-nome'))" title="Excluir Máquina" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                <button onclick="abrirModalEditarAtivo('${ativoIdSeguro}')" title="Editar Equipamento" class="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                </button>
+                <button data-nome="${tituloAtivoSeguro}" onclick="excluirAtivo('${ativoIdSeguro}', this.getAttribute('data-nome'))" title="Excluir Máquina" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
             </div>
@@ -97,12 +151,40 @@ function renderizarListaAtivos(ativos) {
 function filtrarAtivos() {
     const termo = (document.getElementById('busca-ativos')?.value || '').toLowerCase();
     const filtrados = cacheAtivos.filter(a =>
-        `${a.codigoTag} ${a.nome} ${a.fabricante || ''} ${a.setor || ''}`.toLowerCase().includes(termo)
+        `${a.codigoTag || ''} ${a.nome} ${a.tipoEquipamento || ''} ${a.fabricante || ''} ${a.modelo || ''} ${a.numeroSerie || ''} ${a.setor || ''}`.toLowerCase().includes(termo)
     );
     renderizarListaAtivos(filtrados);
 }
 
-function abrirModalNovoAtivo() {
+async function abrirModalNovoAtivo() {
+    const form = document.getElementById('form-novo-ativo');
+    if (form) form.reset();
+
+    document.getElementById('ativo-edit-id').value = '';
+    document.getElementById('modal-ativo-titulo').textContent = 'Cadastrar Novo Ativo';
+    document.getElementById('btn-salvar-ativo').textContent = 'Salvar Máquina';
+
+    await carregarTiposEquipamentoSelect('');
+    document.getElementById('modal-novo-ativo')?.classList.remove('hidden');
+}
+
+async function abrirModalEditarAtivo(ativoId) {
+    const ativo = cacheAtivos.find(a => a.id === ativoId);
+    if (!ativo) return;
+
+    document.getElementById('ativo-edit-id').value = ativo.id;
+    document.getElementById('modal-ativo-titulo').textContent = 'Editar Equipamento';
+    document.getElementById('btn-salvar-ativo').textContent = 'Salvar Alterações';
+
+    document.getElementById('ativo-tag').value = ativo.codigoTag || '';
+    document.getElementById('ativo-nome').value = ativo.nome || '';
+    document.getElementById('ativo-fabricante').value = ativo.fabricante || '';
+    document.getElementById('ativo-modelo').value = ativo.modelo || '';
+    document.getElementById('ativo-numero-serie').value = ativo.numeroSerie || '';
+    document.getElementById('ativo-setor').value = ativo.setor || '';
+    document.getElementById('ativo-status').value = ativo.status || 'Operacional';
+
+    await carregarTiposEquipamentoSelect(ativo.tipoEquipamento || '');
     document.getElementById('modal-novo-ativo')?.classList.remove('hidden');
 }
 
@@ -112,48 +194,89 @@ function fecharModalNovoAtivo() {
 
 async function salvarNovoAtivo(e) {
     e.preventDefault();
+    const btn = document.getElementById('btn-salvar-ativo');
+    btn.disabled = true;
+
     try {
+        const editId = document.getElementById('ativo-edit-id').value;
         const codigoTag = document.getElementById('ativo-tag').value.trim().toUpperCase();
         const nome = document.getElementById('ativo-nome').value.trim();
+        const tipoEquipamento = document.getElementById('ativo-tipo-equipamento').value.trim();
         const fabricante = document.getElementById('ativo-fabricante').value.trim();
         const modelo = document.getElementById('ativo-modelo').value.trim();
+        const numeroSerie = document.getElementById('ativo-numero-serie').value.trim();
         const setor = document.getElementById('ativo-setor').value.trim();
         const status = document.getElementById('ativo-status').value;
 
-        const ativoRef = await db.collection('ativos').add({
-            empresaId: usuarioAtual.empresaId,
-            codigoTag,
-            nome,
-            fabricante,
-            modelo,
-            setor,
-            status,
-            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        const rotuloCompleto = codigoTag ? `${codigoTag} - ${nome}` : nome;
 
-        await db.collection('centros_custo').doc(ativoRef.id).set({
-            empresaId: usuarioAtual.empresaId,
-            ativoId: ativoRef.id,
-            codigo: codigoTag,
-            nome: `${codigoTag} - ${nome}`,
-            setor: setor || 'Geral',
-            ativo: true,
-            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        if (editId) {
+            await db.collection('ativos').doc(editId).update({
+                codigoTag,
+                nome,
+                tipoEquipamento,
+                fabricante,
+                modelo,
+                numeroSerie,
+                setor,
+                status
+            });
 
-        fecharModalNovoAtivo();
-        e.target.reset();
-        carregarAtivos();
-        if (typeof mostrarNotificacaoOSync === 'function') {
-            mostrarNotificacaoOSync(`Máquina "${codigoTag} - ${nome}" cadastrada como Centro de Custo!`, 'sucesso');
+            await db.collection('centros_custo').doc(editId).set({
+                empresaId: usuarioAtual.empresaId,
+                ativoId: editId,
+                codigo: codigoTag || `EQ-${editId.slice(0, 4).toUpperCase()}`,
+                nome: rotuloCompleto,
+                setor: setor || 'Geral',
+                ativo: true
+            }, { merge: true });
+
+            fecharModalNovoAtivo();
+            e.target.reset();
+            await carregarAtivos();
+            if (typeof mostrarNotificacaoOSync === 'function') {
+                mostrarNotificacaoOSync(`Equipamento "${rotuloCompleto}" atualizado!`, 'sucesso');
+            }
+        } else {
+            const ativoRef = await db.collection('ativos').add({
+                empresaId: usuarioAtual.empresaId,
+                codigoTag,
+                nome,
+                tipoEquipamento,
+                fabricante,
+                modelo,
+                numeroSerie,
+                setor,
+                status,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('centros_custo').doc(ativoRef.id).set({
+                empresaId: usuarioAtual.empresaId,
+                ativoId: ativoRef.id,
+                codigo: codigoTag || `EQ-${ativoRef.id.slice(0, 4).toUpperCase()}`,
+                nome: rotuloCompleto,
+                setor: setor || 'Geral',
+                ativo: true,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            fecharModalNovoAtivo();
+            e.target.reset();
+            await carregarAtivos();
+            if (typeof mostrarNotificacaoOSync === 'function') {
+                mostrarNotificacaoOSync(`Equipamento "${rotuloCompleto}" cadastrado com sucesso!`, 'sucesso');
+            }
         }
     } catch (err) {
-        alert('Erro ao cadastrar máquina: ' + err.message);
+        alert('Erro ao salvar equipamento: ' + err.message);
     }
+
+    btn.disabled = false;
 }
 
 async function excluirAtivo(ativoId, nome) {
-    if (!await confirmarAcaoOSync(`Deseja excluir a máquina <strong>"${escaparHTML(nome)}"</strong>?`, { titulo: 'Excluir Máquina', textoConfirmar: 'Excluir' })) return;
+    if (!await confirmarAcaoOSync(`Deseja excluir o equipamento <strong>"${escaparHTML(nome)}"</strong>?`, { titulo: 'Excluir Equipamento', textoConfirmar: 'Excluir' })) return;
     await db.collection('ativos').doc(ativoId).delete();
     await db.collection('centros_custo').doc(ativoId).delete().catch(() => {});
     carregarAtivos();
@@ -163,12 +286,25 @@ async function abrirProntuarioAtivo(ativoId) {
     const ativo = cacheAtivos.find(a => a.id === ativoId);
     if (!ativo) return;
 
-    document.getElementById('prontuario-tag').textContent = ativo.codigoTag;
+    const elTag = document.getElementById('prontuario-tag');
+    if (ativo.codigoTag) {
+        elTag.textContent = ativo.codigoTag;
+        elTag.classList.remove('hidden');
+    } else if (ativo.tipoEquipamento) {
+        elTag.textContent = ativo.tipoEquipamento;
+        elTag.classList.remove('hidden');
+    } else {
+        elTag.textContent = '';
+        elTag.classList.add('hidden');
+    }
+
     document.getElementById('prontuario-nome').textContent = ativo.nome;
+    document.getElementById('prontuario-tipo-equip').textContent = ativo.tipoEquipamento || 'Não informado';
     document.getElementById('prontuario-setor').textContent = ativo.setor || 'Não informado';
     document.getElementById('prontuario-fab-mod').textContent = `${ativo.fabricante || '-'} / ${ativo.modelo || '-'}`;
+    document.getElementById('prontuario-serie').textContent = ativo.numeroSerie || 'Não informado';
     document.getElementById('prontuario-status').textContent = ativo.status;
-    document.getElementById('qrcode-label').textContent = `${ativo.codigoTag} • OSync`;
+    document.getElementById('qrcode-label').textContent = `${ativo.codigoTag || ativo.nome} • OSync`;
 
     const qrContainer = document.getElementById('qrcode-container');
     qrContainer.innerHTML = '';
@@ -259,7 +395,19 @@ async function abrirModalFlutuanteQRMaquina(ativoId) {
         dadosAtivoQRAtual = ativo;
 
         document.getElementById('qr-glob-ativo-id').value = ativo.id;
-        document.getElementById('qr-glob-tag').textContent = ativo.codigoTag || 'TAG';
+
+        const elQrTag = document.getElementById('qr-glob-tag');
+        if (ativo.codigoTag) {
+            elQrTag.textContent = ativo.codigoTag;
+            elQrTag.classList.remove('hidden');
+        } else if (ativo.tipoEquipamento) {
+            elQrTag.textContent = ativo.tipoEquipamento;
+            elQrTag.classList.remove('hidden');
+        } else {
+            elQrTag.textContent = '';
+            elQrTag.classList.add('hidden');
+        }
+
         document.getElementById('qr-glob-nome').textContent = ativo.nome || 'Equipamento';
         document.getElementById('qr-glob-setor').textContent = ativo.setor || 'Geral';
         document.getElementById('qr-glob-fab').textContent = ativo.fabricante || '-';
@@ -293,7 +441,6 @@ async function abrirModalFlutuanteQRMaquina(ativoId) {
         document.getElementById('modal-qr-maquina-global').classList.remove('hidden');
         lucide.createIcons();
 
-        // Líderes não possuem permissão de leitura direta na coleção ordens_servico
         if (isLider) {
             ordensAtivoQRAtual = [];
             document.getElementById('qr-glob-qtd-os').textContent = '';
@@ -380,12 +527,14 @@ async function acaoQR_NovaOrdemOuChamado() {
 
 function acaoQR_GerarRelatorioMaquina() {
     if (!dadosAtivoQRAtual) return;
-    abrirModalQRPeriodoPDF('maquina', `Relatório da Máquina • ${dadosAtivoQRAtual.codigoTag}`);
+    const identificador = dadosAtivoQRAtual.codigoTag || dadosAtivoQRAtual.nome;
+    abrirModalQRPeriodoPDF('maquina', `Relatório da Máquina • ${identificador}`);
 }
 
 function acaoQR_GerarRelatorioCentroCusto() {
     if (!dadosAtivoQRAtual) return;
-    abrirModalQRPeriodoPDF('centro_custo', `Centro de Custo • ${dadosAtivoQRAtual.codigoTag}`);
+    const identificador = dadosAtivoQRAtual.codigoTag || dadosAtivoQRAtual.nome;
+    abrirModalQRPeriodoPDF('centro_custo', `Centro de Custo • ${identificador}`);
 }
 
 function abrirModalQRPeriodoPDF(tipo, titulo) {
@@ -451,6 +600,9 @@ async function executarPDFDoQRCode(e) {
         : null;
 
     const m = dadosAtivoQRAtual;
+    const tituloMaquina = formatarRotuloAtivo(m);
+    const slugArquivo = (m.codigoTag || m.nome || 'Equipamento').replace(/[^a-zA-Z0-9_-]/g, '_');
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -485,7 +637,7 @@ async function executarPDFDoQRCode(e) {
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${m.codigoTag} - ${m.nome}`, 18, 41);
+    doc.text(tituloMaquina, 18, 41);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -493,7 +645,7 @@ async function executarPDFDoQRCode(e) {
     doc.text(`Setor: ${m.setor || 'Não informado'}`, 18, 48);
     doc.text(`Fabricante: ${m.fabricante || '-'}`, 85, 48);
     doc.text(`Modelo: ${m.modelo || '-'}`, 145, 48);
-    doc.text(`Status Atual: ${m.status || 'Operacional'}`, 18, 55);
+    doc.text(`Nº Série: ${m.numeroSerie || '-'}`, 18, 55);
     doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 55);
 
     const ordensFiltradas = ordensAtivoQRAtual.filter(os =>
@@ -501,14 +653,13 @@ async function executarPDFDoQRCode(e) {
     );
 
     if (tipo === 'centro_custo') {
-        const labelAtivo = `${m.codigoTag} - ${m.nome}`;
         const lancamentos = [];
 
         ordensFiltradas.forEach(os => {
             const itens = Array.isArray(os.itensCusto) ? os.itensCusto : [];
             if (itens.length > 0) {
                 itens.forEach(item => {
-                    if (!item.centroCusto || item.centroCusto.toLowerCase() === labelAtivo.toLowerCase()) {
+                    if (!item.centroCusto || item.centroCusto.toLowerCase() === tituloMaquina.toLowerCase()) {
                         lancamentos.push([
                             `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
                             os.dataBR,
@@ -554,7 +705,7 @@ async function executarPDFDoQRCode(e) {
             }
         });
 
-        doc.save(`CentroCusto_${m.codigoTag}_${prefixoFiltro || 'Total'}.pdf`);
+        doc.save(`CentroCusto_${slugArquivo}_${prefixoFiltro || 'Total'}.pdf`);
     } else {
         const linhasMaq = ordensFiltradas.map(os => [
             `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`,
@@ -588,7 +739,7 @@ async function executarPDFDoQRCode(e) {
             }
         });
 
-        doc.save(`Relatorio_Maquina_${m.codigoTag}_${prefixoFiltro || 'Total'}.pdf`);
+        doc.save(`Relatorio_Maquina_${slugArquivo}_${prefixoFiltro || 'Total'}.pdf`);
     }
 
     btn.disabled = false;
