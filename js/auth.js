@@ -94,7 +94,7 @@ function aplicarPermissoesInterface(perfil) {
         });
 
         // Submenus de Relatórios (Desktop e Gaveta Mobile)
-        const rotasRelatorios = ['centros-custo', 'relatorios-os', 'relatorios-maquinas'];
+        const rotasRelatorios = ['centros-custo', 'relatorios-os', 'relatorios-maquinas', 'relatorios-manutentores'];
         const temAlgumRelatorio = rotasRelatorios.some(r => permitidas.includes(r));
         document.getElementById('nav-relatorios-group')?.classList.toggle('hidden', !temAlgumRelatorio);
         document.getElementById('drawer-group-relatorios')?.classList.toggle('hidden', !temAlgumRelatorio);
