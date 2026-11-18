@@ -110,3 +110,34 @@ const OSyncUtils = {
 // Aliases globais para manter compatibilidade com qualquer outro módulo (ex: router.js / QR Code)
 window.carregarImagemLogoBase64 = OSyncUtils.carregarImagemLogoBase64.bind(OSyncUtils);
 window.formatarMoedaBR = OSyncUtils.formatarMoedaBR.bind(OSyncUtils);
+
+// Blindagem global contra cópia de texto fixo e download/arraste de imagens e logotipos
+(function ativarProtecaoInterfaceOSync() {
+    if (window.__osyncProtecaoInterfaceAtiva) return;
+    window.__osyncProtecaoInterfaceAtiva = true;
+
+    document.addEventListener('contextmenu', function (e) {
+        const alvo = e.target;
+        if (!alvo) return;
+        const tag = alvo.tagName;
+        const editavel = tag === 'INPUT' || tag === 'TEXTAREA' || alvo.isContentEditable || Boolean(alvo.closest?.('.texto-selecionavel'));
+        if (!editavel) {
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('dragstart', function (e) {
+        if (e.target && e.target.tagName === 'IMG') {
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('copy', function (e) {
+        const ativo = document.activeElement;
+        const tag = ativo ? ativo.tagName : '';
+        const editavel = tag === 'INPUT' || tag === 'TEXTAREA' || ativo?.isContentEditable || Boolean(ativo?.closest?.('.texto-selecionavel'));
+        if (!editavel) {
+            e.preventDefault();
+        }
+    });
+})();
