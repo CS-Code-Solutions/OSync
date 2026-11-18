@@ -1,29 +1,10 @@
 let cacheRelatorioOS = [];
 let cacheColunasRelOS = [];
 
-function calcularMinutosParadaRelOS(os) {
-    if (Number(os.tempoParadaMinutos) > 0) return Number(os.tempoParadaMinutos);
-    if (os.inicioParada && os.terminoParada) {
-        const d1 = new Date(os.inicioParada);
-        const d2 = new Date(os.terminoParada);
-        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
-            return Math.round((d2.getTime() - d1.getTime()) / 60000);
-        }
-    }
-    return 0;
-}
-
-function formatarHorasParadasRelOS(minutos) {
-    const mins = Math.max(0, Math.round(Number(minutos) || 0));
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${String(m).padStart(2, '0')}m`;
-}
-
 async function initRelatoriosOS() {
     const tbody = document.getElementById('tabela-relatorios-os');
     if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">Carregando ordens de serviço...</td></tr>';
+        tbody.innerHTML = OSyncUtils.gerarSkeletonLinhasTabela(6, 6);
     }
 
     const [osSnap, colSnap, tiposSnap, manutSnap] = await Promise.all([
@@ -41,17 +22,19 @@ async function initRelatoriosOS() {
         .map(d => {
             const data = d.data();
             const col = cacheColunasRelOS.find(c => c.id === data.colunaId);
-            const dataISO = extrairDataISO_OS(data);
-            const minutosParada = calcularMinutosParadaRelOS(data);
+            const dataISO = OSyncUtils.extrairDataISO(data);
+            const minutosParada = OSyncUtils.calcularMinutosParada(data);
             return {
                 id: d.id,
                 ...data,
                 statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
                 statusCor: col ? col.corTopo : '#00E5B0',
                 dataISO,
-                dataBR: formatarDataBR_OS(dataISO),
+                dataBR: OSyncUtils.formatarDataBR(dataISO),
                 minutosParada,
-                paradaLabel: minutosParada > 0 ? formatarHorasParadasRelOS(minutosParada) : (data.maquinaParada || data.condicaoMaquina === 'Maquina parada' ? 'Em aberto' : '-')
+                paradaLabel: minutosParada > 0
+                    ? OSyncUtils.formatarHorasParadas(minutosParada)
+                    : (data.maquinaParada || data.condicaoMaquina === 'Maquina parada' ? 'Em aberto' : '-')
             };
         })
         .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
@@ -76,18 +59,6 @@ async function initRelatoriosOS() {
     }
 
     filtrarRelatorioOS();
-}
-
-function extrairDataISO_OS(os) {
-    if (os.dataHoraEncerramento) return os.dataHoraEncerramento.slice(0, 10);
-    if (os.criadoEm?.toDate) return os.criadoEm.toDate().toISOString().slice(0, 10);
-    return new Date().toISOString().slice(0, 10);
-}
-
-function formatarDataBR_OS(iso) {
-    if (!iso || iso.length < 10) return '-';
-    const [a, m, d] = iso.slice(0, 10).split('-');
-    return `${d}/${m}/${a}`;
 }
 
 function obterOSFiltradasRelatorio() {
@@ -121,7 +92,7 @@ function filtrarRelatorioOS() {
     document.getElementById('rel-os-kpi-total').textContent = total;
     document.getElementById('rel-os-kpi-abertas').textContent = abertas;
     document.getElementById('rel-os-kpi-concluidas').textContent = concluidas;
-    document.getElementById('rel-os-kpi-custo').textContent = custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    document.getElementById('rel-os-kpi-custo').textContent = OSyncUtils.formatarMoedaBR(custoTotal);
 
     if (lista.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">Nenhuma Ordem de Serviço encontrada com os filtros atuais.</td></tr>';
@@ -187,7 +158,9 @@ function alternarPeriodoPDF_OS() {
 async function gerarPDFGeralOS(e) {
     e.preventDefault();
     if (!window.jspdf) {
-        alert('Biblioteca de PDF carregando. Tente novamente em instantes.');
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Biblioteca de PDF carregando. Tente novamente em instantes.', 'aviso');
+        }
         return;
     }
 
@@ -214,10 +187,7 @@ async function gerarPDFGeralOS(e) {
     );
 
     const minutosParadosTotal = baseFiltrada.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
-
-    const logoObj = typeof carregarImagemLogoBase64 === 'function'
-        ? await carregarImagemLogoBase64('images/cabe.png')
-        : null;
+    const logoObj = await OSyncUtils.carregarImagemLogoBase64('images/cabe.png');
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a4');
@@ -246,7 +216,7 @@ async function gerarPDFGeralOS(e) {
     doc.setTextColor(71, 85, 105);
     doc.setFontSize(8.5);
     doc.text(
-        `Total de O.S. listadas: ${baseFiltrada.length} • Total Horas Paradas: ${formatarHorasParadasRelOS(minutosParadosTotal)} • Emitido em ${new Date().toLocaleDateString('pt-BR')}`,
+        `Total de O.S. listadas: ${baseFiltrada.length} • Total Horas Paradas: ${OSyncUtils.formatarHorasParadas(minutosParadosTotal)} • Emitido em ${new Date().toLocaleDateString('pt-BR')}`,
         14,
         33
     );
@@ -278,7 +248,7 @@ async function gerarPDFGeralOS(e) {
         foot: [[
             '', '', '',
             'TOTAL PARADO:',
-            formatarHorasParadasRelOS(minutosParadosTotal),
+            OSyncUtils.formatarHorasParadas(minutosParadosTotal),
             `TOTAL DE ORDENS: ${baseFiltrada.length} O.S.`,
             ''
         ]],
@@ -316,7 +286,7 @@ async function gerarPDFGeralOS(e) {
                 return [
                     nomeMes,
                     `${item.qtd} O.S.`,
-                    formatarHorasParadasRelOS(item.minutosParada)
+                    OSyncUtils.formatarHorasParadas(item.minutosParada)
                 ];
             });
 
@@ -333,7 +303,7 @@ async function gerarPDFGeralOS(e) {
                 foot: [[
                     'TOTAL ACUMULADO',
                     `${baseFiltrada.length} O.S.`,
-                    formatarHorasParadasRelOS(minutosParadosTotal)
+                    OSyncUtils.formatarHorasParadas(minutosParadosTotal)
                 ]],
                 theme: 'grid',
                 headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
