@@ -31,12 +31,20 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         ordem: 3
     },
     {
+        id: 'grafico_horas_manutentores',
+        titulo: 'Gráfico: Horas & O.S. por Manutentor',
+        descricao: 'Horas trabalhadas e total de O.S. (individuais + parcerias) por técnico.',
+        categoria: 'Equipe',
+        ativo: true,
+        ordem: 4
+    },
+    {
         id: 'grafico_tipos_manutencao',
         titulo: 'Gráfico: O.S. por Tipo de Manutenção',
         descricao: 'Distribuição entre Corretiva, Preventiva, Manutenção Externa, etc.',
         categoria: 'Operacional',
         ativo: true,
-        ordem: 4
+        ordem: 5
     },
     {
         id: 'grafico_top_maquinas_custo',
@@ -44,7 +52,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Equipamentos que geraram maior investimento no período.',
         categoria: 'Centros de Custo',
         ativo: true,
-        ordem: 5
+        ordem: 6
     },
     {
         id: 'grafico_top_maquinas_os',
@@ -52,15 +60,15 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Ranking de reincidência de manutenções por equipamento.',
         categoria: 'Confiabilidade',
         ativo: true,
-        ordem: 6
+        ordem: 7
     },
     {
         id: 'grafico_produtividade_tecnicos',
         titulo: 'Gráfico: Desempenho por Manutentor',
-        descricao: 'O.S. concluídas vs. em andamento por técnico.',
+        descricao: 'O.S. concluídas vs. em andamento por técnico (incluindo parcerias).',
         categoria: 'Equipe',
         ativo: false,
-        ordem: 7
+        ordem: 8
     },
     {
         id: 'grafico_status_kanban',
@@ -68,7 +76,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Quantidade de ordens distribuídas em cada coluna do quadro.',
         categoria: 'Fluxo',
         ativo: false,
-        ordem: 8
+        ordem: 9
     },
     {
         id: 'lista_maquinas_paradas',
@@ -76,7 +84,7 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Lista rápida dos equipamentos que não estão operacionais agora.',
         categoria: 'Alertas',
         ativo: true,
-        ordem: 9
+        ordem: 10
     },
     {
         id: 'lista_os_urgentes',
@@ -84,11 +92,41 @@ const CATALOGO_WIDGETS_DASHBOARD = [
         descricao: 'Ordens de prioridade Urgente aguardando conclusão.',
         categoria: 'Alertas',
         ativo: true,
-        ordem: 10
+        ordem: 11
     }
 ];
 
 let layoutWidgetsAtual = [];
+
+function obterParticipantesDashOS(os) {
+    if (Array.isArray(os?.manutentoresIds) && os.manutentoresIds.length > 0) {
+        const nomes = Array.isArray(os.manutentoresNomes) ? os.manutentoresNomes : [];
+        return os.manutentoresIds.map((id, idx) => ({
+            id,
+            nome: nomes[idx] || os.manutentorNome || 'Técnico'
+        }));
+    }
+    if (os?.manutentorId) {
+        return [{ id: os.manutentorId, nome: os.manutentorNome || 'Técnico' }];
+    }
+    return [];
+}
+
+function calcularMinutosTrabalhoDashOS(os) {
+    if (Number(os?.tempoTrabalhoMinutos) > 0) return Number(os.tempoTrabalhoMinutos);
+    const fimStr = os?.dataHoraEncerramento || '';
+    if (!fimStr) return 0;
+    const dFim = new Date(fimStr);
+    if (isNaN(dFim.getTime())) return 0;
+
+    let dIni = null;
+    if (os?.inicioExecucao) dIni = new Date(os.inicioExecucao);
+    else if (os?.inicioParada) dIni = new Date(os.inicioParada);
+    else if (os?.criadoEm?.toDate) dIni = os.criadoEm.toDate();
+
+    if (!dIni || isNaN(dIni.getTime())) return 0;
+    return Math.max(0, Math.round((dFim.getTime() - dIni.getTime()) / 60000));
+}
 
 function renderizarSkeletonDashboard() {
     const container = document.getElementById('dashboard-widgets-container');
@@ -183,7 +221,6 @@ async function renderizarWidgetsDashboard() {
     const periodo = document.getElementById('dash-filtro-periodo')?.value || 'mes_atual';
     const exigeCompleto = periodo === 'total' || periodo === 'ano_atual';
 
-    // Lazy Loading: busca histórico completo somente se o usuário pedir Ano Atual ou Total
     if (exigeCompleto && !OSyncDataStore.isHistoricoCompletoCarregado()) {
         renderizarSkeletonDashboard();
         await carregarDadosBrutosDashboard(true);
@@ -233,6 +270,7 @@ async function renderizarWidgetsDashboard() {
     ativosOrdenados.forEach(w => {
         if (w.id === 'grafico_custos_mensais') montarGraficoCustosMensais();
         if (w.id === 'grafico_maquinas_paradas_periodo') montarGraficoMaquinasParadasPeriodo();
+        if (w.id === 'grafico_horas_manutentores') montarGraficoHorasManutentores(ordensFiltradas);
         if (w.id === 'grafico_tipos_manutencao') montarGraficoTiposManutencao(ordensFiltradas);
         if (w.id === 'grafico_top_maquinas_custo') montarGraficoTopMaquinasCusto(ordensFiltradas);
         if (w.id === 'grafico_top_maquinas_os') montarGraficoTopMaquinasOS(ordensFiltradas);
@@ -242,6 +280,7 @@ async function renderizarWidgetsDashboard() {
         if (w.id === 'lista_os_urgentes') preencherListaOSUrgentes();
     });
 }
+
 // ==========================================
 // CONSTRUTORES DE HTML DOS BLOCOS
 // ==========================================
@@ -330,6 +369,14 @@ function construirHTML_KPIs(ordens) {
 function construirHTML_CardWidget(widget) {
     const ehLista = widget.id.startsWith('lista_');
     const ehWidgetParadas = widget.id === 'grafico_maquinas_paradas_periodo';
+    const ehWidgetManutentores = widget.id === 'grafico_horas_manutentores';
+
+    const botaoRelatorioManut = ehWidgetManutentores ? `
+        <button type="button" onclick="navegarPara('relatorios-manutentores')"
+            class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition shrink-0">
+            Ver Relatório
+        </button>
+    ` : '';
 
     const botoesPeriodoParadas = ehWidgetParadas ? `
         <div class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 shrink-0">
@@ -346,7 +393,7 @@ function construirHTML_CardWidget(widget) {
                 Ano
             </button>
         </div>
-    ` : `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${escaparHTML(widget.categoria)}</span>`;
+    ` : (botaoRelatorioManut || `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${escaparHTML(widget.categoria)}</span>`);
 
     const idSeguro = escaparHTML(widget.id);
     const tituloLimpo = escaparHTML(widget.titulo.replace(/^(Gráfico:|Alerta:|Lista:)\s*/, ''));
@@ -526,6 +573,73 @@ function montarGraficoMaquinasParadasPeriodo() {
     });
 }
 
+function montarGraficoHorasManutentores(ordens) {
+    const ctx = document.getElementById('canvas-grafico_horas_manutentores');
+    if (!ctx) return;
+
+    const mapa = {};
+    ordens.forEach(o => {
+        const participantes = obterParticipantesDashOS(o);
+        const mins = calcularMinutosTrabalhoDashOS(o);
+        participantes.forEach(p => {
+            if (!mapa[p.nome]) {
+                mapa[p.nome] = { minutos: 0, totalOS: 0, parcerias: 0 };
+            }
+            mapa[p.nome].minutos += mins;
+            mapa[p.nome].totalOS += 1;
+            if (participantes.length > 1) mapa[p.nome].parcerias += 1;
+        });
+    });
+
+    const ranking = Object.entries(mapa).sort((a, b) => {
+        if (b[1].minutos !== a[1].minutos) return b[1].minutos - a[1].minutos;
+        return b[1].totalOS - a[1].totalOS;
+    });
+
+    const labels = ranking.length ? ranking.map(([nome, info]) => `${nome} (${info.totalOS} O.S.)`) : ['Sem registros'];
+    const horas = ranking.length ? ranking.map(([, info]) => Number((info.minutos / 60).toFixed(2))) : [0];
+    const minutosOriginais = ranking.map(([, info]) => info.minutos);
+    const infoOriginais = ranking.map(([, info]) => info);
+
+    instanciasGraficosDash['grafico_horas_manutentores'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Horas Trabalhadas',
+                data: horas,
+                backgroundColor: '#2563EB',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const idx = context.dataIndex;
+                            const info = infoOriginais[idx];
+                            if (!info) return ' Sem dados';
+                            const tempoFmt = OSyncUtils.formatarHorasParadas(minutosOriginais[idx] || 0);
+                            return ` ${tempoFmt} • ${info.totalOS} O.S. (${info.parcerias} em parceria)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Horas Trabalhadas', font: { size: 10 } }
+                }
+            }
+        }
+    });
+}
+
 function montarGraficoTiposManutencao(ordens) {
     const ctx = document.getElementById('canvas-grafico_tipos_manutencao');
     if (!ctx) return;
@@ -631,10 +745,18 @@ function montarGraficoProdutividadeTecnicos(ordens) {
 
     const mapa = {};
     ordens.forEach(o => {
-        const tec = o.manutentorNome || 'Não atribuído';
-        if (!mapa[tec]) mapa[tec] = { concluidas: 0, abertas: 0 };
-        if (o.encerrada) mapa[tec].concluidas++;
-        else mapa[tec].abertas++;
+        const participantes = obterParticipantesDashOS(o);
+        if (participantes.length === 0) {
+            if (!mapa['Não atribuído']) mapa['Não atribuído'] = { concluidas: 0, abertas: 0 };
+            if (o.encerrada) mapa['Não atribuído'].concluidas++;
+            else mapa['Não atribuído'].abertas++;
+        } else {
+            participantes.forEach(p => {
+                if (!mapa[p.nome]) mapa[p.nome] = { concluidas: 0, abertas: 0 };
+                if (o.encerrada) mapa[p.nome].concluidas++;
+                else mapa[p.nome].abertas++;
+            });
+        }
     });
 
     const labels = Object.keys(mapa);
@@ -728,15 +850,17 @@ function preencherListaOSUrgentes() {
         return;
     }
 
-    el.innerHTML = urgentes.map(os => `
+    el.innerHTML = urgentes.map(os => {
+        const nomes = obterParticipantesDashOS(os).map(p => p.nome).join(', ') || 'Sem técnico';
+        return `
         <div onclick="navegarPara('os')" class="cursor-pointer p-3 bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200 rounded-xl flex items-center justify-between gap-2 text-xs transition">
             <div class="min-w-0">
                 <span class="font-extrabold text-slate-900">#OS-${String(os.numeroOs || 0).padStart(4, '0')} • ${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome)}</span>
                 <p class="text-[11px] text-slate-600 truncate">${escaparHTML(os.descricao)}</p>
             </div>
-            <span class="text-[11px] font-bold text-blue-700 shrink-0">${escaparHTML(os.manutentorNome || 'Sem técnico')}</span>
-        </div>
-    `).join('');
+            <span class="text-[11px] font-bold text-blue-700 shrink-0">${escaparHTML(nomes)}</span>
+        </div>`;
+    }).join('');
 }
 
 // ==========================================
@@ -848,6 +972,7 @@ async function salvarConfiguracaoDashboard() {
         lucide.createIcons();
     }
 }
+
 // ==========================================
 // FILTRAGEM DE PERÍODO E LIMPEZA DE GRÁFICOS
 // ==========================================
@@ -879,7 +1004,7 @@ function obterOrdensFiltradasDashboard() {
             const chaveAnt = `${dAnt.getFullYear()}-${String(dAnt.getMonth() + 1).padStart(2, '0')}`;
             return os.dataISO.startsWith(chaveAnt);
         }
-        if (periodo === '30_dias' || periodo === 'ultimos_30_dias') {
+        if (periodo === '30_dias' || periodo === 'ultimos_30_dias' || periodo === 'ultimos_30d') {
             const limite = new Date();
             limite.setDate(limite.getDate() - 30);
             return new Date(os.dataISO) >= limite;
