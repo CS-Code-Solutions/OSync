@@ -120,9 +120,22 @@ function renderizarSkeletonDashboard() {
 
 async function initDashboard() {
     renderizarSkeletonDashboard();
-    await carregarPreferenciasLayoutDashboard();
-    await carregarDadosBrutosDashboard();
-    renderizarWidgetsDashboard();
+    try {
+        await carregarPreferenciasLayoutDashboard();
+        await carregarDadosBrutosDashboard();
+        await renderizarWidgetsDashboard();
+    } catch (err) {
+        console.error('Erro ao carregar Dashboard:', err);
+        const container = document.getElementById('dashboard-widgets-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center space-y-2">
+                    <p class="text-sm font-bold text-rose-800">Não foi possível carregar os indicadores agora.</p>
+                    <p class="text-xs text-rose-600">${escaparHTML(err.message || 'Erro de conexão')}</p>
+                    <button onclick="initDashboard()" class="mt-2 px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl">Tentar Novamente</button>
+                </div>`;
+        }
+    }
 }
 
 async function carregarPreferenciasLayoutDashboard() {
