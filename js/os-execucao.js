@@ -98,6 +98,13 @@ async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
 
+    // LIMPEZA PRÉVIA DE MEMÓRIA (Evita persistência de dados da O.S. anterior)
+    anexosOSAtual = [];
+    itensCustoOSAtual = [];
+    manutentoresDetalhesOSAtual = [];
+    const formEnc = document.getElementById('form-encerramento-os');
+    if (formEnc) formEnc.reset();
+
     const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
     osAtualEhExterna = (os.tipoNome || '').trim().toLowerCase() === 'manutenção externa';
     osAtualTeveParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true || Boolean(os.inicioParada);
@@ -195,9 +202,12 @@ async function abrirDetalhesOS(osId) {
 
     const inpIniTrab = document.getElementById('enc-inicio-trabalho');
     if (inpIniTrab) {
-        inpIniTrab.value = inicioPadraoOS || agoraISO;
+        inpIniTrab.value = os.inicioExecucao || ''; // Opcional, sem forçar agoraISO caso esteja em branco
     }
-    document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agoraISO;
+    const inpEncerramento = document.getElementById('enc-data-hora');
+    if (inpEncerramento) {
+        inpEncerramento.value = os.dataHoraEncerramento || '';
+    }
     recalcularTempoTrabalhoEncerramento();
 
     const blocoParada = document.getElementById('bloco-encerramento-parada');
@@ -209,8 +219,8 @@ async function abrirDetalhesOS(osId) {
             inpIniParada.required = true;
             inpFimParada.required = true;
 
-            inpIniParada.value = os.inicioParada || inicioPadraoOS || agoraISO;
-            inpFimParada.value = os.terminoParada || agoraISO;
+            inpIniParada.value = os.inicioParada || inicioPadraoOS || '';
+            inpFimParada.value = os.terminoParada || '';
             recalcularTempoParadaEncerramento();
         } else {
             blocoParada.classList.add('hidden');
@@ -271,12 +281,31 @@ function aplicarLayoutCustosPorTipo(ehExterna) {
 }
 
 function fecharModalDetalhesOS() {
+    // LIMPEZA AO FECHAR O MODAL
+    anexosOSAtual = [];
+    itensCustoOSAtual = [];
+    manutentoresDetalhesOSAtual = [];
+    const formEnc = document.getElementById('form-encerramento-os');
+    if (formEnc) formEnc.reset();
     document.getElementById('modal-detalhes-os').classList.add('hidden');
 }
 
 function mostrarFormularioEncerramento() {
     document.getElementById('box-botao-abrir-encerramento').classList.add('hidden');
     document.getElementById('form-encerramento-os').classList.remove('hidden');
+
+    // Preenche data/hora atual automaticamente apenas ao abrir o encerramento se estiverem vazios
+    const agora = new Date();
+    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+    const agoraISO = agora.toISOString().slice(0, 16);
+
+    const inpIniTrab = document.getElementById('enc-inicio-trabalho');
+    if (inpIniTrab && !inpIniTrab.value) inpIniTrab.value = agoraISO;
+
+    const inpEncerramento = document.getElementById('enc-data-hora');
+    if (inpEncerramento && !inpEncerramento.value) inpEncerramento.value = agoraISO;
+
+    recalcularTempoTrabalhoEncerramento();
     lucide.createIcons();
 }
 
@@ -326,18 +355,29 @@ async function processarUploadFotosOS(event) {
 
     const osId = document.getElementById('det-os-id').value;
     const statusEl = document.getElementById('enc-upload-status');
-    statusEl.classList.remove('hidden');
+    if (statusEl) statusEl.classList.remove('hidden');
 
     try {
         for (const file of files) {
-            const url = await compactarEEnviarImagemOS(file, usuarioAtual.empresaId, osId);
-            anexosOSAtual.push(url);
+            let url = '';
+            if (typeof compactarEEnviarImagemOS === 'function') {
+                url = await compactarEEnviarImagemOS(file, usuarioAtual.empresaId, osId);
+            } else {
+                // Fallback caso image-utils.js demore
+                url = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+            }
+            if (url) anexosOSAtual.push(url);
         }
         renderizarAnexosOS();
     } catch (err) {
+        console.error('Erro no upload de foto:', err);
         alert('Erro ao enviar imagem: ' + err.message);
     } finally {
-        statusEl.classList.add('hidden');
+        if (statusEl) statusEl.classList.add('hidden');
         event.target.value = '';
     }
 }
@@ -416,6 +456,8 @@ function renderizarItensCustoOS() {
     const total = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
     if (totalLabel) totalLabel.textContent = total.toFixed(2).replace('.', ',');
 
+    if (!lista) return;
+
     if (itensCustoOSAtual.length === 0) {
         lista.innerHTML = `<p class="text-[11px] text-slate-400">${osAtualEhExterna ? 'Nenhum valor de serviço lançado.' : 'Nenhum item de custo lançado.'}</p>`;
         return;
@@ -458,23 +500,19 @@ async function confirmarEncerramentoOS(e) {
         if (osAtualTeveParada) {
             inicioParada = document.getElementById('enc-inicio-parada')?.value || '';
             terminoParada = document.getElementById('enc-termino-parada')?.value || '';
-            if (!inicioParada || !terminoParada) {
-                alert('Informe a data/hora de início e término da parada da máquina.');
-                btn.disabled = false;
-                btn.textContent = 'Confirmar Encerramento';
-                return;
-            }
-            if (new Date(terminoParada) < new Date(inicioParada)) {
+            if (inicioParada && terminoParada && new Date(terminoParada) < new Date(inicioParada)) {
                 alert('O término da parada não pode ser anterior ao início da parada.');
                 btn.disabled = false;
                 btn.textContent = 'Confirmar Encerramento';
                 return;
             }
-            tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
+            if (inicioParada && terminoParada) {
+                tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
+            }
         }
 
         const inicioExecucao = document.getElementById('enc-inicio-trabalho')?.value || '';
-        const dataHoraEncerramento = document.getElementById('enc-data-hora').value;
+        const dataHoraEncerramento = document.getElementById('enc-data-hora')?.value || '';
         if (inicioExecucao && dataHoraEncerramento && new Date(dataHoraEncerramento) < new Date(inicioExecucao)) {
             alert('A data/hora do encerramento não pode ser anterior ao início do trabalho.');
             btn.disabled = false;
@@ -492,6 +530,11 @@ async function confirmarEncerramentoOS(e) {
                 valor: valorPendente,
                 tipoCusto: osAtualEhExterna ? 'Serviço Externo' : 'Peça/Material'
             });
+            const descInput = document.getElementById('item-custo-desc');
+            const valInput = document.getElementById('item-custo-valor');
+            if (descInput) descInput.value = '';
+            if (valInput) valInput.value = '';
+            renderizarItensCustoOS();
         }
 
         const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
@@ -523,7 +566,7 @@ async function confirmarEncerramentoOS(e) {
             encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        if (osAtualTeveParada) {
+        if (osAtualTeveParada && inicioParada && terminoParada) {
             dadosAtualizacao.inicioParada = inicioParada;
             dadosAtualizacao.terminoParada = terminoParada;
             dadosAtualizacao.tempoParadaMinutos = tempoParadaMinutos;
@@ -533,10 +576,11 @@ async function confirmarEncerramentoOS(e) {
             dadosAtualizacao.colunaId = ultimaColuna.id;
         }
 
+        // Atualização segura com tratamento de permissões do Firestore
         await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
 
         if (os?.ativoId) {
-            await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' });
+            await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' }).catch(() => {});
         }
 
         const payloadSolicitacaoEncerrada = {
@@ -552,33 +596,38 @@ async function confirmarEncerramentoOS(e) {
         const idsSolicitacoesAtualizar = new Set();
         if (os?.solicitacaoId) idsSolicitacoesAtualizar.add(os.solicitacaoId);
 
-        const solSnap = await db.collection('solicitacoes')
-            .where('empresaId', '==', usuarioAtual.empresaId)
-            .get();
+        try {
+            const solSnap = await db.collection('solicitacoes')
+                .where('empresaId', '==', usuarioAtual.empresaId)
+                .get();
 
-        solSnap.docs.forEach(docSol => {
-            const s = docSol.data();
-            if (
-                s.osId === osId ||
-                (os?.numeroOs && Number(s.numeroOs) === Number(os.numeroOs)) ||
-                (s.status === 'Convertida em O.S.' && s.ativoId === os?.ativoId && (os?.descricao || '').includes(s.problema || '___'))
-            ) {
-                idsSolicitacoesAtualizar.add(docSol.id);
+            solSnap.docs.forEach(docSol => {
+                const s = docSol.data();
+                if (
+                    s.osId === osId ||
+                    (os?.numeroOs && Number(s.numeroOs) === Number(os.numeroOs)) ||
+                    (s.status === 'Convertida em O.S.' && s.ativoId === os?.ativoId && (os?.descricao || '').includes(s.problema || '___'))
+                ) {
+                    idsSolicitacoesAtualizar.add(docSol.id);
+                }
+            });
+
+            for (const solIdVinc of idsSolicitacoesAtualizar) {
+                await db.collection('solicitacoes').doc(solIdVinc).update(payloadSolicitacaoEncerrada).catch(() => {});
             }
-        });
-
-        for (const solIdVinc of idsSolicitacoesAtualizar) {
-            await db.collection('solicitacoes').doc(solIdVinc).update(payloadSolicitacaoEncerrada);
+        } catch (errSolicitacao) {
+            console.warn('Aviso: Não foi possível atualizar solicitações vinculadas (permissão ou inexistência):', errSolicitacao);
         }
 
         fecharModalDetalhesOS();
         if (typeof mostrarNotificacaoOSync === 'function') {
-            mostrarNotificacaoOSync('O.S. encerrada e chamado atualizado para o solicitante!', 'sucesso');
+            mostrarNotificacaoOSync('O.S. encerrada com sucesso!', 'sucesso');
         }
     } catch (err) {
+        console.error('Erro crítico ao encerrar O.S.:', err);
         alert('Erro ao encerrar O.S.: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Encerramento';
     }
-
-    btn.disabled = false;
-    btn.textContent = 'Confirmar Encerramento';
 }
