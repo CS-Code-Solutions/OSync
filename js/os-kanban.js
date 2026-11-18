@@ -1,9 +1,10 @@
-let cacheOS = [];
+let cacheOrdensServico = [];
 let cacheColunasOS = [];
 let cacheAtivosOS = [];
 let cacheTiposOS = [];
 let cacheManutentoresOS = [];
 let osArrastadaId = null;
+let unsubscribeOrdensOS = null;
 
 function formatarRotuloAtivoOS(tag, nome) {
     const t = (tag || '').trim();
@@ -11,9 +12,9 @@ function formatarRotuloAtivoOS(tag, nome) {
     return t ? `${t} - ${n}` : n;
 }
 
-async function initOrdensServico() {
+async function initKanbanOS() {
     await carregarDadosBaseOS();
-    await carregarOrdensServico();
+    iniciarEscutaOrdensServico();
 
     const formNovaOS = document.getElementById('form-nova-os');
     if (formNovaOS && !formNovaOS.dataset.bound) {
@@ -22,8 +23,8 @@ async function initOrdensServico() {
     }
 
     const formEncOS = document.getElementById('form-encerramento-os');
-    if (formEncOS && !formEncOS.dataset.bound) {
-        formEncOS.addEventListener('submit', encerrarOrdemServico);
+    if (formEncOS && !formEncOS.dataset.bound && typeof confirmarEncerramentoOS === 'function') {
+        formEncOS.addEventListener('submit', confirmarEncerramentoOS);
         formEncOS.dataset.bound = 'true';
     }
 
@@ -31,7 +32,9 @@ async function initOrdensServico() {
     const osIdUrl = params.get('os');
     if (osIdUrl) {
         window.history.replaceState({}, document.title, window.location.pathname);
-        abrirDetalhesOS(osIdUrl);
+        setTimeout(() => {
+            if (typeof abrirDetalhesOS === 'function') abrirDetalhesOS(osIdUrl);
+        }, 400);
     }
 }
 
@@ -56,7 +59,7 @@ async function carregarDadosBaseOS() {
 
     cacheColunasOS = colSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.ordem - b.ordem);
+        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 
     cacheAtivosOS = ativoSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
@@ -64,7 +67,7 @@ async function carregarDadosBaseOS() {
 
     cacheTiposOS = tipoSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.nome.localeCompare(b.nome));
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
     cacheManutentoresOS = manSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
@@ -83,16 +86,27 @@ async function carregarDadosBaseOS() {
     }
 }
 
-async function carregarOrdensServico() {
-    const snap = await db.collection('ordens_servico')
+function iniciarEscutaOrdensServico() {
+    if (typeof unsubscribeOrdensOS === 'function') {
+        unsubscribeOrdensOS();
+        unsubscribeOrdensOS = null;
+    }
+
+    unsubscribeOrdensOS = db.collection('ordens_servico')
         .where('empresaId', '==', usuarioAtual.empresaId)
-        .get();
+        .onSnapshot((snap) => {
+            cacheOrdensServico = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
-    cacheOS = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
+            if (typeof OSyncDataStore !== 'undefined') {
+                OSyncDataStore.invalidarOrdens();
+            }
 
-    renderizarVisaoOS();
+            renderizarVisaoOS();
+        }, (err) => {
+            console.error('Erro ao carregar Ordens de Serviço:', err);
+        });
 }
 
 function obterOSFiltradas() {
@@ -101,7 +115,7 @@ function obterOSFiltradas() {
     const prio = document.getElementById('filtro-os-prioridade')?.value || '';
     const manId = document.getElementById('filtro-os-manutentor')?.value || '';
 
-    return cacheOS.filter(os => {
+    return cacheOrdensServico.filter(os => {
         const numFormatado = `#os-${String(os.numeroOs || 0).padStart(4, '0')}`;
         const texto = `${numFormatado} ${os.ativoTag || ''} ${os.ativoNome || ''} ${os.descricao || ''}`.toLowerCase();
         if (busca && !texto.includes(busca)) return false;
@@ -121,7 +135,7 @@ function renderizarVisaoOS() {
     const listaFiltrada = obterOSFiltradas();
     renderizarMobileOS(listaFiltrada);
     renderizarKanbanOS(listaFiltrada);
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function renderizarMobileOS(ordens) {
@@ -255,7 +269,10 @@ async function soltarCardOS(e, novaColunaId) {
     const ehConcluida = colDestino && colDestino.titulo.toLowerCase().includes('conclu');
 
     if (ehConcluida) {
-        abrirDetalhesOS(osId, true);
+        abrirDetalhesOS(osId);
+        if (typeof mostrarFormularioEncerramento === 'function') {
+            mostrarFormularioEncerramento();
+        }
         return;
     }
 
@@ -264,7 +281,6 @@ async function soltarCardOS(e, novaColunaId) {
         encerrada: false
     });
     osArrastadaId = null;
-    carregarOrdensServico();
 }
 
 // ==========================================
@@ -413,7 +429,6 @@ async function salvarNovaOS(e) {
 
         fecharModalNovaOS();
         e.target.reset();
-        carregarOrdensServico();
         if (typeof mostrarNotificacaoOSync === 'function') {
             mostrarNotificacaoOSync(`#OS-${String(numeroGerado).padStart(4, '0')} criada com sucesso!`, 'sucesso');
         }
@@ -431,7 +446,7 @@ async function abrirModalEditarKanbanOS() {
     document.getElementById('modal-editar-kanban-os')?.classList.remove('hidden');
     cancelarEdicaoColunaModalOS();
     await renderizarColunasModalOS();
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function fecharModalEditarKanbanOS() {
@@ -448,7 +463,7 @@ async function renderizarColunasModalOS() {
 
     cacheColunasOS = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.ordem - b.ordem);
+        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 
     const selColFiltro = document.getElementById('filtro-os-coluna');
     if (selColFiltro) {
@@ -555,7 +570,7 @@ function prepararEdicaoColunaModalOS(colId) {
 
     document.getElementById('btn-os-cancelar-edit-coluna').classList.remove('hidden');
     document.getElementById('os-col-titulo').focus();
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function cancelarEdicaoColunaModalOS() {
