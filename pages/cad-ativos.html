@@ -15,43 +15,52 @@
     <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
-            <input type="text" id="busca-ativos" oninput="filtrarAtivos()" placeholder="Pesquisar por tag, nome da máquina, fabricante ou setor..."
+            <input type="text" id="busca-ativos" oninput="filtrarAtivos()" placeholder="Pesquisar por tag, equipamento, tipo, fabricante, nº de série ou setor..."
                 class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:border-blue-600 outline-none">
         </div>
     </div>
 
-    <!-- Lista de Máquinas (Estilo Cards NexOS) -->
+    <!-- Lista de Máquinas -->
     <div id="lista-ativos" class="space-y-3">
         <!-- Preenchido via js/cadastros.js -->
     </div>
 </div>
 
-<!-- MODAL: NOVO ATIVO / MÁQUINA -->
+<!-- MODAL: NOVO / EDITAR ATIVO -->
 <div id="modal-novo-ativo" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
             <h3 class="text-base font-bold text-white flex items-center gap-2">
                 <i data-lucide="cpu" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span>Cadastrar Novo Ativo</span>
+                <span id="modal-ativo-titulo">Cadastrar Novo Ativo</span>
             </h3>
             <button onclick="fecharModalNovoAtivo()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
 
-        <form id="form-novo-ativo" class="p-6 space-y-4">
+        <form id="form-novo-ativo" class="p-6 space-y-4 overflow-y-auto">
+            <input type="hidden" id="ativo-edit-id" value="">
+
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Código / Tag *</label>
-                    <input type="text" id="ativo-tag" required placeholder="Ex: CM-034"
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Código / Tag <span class="text-slate-400 font-normal">(Opcional)</span></label>
+                    <input type="text" id="ativo-tag" placeholder="Ex: CM-034"
                         class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm uppercase outline-none focus:border-blue-600">
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nome da Máquina *</label>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Equipamento *</label>
                     <input type="text" id="ativo-nome" required placeholder="Ex: Centro de Usinagem CNC"
                         class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Equipamento</label>
+                <select id="ativo-tipo-equipamento" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                    <option value="">Selecione o tipo (Opcional)...</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Fabricante</label>
                     <input type="text" id="ativo-fabricante" placeholder="Ex: Romi / Biesse"
@@ -62,12 +71,17 @@
                     <input type="text" id="ativo-modelo" placeholder="Ex: D800"
                         class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nº de Série</label>
+                    <input type="text" id="ativo-numero-serie" placeholder="Ex: SN-948271"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
+                </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Setor / Linha</label>
-                    <input type="text" id="ativo-setor" placeholder="Ex: Usinagem / Produção"
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Setor</label>
+                    <input type="text" id="ativo-setor" placeholder="Ex: Usinagem"
                         class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-600">
                 </div>
                 <div>
@@ -82,7 +96,7 @@
 
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onclick="fecharModalNovoAtivo()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Salvar Máquina</button>
+                <button type="submit" id="btn-salvar-ativo" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Salvar Máquina</button>
             </div>
         </form>
     </div>
@@ -93,7 +107,7 @@
     <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
         <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
             <div>
-                <span id="prontuario-tag" class="text-xs font-bold text-[#00E5B0] uppercase tracking-wider">TAG</span>
+                <span id="prontuario-tag" class="text-xs font-bold text-[#00E5B0] uppercase tracking-wider block"></span>
                 <h3 id="prontuario-nome" class="text-lg font-bold text-white">Nome do Equipamento</h3>
             </div>
             <button onclick="fecharProntuarioAtivo()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
@@ -103,8 +117,10 @@
             <!-- Bloco Superior: Dados + QR Code -->
             <div class="flex flex-col sm:flex-row items-center justify-between gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div class="space-y-1.5 text-sm text-slate-700 w-full">
+                    <p><strong>Tipo de Equipamento:</strong> <span id="prontuario-tipo-equip">-</span></p>
                     <p><strong>Setor:</strong> <span id="prontuario-setor">-</span></p>
                     <p><strong>Fabricante / Modelo:</strong> <span id="prontuario-fab-mod">-</span></p>
+                    <p><strong>Nº de Série:</strong> <span id="prontuario-serie">-</span></p>
                     <p><strong>Status Atual:</strong> <span id="prontuario-status" class="font-bold">-</span></p>
                     <div class="pt-2">
                         <button onclick="imprimirEtiquetaQR()" class="bg-[#0B1120] hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg inline-flex items-center gap-2 transition">
@@ -115,7 +131,7 @@
                 </div>
                 <div id="area-impressao-qr" class="flex flex-col items-center bg-white p-3 rounded-xl border border-slate-200 shadow-xs shrink-0">
                     <div id="qrcode-container"></div>
-                    <span id="qrcode-label" class="text-[11px] font-extrabold text-slate-800 mt-1.5"></span>
+                    <span id="qrcode-label" class="text-[11px] font-extrabold text-slate-800 mt-1.5 text-center max-w-[130px] truncate"></span>
                 </div>
             </div>
 
