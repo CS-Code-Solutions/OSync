@@ -1,9 +1,14 @@
 let unsubscribeSolicitacoes = null;
 let cacheListaSolicitacoes = [];
+let cacheAtivosSolicitacoes = [];
 
 function initSolicitacoes() {
     iniciarListenerSolicitacoes();
-    document.getElementById('form-nova-solicitacao')?.addEventListener('submit', salvarNovaSolicitacao);
+    const formSol = document.getElementById('form-nova-solicitacao');
+    if (formSol && !formSol.dataset.bound) {
+        formSol.addEventListener('submit', salvarNovaSolicitacao);
+        formSol.dataset.bound = 'true';
+    }
 }
 
 function iniciarListenerSolicitacoes() {
@@ -126,24 +131,79 @@ function renderizarSolicitacoes(lista) {
     lucide.createIcons();
 }
 
-async function abrirModalNovaSolicitacao() {
-    document.getElementById('modal-nova-solicitacao').classList.remove('hidden');
-    const snap = await db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get();
-    document.getElementById('sol-ativo').innerHTML = snap.docs.map(d => {
-        const a = d.data();
-        const tagSegura = escaparHTML(a.codigoTag);
-        const nomeSeguro = escaparHTML(a.nome);
-        return `<option value="${escaparHTML(d.id)}" data-tag="${tagSegura}" data-nome="${nomeSeguro}">${tagSegura} - ${nomeSeguro}</option>`;
+function filtrarSelectAtivosSolicitacao(ativoIdForcado = '') {
+    const sel = document.getElementById('sol-ativo');
+    if (!sel) return;
+
+    const termo = (document.getElementById('sol-ativo-busca')?.value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+
+    const valorAtual = ativoIdForcado || sel.value;
+
+    const filtrados = cacheAtivosSolicitacoes.filter(a => {
+        if (!termo) return true;
+        const texto = `${a.codigoTag || ''} ${a.nome || ''} ${a.setor || ''} ${a.tipoEquipamento || ''}`
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+        return texto.includes(termo);
+    });
+
+    if (filtrados.length === 0) {
+        sel.innerHTML = '<option value="">Nenhuma máquina encontrada...</option>';
+        return;
+    }
+
+    sel.innerHTML = filtrados.map(a => {
+        const tagSegura = escaparHTML(a.codigoTag || '');
+        const nomeSeguro = escaparHTML(a.nome || '');
+        const rotulo = (a.codigoTag || '').trim() ? `${tagSegura} - ${nomeSeguro}` : nomeSeguro;
+        return `<option value="${escaparHTML(a.id)}" data-tag="${tagSegura}" data-nome="${nomeSeguro}">${rotulo}</option>`;
     }).join('');
+
+    if (valorAtual && filtrados.some(a => a.id === valorAtual)) {
+        sel.value = valorAtual;
+    }
+}
+
+async function abrirModalNovaSolicitacao() {
+    const form = document.getElementById('form-nova-solicitacao');
+    if (form) form.reset();
+
+    const buscaEl = document.getElementById('sol-ativo-busca');
+    if (buscaEl) buscaEl.value = '';
+
+    document.getElementById('modal-nova-solicitacao').classList.remove('hidden');
+
+    const snap = await db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get();
+    cacheAtivosSolicitacoes = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+            const rotA = (a.codigoTag || '').trim() ? `${a.codigoTag} - ${a.nome}` : (a.nome || '');
+            const rotB = (b.codigoTag || '').trim() ? `${b.codigoTag} - ${b.nome}` : (b.nome || '');
+            return rotA.localeCompare(rotB);
+        });
+
+    filtrarSelectAtivosSolicitacao();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function fecharModalNovaSolicitacao() {
+    const buscaEl = document.getElementById('sol-ativo-busca');
+    if (buscaEl) buscaEl.value = '';
     document.getElementById('modal-nova-solicitacao').classList.add('hidden');
 }
 
 async function salvarNovaSolicitacao(e) {
     e.preventDefault();
     const sel = document.getElementById('sol-ativo');
+    if (!sel.value) {
+        alert('Selecione uma máquina válida na lista.');
+        return;
+    }
     const opt = sel.options[sel.selectedIndex];
     const parada = document.getElementById('sol-maquina-parada').checked;
 
