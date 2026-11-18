@@ -7,25 +7,21 @@ async function initRelatoriosOS() {
         tbody.innerHTML = OSyncUtils.gerarSkeletonLinhasTabela(6, 6);
     }
 
-    const [osSnap, colSnap, tiposSnap, manutSnap] = await Promise.all([
-        db.collection('ordens_servico').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get(),
+    const [ordens, colunas, tiposSnap, manutSnap] = await Promise.all([
+        OSyncDataStore.getOrdensServico({ completo: true }),
+        OSyncDataStore.getColunasKanban(),
         db.collection('tipos_manutencao').where('empresaId', '==', usuarioAtual.empresaId).get(),
         db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
     ]);
 
-    cacheColunasRelOS = colSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    cacheColunasRelOS = colunas;
 
-    cacheRelatorioOS = osSnap.docs
-        .map(d => {
-            const data = d.data();
+    cacheRelatorioOS = ordens
+        .map(data => {
             const col = cacheColunasRelOS.find(c => c.id === data.colunaId);
             const dataISO = OSyncUtils.extrairDataISO(data);
             const minutosParada = OSyncUtils.calcularMinutosParada(data);
             return {
-                id: d.id,
                 ...data,
                 statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
                 statusCor: col ? col.corTopo : '#00E5B0',
