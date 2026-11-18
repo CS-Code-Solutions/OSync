@@ -6,6 +6,7 @@ let cacheManutentoresOS = [];
 let manutentoresNovaOSSelecionados = [];
 let osArrastadaId = null;
 let unsubscribeOrdensOS = null;
+let abaOSAtual = 'minhas'; // 'minhas' | 'todas' | 'solicitacoes'
 
 function formatarRotuloAtivoOS(tag, nome) {
     const t = (tag || '').trim();
@@ -13,7 +14,77 @@ function formatarRotuloAtivoOS(tag, nome) {
     return t ? `${t} - ${n}` : n;
 }
 
+function alternarPainelFiltrosOS() {
+    const painel = document.getElementById('painel-filtros-os');
+    const btn = document.getElementById('btn-toggle-filtros-os');
+    if (!painel) return;
+
+    const oculto = painel.classList.toggle('hidden');
+    if (btn) {
+        btn.classList.toggle('border-blue-600', !oculto);
+        btn.classList.toggle('bg-blue-50', !oculto);
+    }
+}
+
+function limparFiltrosOS() {
+    const b = document.getElementById('filtro-os-busca');
+    const c = document.getElementById('filtro-os-coluna');
+    const p = document.getElementById('filtro-os-prioridade');
+    const m = document.getElementById('filtro-os-manutentor');
+    if (b) b.value = '';
+    if (c) c.value = '';
+    if (p) p.value = '';
+    if (m) m.value = '';
+    renderizarVisaoOS();
+}
+
+function selecionarAbaOS(aba) {
+    abaOSAtual = aba;
+
+    const abas = ['minhas', 'todas', 'solicitacoes'];
+    abas.forEach(nome => {
+        const el = document.getElementById(`aba-os-${nome}`);
+        const badge = document.getElementById(`cont-aba-${nome}`);
+        if (!el) return;
+
+        if (nome === aba) {
+            el.className = 'px-4 py-2 text-xs sm:text-sm font-bold rounded-t-xl border border-b-0 border-slate-300 bg-white text-blue-700 shadow-2xs -mb-px flex items-center gap-1.5 shrink-0 transition';
+            if (badge) badge.className = 'text-[11px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700';
+        } else {
+            el.className = 'px-4 py-2 text-xs sm:text-sm font-semibold rounded-t-xl border border-b-0 border-transparent bg-slate-200/70 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 shrink-0 transition';
+            if (badge) badge.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-slate-300/80 text-slate-700';
+        }
+    });
+
+    renderizarVisaoOS();
+}
+
+function osPertenceAoUsuarioAtual(os) {
+    const uid = usuarioAtual?.id || usuarioAtual?.uid || '';
+    const nomeUsuario = (usuarioAtual?.nome || '').trim().toLowerCase();
+
+    const ids = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
+        ? os.manutentoresIds
+        : (os.manutentorId ? [os.manutentorId] : []);
+
+    if (uid && ids.includes(uid)) return true;
+
+    if (nomeUsuario) {
+        const nomes = Array.isArray(os.manutentoresNomes) && os.manutentoresNomes.length > 0
+            ? os.manutentoresNomes.map(n => String(n).trim().toLowerCase())
+            : (os.manutentorNome ? String(os.manutentorNome).split(',').map(n => n.trim().toLowerCase()) : []);
+        if (nomes.includes(nomeUsuario)) return true;
+    }
+
+    return false;
+}
+
+function osVeioDeSolicitacao(os) {
+    return Boolean(os.solicitacaoId) || String(os.descricao || '').trim().startsWith('[Solicitação de ');
+}
+
 async function initKanbanOS() {
+    abaOSAtual = 'minhas';
     await carregarDadosBaseOS();
     iniciarEscutaOrdensServico();
 
@@ -116,7 +187,18 @@ function obterOSFiltradas() {
     const prio = document.getElementById('filtro-os-prioridade')?.value || '';
     const manId = document.getElementById('filtro-os-manutentor')?.value || '';
 
-    return cacheOrdensServico.filter(os => {
+    const qtdFiltros = [busca, colId, prio, manId].filter(Boolean).length;
+    const badgeFiltros = document.getElementById('badge-filtros-ativos-os');
+    if (badgeFiltros) {
+        if (qtdFiltros > 0) {
+            badgeFiltros.textContent = qtdFiltros;
+            badgeFiltros.classList.remove('hidden');
+        } else {
+            badgeFiltros.classList.add('hidden');
+        }
+    }
+
+    const filtradasGerais = cacheOrdensServico.filter(os => {
         const numFormatado = `#os-${String(os.numeroOs || 0).padStart(4, '0')}`;
         const texto = `${numFormatado} ${os.ativoTag || ''} ${os.ativoNome || ''} ${os.descricao || ''}`.toLowerCase();
         if (busca && !texto.includes(busca)) return false;
@@ -130,6 +212,21 @@ function obterOSFiltradas() {
         }
         return true;
     });
+
+    const cMinhas = document.getElementById('cont-aba-minhas');
+    const cTodas = document.getElementById('cont-aba-todas');
+    const cSol = document.getElementById('cont-aba-solicitacoes');
+    if (cMinhas) cMinhas.textContent = filtradasGerais.filter(osPertenceAoUsuarioAtual).length;
+    if (cTodas) cTodas.textContent = filtradasGerais.length;
+    if (cSol) cSol.textContent = filtradasGerais.filter(osVeioDeSolicitacao).length;
+
+    if (abaOSAtual === 'minhas') {
+        return filtradasGerais.filter(osPertenceAoUsuarioAtual);
+    }
+    if (abaOSAtual === 'solicitacoes') {
+        return filtradasGerais.filter(osVeioDeSolicitacao);
+    }
+    return filtradasGerais;
 }
 
 function renderizarVisaoOS() {
@@ -252,7 +349,6 @@ function renderizarKanbanOS(ordens) {
     }).join('');
 }
 
-
 function iniciarDragOS(e, osId) {
     osArrastadaId = osId;
     e.dataTransfer.setData('text/plain', osId);
@@ -353,7 +449,8 @@ async function abrirModalNovaOS() {
 
     manutentoresNovaOSSelecionados = [];
     if (usuarioAtual.perfil === 'Manutentor') {
-        const proprio = cacheManutentoresOS.find(m => m.id === usuarioAtual.uid);
+        const uidAtual = usuarioAtual.id || usuarioAtual.uid;
+        const proprio = cacheManutentoresOS.find(m => m.id === uidAtual);
         if (proprio) {
             manutentoresNovaOSSelecionados.push({ id: proprio.id, nome: proprio.nome });
         }
