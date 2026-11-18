@@ -128,7 +128,10 @@ async function carregarDadosBaseOS() {
         db.collection('kanban_colunas').where('empresaId', '==', empId).get(),
         db.collection('ativos').where('empresaId', '==', empId).get(),
         db.collection('tipos_manutencao').where('empresaId', '==', empId).get(),
-        db.collection('usuarios').where('empresaId', '==', empId).where('perfil', '==', 'Manutentor').get()
+        db.collection('usuarios')
+            .where('empresaId', '==', empId)
+            .where('perfil', 'in', ['Manutentor', 'Admin'])
+            .get()
     ]);
 
     cacheColunasOS = colSnap.docs
@@ -145,6 +148,7 @@ async function carregarDadosBaseOS() {
 
     cacheManutentoresOS = manSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => u.ativo !== false)
         .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
     const selColFiltro = document.getElementById('filtro-os-coluna');
@@ -155,8 +159,11 @@ async function carregarDadosBaseOS() {
 
     const selManFiltro = document.getElementById('filtro-os-manutentor');
     if (selManFiltro) {
-        selManFiltro.innerHTML = '<option value="">Todos Manutentores</option>' +
-            cacheManutentoresOS.map(m => `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`).join('');
+        selManFiltro.innerHTML = '<option value="">Todos Manutentores / Gestão</option>' +
+            cacheManutentoresOS.map(m => {
+                const rotulo = m.perfil === 'Admin' ? `${m.nome} (Gestão)` : m.nome;
+                return `<option value="${escaparHTML(m.id)}">${escaparHTML(rotulo)}</option>`;
+            }).join('');
     }
 }
 
@@ -465,7 +472,6 @@ async function confirmarExclusaoOSLixeira(e) {
     btn.textContent = 'Excluindo...';
 
     try {
-        // Registra log de auditoria da exclusão caso a coleção esteja liberada nas regras
         if (os) {
             await db.collection('logs_exclusao_os').add({
                 empresaId: usuarioAtual.empresaId,
@@ -528,11 +534,14 @@ function renderizarManutentoresNovaOS() {
     if (selMan) {
         const disponiveis = cacheManutentoresOS.filter(m => !manutentoresNovaOSSelecionados.some(sel => sel.id === m.id));
         const textoPadrao = manutentoresNovaOSSelecionados.length > 0
-            ? '+ Adicionar outro manutentor...'
+            ? '+ Adicionar outro responsável...'
             : 'Não atribuído (Livre) — Toque para escolher';
 
         selMan.innerHTML = `<option value="">${textoPadrao}</option>` +
-            disponiveis.map(m => `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`).join('');
+            disponiveis.map(m => {
+                const rotulo = m.perfil === 'Admin' ? `${m.nome} (Gestão)` : m.nome;
+                return `<option value="${escaparHTML(m.id)}">${escaparHTML(rotulo)}</option>`;
+            }).join('');
         selMan.value = '';
     }
 
@@ -570,7 +579,7 @@ function removerManutentorNovaOS(manId) {
 async function abrirModalNovaOS() {
     resetarFormularioNovaOS();
 
-    if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0) {
+    if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0 || cacheManutentoresOS.length === 0) {
         await carregarDadosBaseOS();
     }
 
@@ -586,7 +595,8 @@ async function abrirModalNovaOS() {
         `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`
     ).join('');
 
-    if (usuarioAtual.perfil === 'Manutentor') {
+    // Pré-seleciona o usuário logado se ele for Manutentor ou Gestão (Admin)
+    if (usuarioAtual.perfil === 'Manutentor' || usuarioAtual.perfil === 'Admin') {
         const uidAtual = usuarioAtual.id || usuarioAtual.uid;
         const proprio = cacheManutentoresOS.find(m => m.id === uidAtual);
         if (proprio) {
