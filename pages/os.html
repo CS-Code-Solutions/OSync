@@ -195,7 +195,14 @@
         <form id="form-nova-os" class="p-6 space-y-4 overflow-y-auto">
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Máquina / Equipamento *</label>
-                <select id="os-ativo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
+                <div class="space-y-1.5">
+                    <div class="relative">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+                        <input type="text" id="os-ativo-busca" oninput="filtrarSelectAtivosNovaOS()" placeholder="Digite o nome, código ou setor da máquina..."
+                            class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs outline-none focus:border-blue-600">
+                    </div>
+                    <select id="os-ativo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
