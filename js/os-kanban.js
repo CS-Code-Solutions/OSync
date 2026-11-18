@@ -14,6 +14,13 @@ function formatarDuracaoParadaOS(minutos) {
     return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+// Helper para formatar TAG + Nome sem sobrar hífen quando a TAG for vazia
+function formatarRotuloAtivoOS(tag, nome) {
+    const tagLimpa = (tag || '').trim();
+    const nomeLimpo = (nome || 'Equipamento').trim();
+    return tagLimpa ? `${tagLimpa} - ${nomeLimpo}` : nomeLimpo;
+}
+
 // Helper universal para obter lista de manutentores (compatível com O.S. antigas e múltiplas)
 function obterManutentoresDaOS(os) {
     if (Array.isArray(os?.manutentoresIds) && os.manutentoresIds.length > 0) {
@@ -133,7 +140,7 @@ function obterOrdensFiltradas() {
         }
         if (busca) {
             const nomesTecnicos = formatarNomesManutentoresOS(os);
-            const texto = `${os.numeroOs} ${os.ativoTag} ${os.ativoNome} ${os.descricao} ${os.tipoNome} ${nomesTecnicos}`.toLowerCase();
+            const texto = `${os.numeroOs} ${os.ativoTag || ''} ${os.ativoNome} ${os.descricao} ${os.tipoNome} ${nomesTecnicos}`.toLowerCase();
             if (!texto.includes(busca)) return false;
         }
         return true;
@@ -166,6 +173,7 @@ function renderizarCardsMobile(ordens) {
         const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
         const nomesTecnicos = formatarNomesManutentoresOS(os);
         const qtdTecnicos = obterManutentoresDaOS(os).length;
+        const tituloAtivo = escaparHTML(formatarRotuloAtivoOS(os.ativoTag, os.ativoNome));
 
         return `
         <div onclick="abrirDetalhesOS('${osIdSeguro}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
@@ -181,7 +189,7 @@ function renderizarCardsMobile(ordens) {
             </div>
 
             <h3 class="font-bold text-slate-900 text-base leading-snug">
-                ${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome || 'Equipamento')}
+                ${tituloAtivo}
             </h3>
 
             <div class="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
@@ -234,6 +242,7 @@ function renderizarKanbanDesktop(ordens) {
                     const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
                     const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
                     const nomesTecnicos = formatarNomesManutentoresOS(os) || 'Sem técnico';
+                    const tituloAtivo = escaparHTML(formatarRotuloAtivoOS(os.ativoTag, os.ativoNome));
                     return `
                 <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${osIdSeguro}')" onclick="abrirDetalhesOS('${osIdSeguro}')"
                      class="osync-card p-3 cursor-pointer hover:shadow-md transition" style="border-left-color: ${corCol}">
@@ -241,7 +250,7 @@ function renderizarKanbanDesktop(ordens) {
                         <span class="font-extrabold text-slate-500 shrink-0">#OS-${String(Number(os.numeroOs) || 0).padStart(4, '0')}</span>
                         <span class="font-bold px-2 py-0.5 rounded text-white truncate max-w-[130px]" style="background-color: ${corCol}" title="${tituloColSeguro}">${tituloColSeguro}</span>
                     </div>
-                    <h4 class="font-bold text-slate-900 text-[13px] leading-snug">${escaparHTML(os.ativoTag)} - ${escaparHTML(os.ativoNome)}</h4>
+                    <h4 class="font-bold text-slate-900 text-[13px] leading-snug">${tituloAtivo}</h4>
                     ${ehParada ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Máquina Parada${os.tempoParadaMinutos ? ` • ${formatarDuracaoParadaOS(os.tempoParadaMinutos)}` : ''}</span>` : ''}
                     ${ehParcial ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Parcialmente Funcional</span>` : ''}
                     <p class="text-[11.5px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">${escaparHTML(os.descricao)}</p>
@@ -487,9 +496,14 @@ async function abrirModalNovaOS() {
         db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get()
     ]);
 
-    document.getElementById('os-ativo').innerHTML = ativosSnap.docs.map(d => {
-        const a = d.data();
-        return `<option value="${escaparHTML(d.id)}" data-tag="${escaparHTML(a.codigoTag)}" data-nome="${escaparHTML(a.nome)}">${escaparHTML(a.codigoTag)} - ${escaparHTML(a.nome)}</option>`;
+    const ativosOrdenados = ativosSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => formatarRotuloAtivoOS(a.codigoTag, a.nome).localeCompare(formatarRotuloAtivoOS(b.codigoTag, b.nome)));
+
+    document.getElementById('os-ativo').innerHTML = ativosOrdenados.map(a => {
+        const tag = (a.codigoTag || '').trim();
+        const rotulo = formatarRotuloAtivoOS(tag, a.nome);
+        return `<option value="${escaparHTML(a.id)}" data-tag="${escaparHTML(tag)}" data-nome="${escaparHTML(a.nome)}">${escaparHTML(rotulo)}</option>`;
     }).join('');
 
     document.getElementById('os-tipo').innerHTML = tiposSnap.docs.map(d => {
@@ -560,8 +574,8 @@ async function salvarNovaOS(e) {
             empresaId: usuarioAtual.empresaId,
             numeroOs: maiorNum + 1,
             ativoId: selAtivo.value,
-            ativoTag: optAtivo?.getAttribute('data-tag') || '',
-            ativoNome: optAtivo?.getAttribute('data-nome') || '',
+            ativoTag: (optAtivo?.getAttribute('data-tag') || '').trim(),
+            ativoNome: (optAtivo?.getAttribute('data-nome') || '').trim(),
             tipoNome: selTipo.value,
             tipoCor: sanitizarCorHex(optTipo?.getAttribute('data-cor'), '#1D4ED8'),
             colunaId: document.getElementById('os-coluna-inicial').value,
