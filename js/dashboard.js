@@ -400,8 +400,12 @@ function montarGraficoCustosMensais() {
     });
 }
 
-function alterarPeriodoWidgetParadas(novoPeriodo) {
+async function alterarPeriodoWidgetParadas(novoPeriodo) {
     periodoWidgetParadas = novoPeriodo;
+    if (novoPeriodo === 'ano' && !OSyncDataStore.isHistoricoCompletoCarregado()) {
+        renderizarSkeletonDashboard();
+        await carregarDadosBrutosDashboard(true);
+    }
     renderizarWidgetsDashboard();
 }
 
