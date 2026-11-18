@@ -36,6 +36,18 @@ async function initRelatoriosMaquinas() {
                 .filter(o => o.ativoId === ativo.id)
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
+            const totalMinutosParada = ordensMaquina.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
+            totalOSGeral += ordensMaquina.length;
+
+            return {
+                ...ativo,
+                qtdOS: ordensMaquina.length,
+                totalMinutosParada,
+                ordens: ordensMaquina
+            };
+        })
+        .sort((a, b) => b.qtdOS - a.qtdOS);
+
     const operacionais = cacheRelatorioMaquinas.filter(m => m.status === 'Operacional').length;
 
     document.getElementById('rel-maq-kpi-total').textContent = cacheRelatorioMaquinas.length;
@@ -43,6 +55,7 @@ async function initRelatoriosMaquinas() {
     document.getElementById('rel-maq-kpi-operacionais').textContent = operacionais;
 
     filtrarRelatorioMaquinas();
+
 }
 
 function filtrarRelatorioMaquinas() {
