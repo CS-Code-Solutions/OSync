@@ -17,10 +17,20 @@ async function navegarPara(pagina) {
         }
     }
 
-    // Proteção contra Path Traversal no nome da página
+        // Proteção contra Path Traversal no nome da página
     const paginaSegura = String(pagina || 'os').replace(/[^a-z0-9\-]/gi, '');
 
+    // Libera largura total e reduz margens no Kanban (O.S.) mantendo padrão nas demais telas
+    if (container) {
+        if (paginaSegura === 'os') {
+            container.className = 'flex-1 max-w-full w-full mx-auto p-3 md:px-4 md:py-4';
+        } else {
+            container.className = 'flex-1 max-w-7xl w-full mx-auto p-4 md:p-6';
+        }
+    }
+
     document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+
 
     if (paginaSegura.startsWith('cad-')) {
         document.getElementById('btn-menu-cadastros')?.classList.add('active');
