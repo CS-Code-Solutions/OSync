@@ -47,6 +47,7 @@ async function navegarPara(pagina) {
         if (paginaSegura === 'centros-custo' && typeof initCentrosCusto === 'function') initCentrosCusto();
         if (paginaSegura === 'relatorios-os' && typeof initRelatoriosOS === 'function') initRelatoriosOS();
         if (paginaSegura === 'relatorios-maquinas' && typeof initRelatoriosMaquinas === 'function') initRelatoriosMaquinas();
+        if (paginaSegura === 'relatorios-manutentores' && typeof initRelatoriosManutentores === 'function') initRelatoriosManutentores();
         if (paginaSegura === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
         if (paginaSegura === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
         if (paginaSegura === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
@@ -99,7 +100,6 @@ async function abrirLeitorQRCodeCamera() {
         video.srcObject = streamCameraQR;
         await video.play();
 
-        // 1. Se o navegador tiver suporte nativo (Android / Chrome / Samsung)
         if (window.BarcodeDetector) {
             const detector = new BarcodeDetector({ formats: ['qr_code'] });
             scannerIntervalQR = setInterval(async () => {
@@ -113,9 +113,7 @@ async function abrirLeitorQRCodeCamera() {
                     }
                 } catch (e) {}
             }, 250);
-        } 
-        // 2. Se NÃO tiver suporte nativo (iPhone / Safari), usa o jsQR via canvas
-        else {
+        } else {
             const canvasElement = document.createElement('canvas');
             const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
 
@@ -176,7 +174,6 @@ async function processarArquivoQRCode(e) {
 
     pararEfecharLeitorQR();
 
-    // Tenta via BarcodeDetector de imagem se suportado
     if (window.BarcodeDetector) {
         try {
             const imageBitmap = await createImageBitmap(file);
@@ -189,7 +186,6 @@ async function processarArquivoQRCode(e) {
         } catch (err) {}
     }
 
-    // Fallback universal via FileReader e jsQR para iPhone e Android (ao tirar foto)
     const reader = new FileReader();
     reader.onload = function (event) {
         const img = new Image();
