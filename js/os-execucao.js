@@ -1,6 +1,8 @@
 let anexosOSAtual = [];
 let itensCustoOSAtual = [];
 let cacheCentrosCustoOS = [];
+let cacheManutentoresDetalhesOS = [];
+let manutentoresDetalhesOSAtual = [];
 let osAtualEhExterna = false;
 let osAtualTeveParada = false;
 
@@ -44,6 +46,54 @@ function recalcularTempoTrabalhoEncerramento() {
     badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+function renderizarManutentoresDetalhesOS() {
+    const selMan = document.getElementById('det-os-manutentor-select');
+    const chipsBox = document.getElementById('det-os-manutentores-chips');
+
+    if (selMan) {
+        const disponiveis = cacheManutentoresDetalhesOS.filter(m => !manutentoresDetalhesOSAtual.some(sel => sel.id === m.id));
+        const textoPadrao = manutentoresDetalhesOSAtual.length > 0
+            ? '+ Adicionar parceria / técnico...'
+            : 'Sem técnico — Toque para escolher';
+
+        selMan.innerHTML = `<option value="">${textoPadrao}</option>` +
+            disponiveis.map(m => `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`).join('');
+        selMan.value = '';
+    }
+
+    if (chipsBox) {
+        if (manutentoresDetalhesOSAtual.length === 0) {
+            chipsBox.innerHTML = '';
+        } else {
+            chipsBox.innerHTML = manutentoresDetalhesOSAtual.map(m => `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                    <span>${escaparHTML(m.nome)}</span>
+                    <button type="button" onclick="removerManutentorDetalhesOS('${escaparHTML(m.id)}')" class="text-blue-500 hover:text-rose-600 font-extrabold leading-none">×</button>
+                </span>
+            `).join('');
+        }
+    }
+}
+
+async function adicionarManutentorDetalhesOS() {
+    const selMan = document.getElementById('det-os-manutentor-select');
+    const manId = selMan?.value || '';
+    if (!manId) return;
+
+    const manObj = cacheManutentoresDetalhesOS.find(m => m.id === manId);
+    if (manObj && !manutentoresDetalhesOSAtual.some(s => s.id === manObj.id)) {
+        manutentoresDetalhesOSAtual.push({ id: manObj.id, nome: manObj.nome });
+    }
+    renderizarManutentoresDetalhesOS();
+    await atualizarManutentorRapidoOS();
+}
+
+async function removerManutentorDetalhesOS(manId) {
+    manutentoresDetalhesOSAtual = manutentoresDetalhesOSAtual.filter(m => m.id !== manId);
+    renderizarManutentoresDetalhesOS();
+    await atualizarManutentorRapidoOS();
+}
+
 async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
@@ -74,7 +124,8 @@ async function abrirDetalhesOS(osId) {
         }
     }
 
-    document.getElementById('det-os-maquina').textContent = `${os.ativoTag} - ${os.ativoNome}`;
+    const tituloMaquina = (os.ativoTag || '').trim() ? `${os.ativoTag} - ${os.ativoNome}` : (os.ativoNome || 'Equipamento');
+    document.getElementById('det-os-maquina').textContent = tituloMaquina;
     document.getElementById('det-os-tipo').textContent = os.tipoNome || 'Manutenção';
     document.getElementById('det-os-prioridade').textContent = `Prioridade: ${os.prioridade || 'Normal'}`;
     document.getElementById('det-os-descricao').textContent = os.descricao;
@@ -89,45 +140,35 @@ async function abrirDetalhesOS(osId) {
         db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get()
     ]);
 
+    cacheManutentoresDetalhesOS = manutSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
     const idsSelecionados = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
         ? os.manutentoresIds
         : (os.manutentorId ? [os.manutentorId] : []);
 
-    const listaManutDet = document.getElementById('det-os-manutentores-lista');
-    const manutentoresOrdenados = manutSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    const nomesSelecionados = Array.isArray(os.manutentoresNomes) && os.manutentoresNomes.length > 0
+        ? os.manutentoresNomes
+        : (os.manutentorNome ? [os.manutentorNome] : []);
 
-    if (listaManutDet) {
-        if (manutentoresOrdenados.length === 0) {
-            listaManutDet.innerHTML = '<span class="text-[11px] text-slate-400">Nenhum técnico cadastrado.</span>';
-        } else {
-            listaManutDet.innerHTML = manutentoresOrdenados.map(m => {
-                const idSeg = escaparHTML(m.id);
-                const nomeSeg = escaparHTML(m.nome);
-                const marcado = idsSelecionados.includes(m.id);
-                return `
-                <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 cursor-pointer text-xs select-none">
-                    <input type="checkbox" name="det-os-manutentor-check" value="${idSeg}" data-nome="${nomeSeg}"
-                        ${marcado ? 'checked' : ''}
-                        onchange="atualizarManutentorRapidoOS()"
-                        class="w-3.5 h-3.5 accent-blue-600 rounded shrink-0">
-                    <span class="font-semibold text-slate-800 truncate">${nomeSeg}</span>
-                </label>`;
-            }).join('');
-        }
-    }
-    const badgeManut = document.getElementById('det-os-manutentores-badge');
-    if (badgeManut) {
-        badgeManut.textContent = `${idsSelecionados.length} selecionado${idsSelecionados.length === 1 ? '' : 's'}`;
-    }
+    manutentoresDetalhesOSAtual = idsSelecionados.map((id, idx) => {
+        const encontrado = cacheManutentoresDetalhesOS.find(m => m.id === id);
+        return {
+            id,
+            nome: encontrado ? encontrado.nome : (nomesSelecionados[idx] || 'Técnico')
+        };
+    });
+
+    renderizarManutentoresDetalhesOS();
 
     cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const selCC = document.getElementById('item-custo-cc');
     if (selCC) {
-        const labelPadraoOS = escaparHTML(`${os.ativoTag} - ${os.ativoNome}`);
+        const labelPadraoOS = escaparHTML(tituloMaquina);
         selCC.innerHTML = cacheCentrosCustoOS.map(a => {
-            const label = escaparHTML(`${a.codigoTag} - ${a.nome}`);
+            const rotulo = (a.codigoTag || '').trim() ? `${a.codigoTag} - ${a.nome}` : a.nome;
+            const label = escaparHTML(rotulo);
             const selecionado = a.id === os.ativoId ? 'selected' : '';
             return `<option value="${label}" ${selecionado}>${label}</option>`;
         }).join('') || `<option value="${labelPadraoOS}" selected>${labelPadraoOS}</option>`;
@@ -268,14 +309,8 @@ async function atualizarStatusRapidoOS() {
 
 async function atualizarManutentorRapidoOS() {
     const osId = document.getElementById('det-os-id').value;
-    const checks = Array.from(document.querySelectorAll('input[name="det-os-manutentor-check"]:checked'));
-    const manutentoresIds = checks.map(c => c.value);
-    const manutentoresNomes = checks.map(c => c.getAttribute('data-nome') || '');
-
-    const badgeManut = document.getElementById('det-os-manutentores-badge');
-    if (badgeManut) {
-        badgeManut.textContent = `${manutentoresIds.length} selecionado${manutentoresIds.length === 1 ? '' : 's'}`;
-    }
+    const manutentoresIds = manutentoresDetalhesOSAtual.map(m => m.id);
+    const manutentoresNomes = manutentoresDetalhesOSAtual.map(m => m.nome);
 
     await db.collection('ordens_servico').doc(osId).update({
         manutentorId: manutentoresIds[0] || '',
@@ -338,7 +373,9 @@ function removerAnexoOS(idx) {
 function adicionarItemCustoOS() {
     const osId = document.getElementById('det-os-id').value;
     const os = cacheOrdensServico.find(o => o.id === osId);
-    const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
+    const padraoMaquina = os
+        ? ((os.ativoTag || '').trim() ? `${os.ativoTag} - ${os.ativoNome}` : os.ativoNome)
+        : 'Máquina';
 
     const descInput = document.getElementById('item-custo-desc');
     const desc = descInput.value.trim() || (osAtualEhExterna ? 'Serviço de Manutenção Externa' : '');
@@ -410,7 +447,9 @@ async function confirmarEncerramentoOS(e) {
     try {
         const osId = document.getElementById('det-os-id').value;
         const os = cacheOrdensServico.find(o => o.id === osId);
-        const padraoMaquina = os ? `${os.ativoTag} - ${os.ativoNome}` : 'Máquina';
+        const padraoMaquina = os
+            ? ((os.ativoTag || '').trim() ? `${os.ativoTag} - ${os.ativoNome}` : os.ativoNome)
+            : 'Máquina';
 
         let inicioParada = '';
         let terminoParada = '';
@@ -459,9 +498,8 @@ async function confirmarEncerramentoOS(e) {
         const observacoes = document.getElementById('enc-observacoes').value.trim();
         const custoTotal = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
 
-        const checksManut = Array.from(document.querySelectorAll('input[name="det-os-manutentor-check"]:checked'));
-        const manutentoresIds = checksManut.map(c => c.value);
-        const manutentoresNomes = checksManut.map(c => c.getAttribute('data-nome') || '');
+        const manutentoresIds = manutentoresDetalhesOSAtual.map(m => m.id);
+        const manutentoresNomes = manutentoresDetalhesOSAtual.map(m => m.nome);
 
         const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
 
