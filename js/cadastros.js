@@ -2,9 +2,9 @@ let cacheAtivos = [];
 let cacheUsuariosPerfil = [];
 let perfilAtualCadastro = 'Manutentor';
 
-const ROTULOS_PAGINAS_MANUTENTOR = {
+const ROTULOS_PAGINAS_PERFIL = {
     'os': 'O.S.',
-    'solicitacoes': 'Chamados',
+    'solicitacoes': 'Solicitações',
     'dashboard': 'Dashboard',
     'cad-ativos': 'Máquinas',
     'relatorios-os': 'Rel. O.S.',
@@ -269,14 +269,39 @@ async function abrirModalFlutuanteQRMaquina(ativoId) {
         const isGestor = usuarioAtual.perfil === 'Admin' || usuarioAtual.perfil === 'SuperAdmin';
         const isLider = usuarioAtual.perfil === 'Lideranca';
 
+        const btnPrincipal = document.querySelector('[onclick="acaoQR_NovaOrdemOuChamado()"]');
+        const boxBotoes = btnPrincipal?.parentElement;
+        const btnRelMaq = document.getElementById('qr-glob-btn-rel-maquina');
+        const btnRelCC = document.getElementById('qr-glob-btn-rel-cc');
+
         document.getElementById('qr-glob-btn-nova-os-texto').textContent = isLider ? 'Abrir Solicitação' : 'Nova Ordem (O.S.)';
-        document.getElementById('qr-glob-btn-rel-cc').classList.toggle('hidden', !isGestor);
-        document.getElementById('qr-glob-btn-rel-maquina').classList.toggle('hidden', isLider);
+        btnRelCC?.classList.toggle('hidden', !isGestor);
+        btnRelMaq?.classList.toggle('hidden', isLider);
+
+        if (boxBotoes) {
+            boxBotoes.classList.remove('sm:grid-cols-3', 'sm:grid-cols-2');
+            if (isLider) {
+                // Líder vê exclusivamente a opção Abrir Solicitação
+            } else if (isGestor) {
+                boxBotoes.classList.add('sm:grid-cols-3');
+            } else {
+                boxBotoes.classList.add('sm:grid-cols-2');
+            }
+        }
 
         const histBox = document.getElementById('qr-glob-historico-os');
-        histBox.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">Carregando histórico da máquina...</p>';
         document.getElementById('modal-qr-maquina-global').classList.remove('hidden');
         lucide.createIcons();
+
+        // Líderes não possuem permissão de leitura direta na coleção ordens_servico
+        if (isLider) {
+            ordensAtivoQRAtual = [];
+            document.getElementById('qr-glob-qtd-os').textContent = '';
+            histBox.innerHTML = '<p class="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl text-center border border-slate-200">Clique em <strong>Abrir Solicitação</strong> acima para registrar um chamado de manutenção para este equipamento.</p>';
+            return;
+        }
+
+        histBox.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">Carregando histórico da máquina...</p>';
 
         const [osSnap, colSnap] = await Promise.all([
             db.collection('ordens_servico')
@@ -611,13 +636,14 @@ function obterPermissoesSelecionadasFormulario() {
     return checkboxes.map(cb => cb.value);
 }
 
-function preencherPermissoesFormulario(permissoesSalvas) {
+function preencherPermissoesFormulario(permissoesSalvas, perfil = 'Manutentor') {
     const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]'));
     if (checkboxes.length === 0) return;
 
+    const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
     const lista = Array.isArray(permissoesSalvas) && permissoesSalvas.length > 0
         ? permissoesSalvas
-        : ['os', 'solicitacoes'];
+        : padraoPerfil;
 
     checkboxes.forEach(cb => {
         cb.checked = lista.includes(cb.value);
@@ -645,19 +671,19 @@ async function carregarUsuariosPorPerfil(perfil) {
     grid.innerHTML = cacheUsuariosPerfil.map(u => {
         const uIdSeguro = escaparHTML(u.id);
         const uNomeSeguro = escaparHTML(u.nome);
+        const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
         const paginasPermitidas = Array.isArray(u.paginasPermitidas) && u.paginasPermitidas.length > 0
             ? u.paginasPermitidas
-            : ['os', 'solicitacoes'];
+            : padraoPerfil;
 
-        const badgesPaginas = perfil === 'Manutentor'
-            ? `<div class="flex flex-wrap gap-1 mt-2">
+        const badgesPaginas = `
+            <div class="flex flex-wrap gap-1 mt-2">
                 ${paginasPermitidas.map(p => `
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                        ${escaparHTML(ROTULOS_PAGINAS_MANUTENTOR[p] || p)}
+                        ${escaparHTML(ROTULOS_PAGINAS_PERFIL[p] || p)}
                     </span>
                 `).join('')}
-               </div>`
-            : '';
+            </div>`;
 
         return `
         <div class="osync-card p-4 flex items-start justify-between gap-3">
@@ -703,7 +729,8 @@ function abrirModalNovoUsuario(perfil) {
     if (document.getElementById('user-email')) document.getElementById('user-email').required = true;
     if (document.getElementById('user-senha')) document.getElementById('user-senha').required = true;
 
-    preencherPermissoesFormulario(['os', 'solicitacoes']);
+    const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
+    preencherPermissoesFormulario(padraoPerfil, perfil);
     verificarOutraEspecialidade();
     document.getElementById('modal-novo-usuario')?.classList.remove('hidden');
     lucide.createIcons();
@@ -741,7 +768,7 @@ function abrirModalEditarUsuario(userId) {
         document.getElementById('user-setor').value = u.setor || '';
     }
 
-    preencherPermissoesFormulario(u.paginasPermitidas);
+    preencherPermissoesFormulario(u.paginasPermitidas, u.perfil);
     document.getElementById('modal-novo-usuario')?.classList.remove('hidden');
     lucide.createIcons();
 }
@@ -759,14 +786,11 @@ async function salvarNovoUsuario(e) {
     const nome = document.getElementById('user-nome').value.trim();
     const perfil = document.getElementById('user-perfil-alvo').value;
 
-    let paginasPermitidas = [];
-    if (perfil === 'Manutentor') {
-        paginasPermitidas = obterPermissoesSelecionadasFormulario();
-        if (paginasPermitidas.length === 0) {
-            alert('Selecione ao menos uma página que o manutentor terá acesso.');
-            btn.disabled = false;
-            return;
-        }
+    const paginasPermitidas = obterPermissoesSelecionadasFormulario();
+    if (paginasPermitidas.length === 0) {
+        alert('Selecione ao menos uma tela que o usuário terá acesso.');
+        btn.disabled = false;
+        return;
     }
 
     let setor = '';
@@ -782,11 +806,11 @@ async function salvarNovoUsuario(e) {
     if (editId) {
         btn.textContent = 'Salvando...';
         try {
-            const dadosUpdate = { nome, setor };
-            if (perfil === 'Manutentor') {
-                dadosUpdate.paginasPermitidas = paginasPermitidas;
-            }
-            await db.collection('usuarios').doc(editId).update(dadosUpdate);
+            await db.collection('usuarios').doc(editId).update({
+                nome,
+                setor,
+                paginasPermitidas
+            });
             fecharModalNovoUsuario();
             carregarUsuariosPorPerfil(perfil);
             if (typeof mostrarNotificacaoOSync === 'function') {
@@ -809,28 +833,23 @@ async function salvarNovoUsuario(e) {
         const cred = await appSecundario.auth().createUserWithEmailAndPassword(email, password);
         await appSecundario.auth().signOut();
 
-        const novoDoc = {
+        await db.collection('usuarios').doc(cred.user.uid).set({
             empresaId: usuarioAtual.empresaId,
             nome,
             email,
             perfil,
             setor,
+            paginasPermitidas,
             ativo: true,
             statusAcesso: 'aprovado',
             criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        if (perfil === 'Manutentor') {
-            novoDoc.paginasPermitidas = paginasPermitidas;
-        }
-
-        await db.collection('usuarios').doc(cred.user.uid).set(novoDoc);
+        });
 
         fecharModalNovoUsuario();
         e.target.reset();
         carregarUsuariosPorPerfil(perfil);
         if (typeof mostrarNotificacaoOSync === 'function') {
-            mostrarNotificacaoOSync('Manutentor cadastrado com as permissões selecionadas!', 'sucesso');
+            mostrarNotificacaoOSync('Cadastro criado com as permissões selecionadas!', 'sucesso');
         }
     } catch (err) {
         alert('Erro ao criar acesso: ' + err.message);
