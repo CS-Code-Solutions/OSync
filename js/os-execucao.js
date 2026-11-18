@@ -32,6 +32,18 @@ function recalcularTempoParadaEncerramento() {
     badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+function recalcularTempoTrabalhoEncerramento() {
+    const ini = document.getElementById('enc-inicio-trabalho')?.value || '';
+    const fim = document.getElementById('enc-data-hora')?.value || '';
+    const badge = document.getElementById('enc-tempo-trabalho-calculado');
+    if (!badge) return;
+
+    const mins = calcularMinutosParadaEntreDatas(ini, fim);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
 async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
@@ -77,13 +89,38 @@ async function abrirDetalhesOS(osId) {
         db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get()
     ]);
 
-    const selManut = document.getElementById('det-os-manutentor-select');
-    selManut.innerHTML = '<option value="">-- Sem técnico --</option>' +
-        manutSnap.docs.map(d => {
-            const nomeSeg = escaparHTML(d.data().nome);
-            return `<option value="${escaparHTML(d.id)}" data-nome="${nomeSeg}" ${d.id === os.manutentorId ? 'selected' : ''}>${nomeSeg}</option>`;
-        }).join('');
-    selManut.disabled = usuarioAtual.perfil === 'Manutentor';
+    const idsSelecionados = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
+        ? os.manutentoresIds
+        : (os.manutentorId ? [os.manutentorId] : []);
+
+    const listaManutDet = document.getElementById('det-os-manutentores-lista');
+    const manutentoresOrdenados = manutSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+    if (listaManutDet) {
+        if (manutentoresOrdenados.length === 0) {
+            listaManutDet.innerHTML = '<span class="text-[11px] text-slate-400">Nenhum técnico cadastrado.</span>';
+        } else {
+            listaManutDet.innerHTML = manutentoresOrdenados.map(m => {
+                const idSeg = escaparHTML(m.id);
+                const nomeSeg = escaparHTML(m.nome);
+                const marcado = idsSelecionados.includes(m.id);
+                return `
+                <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 cursor-pointer text-xs select-none">
+                    <input type="checkbox" name="det-os-manutentor-check" value="${idSeg}" data-nome="${nomeSeg}"
+                        ${marcado ? 'checked' : ''}
+                        onchange="atualizarManutentorRapidoOS()"
+                        class="w-3.5 h-3.5 accent-blue-600 rounded shrink-0">
+                    <span class="font-semibold text-slate-800 truncate">${nomeSeg}</span>
+                </label>`;
+            }).join('');
+        }
+    }
+    const badgeManut = document.getElementById('det-os-manutentores-badge');
+    if (badgeManut) {
+        badgeManut.textContent = `${idsSelecionados.length} selecionado${idsSelecionados.length === 1 ? '' : 's'}`;
+    }
 
     cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const selCC = document.getElementById('item-custo-cc');
@@ -107,7 +144,20 @@ async function abrirDetalhesOS(osId) {
     const agora = new Date();
     agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
     const agoraISO = agora.toISOString().slice(0, 16);
+
+    let inicioPadraoOS = os.inicioExecucao || os.inicioParada || '';
+    if (!inicioPadraoOS && os.criadoEm?.toDate) {
+        const dCriado = os.criadoEm.toDate();
+        dCriado.setMinutes(dCriado.getMinutes() - dCriado.getTimezoneOffset());
+        inicioPadraoOS = dCriado.toISOString().slice(0, 16);
+    }
+
+    const inpIniTrab = document.getElementById('enc-inicio-trabalho');
+    if (inpIniTrab) {
+        inpIniTrab.value = inicioPadraoOS || agoraISO;
+    }
     document.getElementById('enc-data-hora').value = os.dataHoraEncerramento || agoraISO;
+    recalcularTempoTrabalhoEncerramento();
 
     const blocoParada = document.getElementById('bloco-encerramento-parada');
     const inpIniParada = document.getElementById('enc-inicio-parada');
@@ -118,13 +168,7 @@ async function abrirDetalhesOS(osId) {
             inpIniParada.required = true;
             inpFimParada.required = true;
 
-            let inicioPadrao = os.inicioParada;
-            if (!inicioPadrao && os.criadoEm?.toDate) {
-                const dCriado = os.criadoEm.toDate();
-                dCriado.setMinutes(dCriado.getMinutes() - dCriado.getTimezoneOffset());
-                inicioPadrao = dCriado.toISOString().slice(0, 16);
-            }
-            inpIniParada.value = inicioPadrao || agoraISO;
+            inpIniParada.value = os.inicioParada || inicioPadraoOS || agoraISO;
             inpFimParada.value = os.terminoParada || agoraISO;
             recalcularTempoParadaEncerramento();
         } else {
@@ -224,12 +268,20 @@ async function atualizarStatusRapidoOS() {
 
 async function atualizarManutentorRapidoOS() {
     const osId = document.getElementById('det-os-id').value;
-    const sel = document.getElementById('det-os-manutentor-select');
-    const opt = sel.options[sel.selectedIndex];
+    const checks = Array.from(document.querySelectorAll('input[name="det-os-manutentor-check"]:checked'));
+    const manutentoresIds = checks.map(c => c.value);
+    const manutentoresNomes = checks.map(c => c.getAttribute('data-nome') || '');
+
+    const badgeManut = document.getElementById('det-os-manutentores-badge');
+    if (badgeManut) {
+        badgeManut.textContent = `${manutentoresIds.length} selecionado${manutentoresIds.length === 1 ? '' : 's'}`;
+    }
 
     await db.collection('ordens_servico').doc(osId).update({
-        manutentorId: sel.value || '',
-        manutentorNome: sel.value ? (opt?.getAttribute('data-nome') || '') : ''
+        manutentorId: manutentoresIds[0] || '',
+        manutentorNome: manutentoresNomes.join(', '),
+        manutentoresIds,
+        manutentoresNomes
     });
 }
 
@@ -382,6 +434,16 @@ async function confirmarEncerramentoOS(e) {
             tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
         }
 
+        const inicioExecucao = document.getElementById('enc-inicio-trabalho')?.value || '';
+        const dataHoraEncerramento = document.getElementById('enc-data-hora').value;
+        if (inicioExecucao && dataHoraEncerramento && new Date(dataHoraEncerramento) < new Date(inicioExecucao)) {
+            alert('A data/hora do encerramento não pode ser anterior ao início do trabalho.');
+            btn.disabled = false;
+            btn.textContent = 'Confirmar Encerramento';
+            return;
+        }
+        const tempoTrabalhoMinutos = calcularMinutosParadaEntreDatas(inicioExecucao, dataHoraEncerramento);
+
         const descPendente = document.getElementById('item-custo-desc')?.value.trim();
         const valorPendente = parseFloat(document.getElementById('item-custo-valor')?.value) || 0;
         if (valorPendente > 0) {
@@ -394,9 +456,12 @@ async function confirmarEncerramentoOS(e) {
         }
 
         const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
-        const dataHoraEncerramento = document.getElementById('enc-data-hora').value;
         const observacoes = document.getElementById('enc-observacoes').value.trim();
         const custoTotal = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
+
+        const checksManut = Array.from(document.querySelectorAll('input[name="det-os-manutentor-check"]:checked'));
+        const manutentoresIds = checksManut.map(c => c.value);
+        const manutentoresNomes = checksManut.map(c => c.getAttribute('data-nome') || '');
 
         const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
 
@@ -407,7 +472,13 @@ async function confirmarEncerramentoOS(e) {
             custoTotal,
             centroCustoId: os?.ativoId || '',
             centroCustoNome: padraoMaquina,
+            inicioExecucao,
             dataHoraEncerramento,
+            tempoTrabalhoMinutos,
+            manutentorId: manutentoresIds[0] || '',
+            manutentorNome: manutentoresNomes.join(', '),
+            manutentoresIds,
+            manutentoresNomes,
             observacoes,
             encerrada: true,
             encerradoPor: usuarioAtual.nome,
