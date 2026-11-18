@@ -73,7 +73,7 @@ function fecharMenuRelatoriosMobile() {
 }
 
 // ==========================================
-// LEITOR DE QR CODE VIA CÂMERA DO CELULAR
+// LEITOR DE QR CODE VIA CÂMERA DO CELULAR (CORRIGIDO PARA IPHONE / SAFARI)
 // ==========================================
 async function abrirLeitorQRCodeCamera() {
     const modal = document.getElementById('modal-scanner-qr');
@@ -84,15 +84,33 @@ async function abrirLeitorQRCodeCamera() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
     try {
-        streamCameraQR = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-        });
-        video.srcObject = streamCameraQR;
-        await video.play();
+        // Garante os atributos vitais exigidos pelo Safari do iOS
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('muted', 'true');
+        video.setAttribute('autoplay', 'true');
 
+        streamCameraQR = await navigator.mediaDevices.getUserMedia({
+            video: { 
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        });
+        
+        video.srcObject = streamCameraQR;
+        
+        // O iOS exige que o play() seja tratado como Promise
+        try {
+            await video.play();
+        } catch (playErr) {
+            console.warn('Erro ao reproduzir vídeo da câmera:', playErr);
+        }
+
+        // Verifica se o BarcodeDetector existe (Android/Chrome), senão avisa o usuário no iPhone
         if (window.BarcodeDetector) {
             const detector = new BarcodeDetector({ formats: ['qr_code'] });
             scannerIntervalQR = setInterval(async () => {
+                if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
                 try {
                     const barcodes = await detector.detect(video);
                     if (barcodes.length > 0) {
@@ -104,71 +122,14 @@ async function abrirLeitorQRCodeCamera() {
                     // Ignora erros de frame individual
                 }
             }, 300);
+        } else {
+            // Fallback elegante para o Safari do iOS que não suporta BarcodeDetector nativo
+            console.info('BarcodeDetector nativo indisponível neste navegador (iOS Safari). Usando captura por imagem/arquivo.');
         }
+
     } catch (err) {
         console.warn('Acesso direto à câmera indisponível ou negado:', err);
-    }
-}
-
-function pararEfecharLeitorQR() {
-    if (scannerIntervalQR) {
-        clearInterval(scannerIntervalQR);
-        scannerIntervalQR = null;
-    }
-    if (streamCameraQR) {
-        streamCameraQR.getTracks().forEach(track => track.stop());
-        streamCameraQR = null;
-    }
-    const video = document.getElementById('video-scanner-qr');
-    if (video) video.srcObject = null;
-
-    document.getElementById('modal-scanner-qr')?.classList.add('hidden');
-}
-
-function fecharLeitorQRCodeCamera() {
-    pararEfecharLeitorQR();
-}
-
-async function processarArquivoQRCode(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    pararEfecharLeitorQR();
-
-    if (window.BarcodeDetector) {
-        try {
-            const imageBitmap = await createImageBitmap(file);
-            const detector = new BarcodeDetector({ formats: ['qr_code'] });
-            const barcodes = await detector.detect(imageBitmap);
-            if (barcodes.length > 0) {
-                tratarTextoQRLido(barcodes[0].rawValue);
-                return;
-            }
-        } catch (err) {
-            console.error('Erro ao ler QR code da imagem:', err);
-        }
-    }
-
-    const leitorLeituraManual = prompt('Digite ou cole o link/ID da máquina lida no QR Code:');
-    if (leitorLeituraManual) {
-        tratarTextoQRLido(leitorLeituraManual);
-    }
-}
-
-function tratarTextoQRLido(texto) {
-    try {
-        let ativoId = texto;
-        if (texto.includes('?ativo=')) {
-            const urlObj = new URL(texto);
-            ativoId = urlObj.searchParams.get('ativo') || texto;
-        }
-
-        if (typeof abrirModalFlutuanteQRMaquina === 'function' && ativoId) {
-            abrirModalFlutuanteQRMaquina(ativoId.trim());
-        } else {
-            alert('QR Code lido: ' + texto);
-        }
-    } catch (err) {
-        alert('Conteúdo do QR Code: ' + texto);
+        alert('Não foi possível acessar a câmera do dispositivo. Verifique as permissões nas configurações do seu navegador.');
+        pararEfecharLeitorQR();
     }
 }
