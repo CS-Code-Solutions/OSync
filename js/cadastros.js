@@ -104,10 +104,11 @@ function renderizarListaAtivos(ativos) {
         const tituloAtivoSeguro = escaparHTML(formatarRotuloAtivo(ativo));
         const tipoEquipSeguro = ativo.tipoEquipamento ? escaparHTML(ativo.tipoEquipamento) : '';
         const serieSeguro = ativo.numeroSerie ? escaparHTML(ativo.numeroSerie) : '';
+        const descricaoSegura = ativo.descricao ? escaparHTML(ativo.descricao) : '';
 
         return `
         <div class="osync-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div class="space-y-1">
+            <div class="space-y-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="font-extrabold text-base text-slate-900">${tituloAtivoSeguro}</span>
                     ${tipoEquipSeguro ? `
@@ -127,9 +128,10 @@ function renderizarListaAtivos(ativos) {
                     <span>Modelo: ${escaparHTML(ativo.modelo || 'N/I')}</span>
                     ${serieSeguro ? `<span>•</span><span>Série: <strong class="text-slate-700">${serieSeguro}</strong></span>` : ''}
                 </div>
+                ${descricaoSegura ? `<p class="text-xs text-slate-600 line-clamp-2 pt-0.5">${descricaoSegura}</p>` : ''}
             </div>
 
-            <div class="flex items-center gap-1.5 self-end sm:self-center">
+            <div class="flex items-center gap-1.5 self-end sm:self-center shrink-0">
                 <button onclick="abrirProntuarioAtivo('${ativoIdSeguro}')" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition">
                     <i data-lucide="qr-code" class="w-4 h-4"></i>
                     <span>QR Code & Prontuário</span>
@@ -150,7 +152,7 @@ function renderizarListaAtivos(ativos) {
 function filtrarAtivos() {
     const termo = (document.getElementById('busca-ativos')?.value || '').toLowerCase();
     const filtrados = cacheAtivos.filter(a =>
-        `${a.codigoTag || ''} ${a.nome} ${a.tipoEquipamento || ''} ${a.fabricante || ''} ${a.modelo || ''} ${a.numeroSerie || ''} ${a.setor || ''}`.toLowerCase().includes(termo)
+        `${a.codigoTag || ''} ${a.nome} ${a.tipoEquipamento || ''} ${a.fabricante || ''} ${a.modelo || ''} ${a.numeroSerie || ''} ${a.setor || ''} ${a.descricao || ''}`.toLowerCase().includes(termo)
     );
     renderizarListaAtivos(filtrados);
 }
@@ -160,6 +162,9 @@ async function abrirModalNovoAtivo() {
     if (form) form.reset();
 
     document.getElementById('ativo-edit-id').value = '';
+    const descEl = document.getElementById('ativo-descricao');
+    if (descEl) descEl.value = '';
+
     document.getElementById('modal-ativo-titulo').textContent = 'Cadastrar Novo Ativo';
     document.getElementById('btn-salvar-ativo').textContent = 'Salvar Máquina';
 
@@ -182,6 +187,9 @@ async function abrirModalEditarAtivo(ativoId) {
     document.getElementById('ativo-numero-serie').value = ativo.numeroSerie || '';
     document.getElementById('ativo-setor').value = ativo.setor || '';
     document.getElementById('ativo-status').value = ativo.status || 'Operacional';
+    if (document.getElementById('ativo-descricao')) {
+        document.getElementById('ativo-descricao').value = ativo.descricao || '';
+    }
 
     await carregarTiposEquipamentoSelect(ativo.tipoEquipamento || '');
     document.getElementById('modal-novo-ativo')?.classList.remove('hidden');
@@ -206,6 +214,7 @@ async function salvarNovoAtivo(e) {
         const numeroSerie = document.getElementById('ativo-numero-serie').value.trim();
         const setor = document.getElementById('ativo-setor').value.trim();
         const status = document.getElementById('ativo-status').value;
+        const descricao = (document.getElementById('ativo-descricao')?.value || '').trim();
 
         const rotuloCompleto = codigoTag ? `${codigoTag} - ${nome}` : nome;
 
@@ -218,7 +227,8 @@ async function salvarNovoAtivo(e) {
                 modelo,
                 numeroSerie,
                 setor,
-                status
+                status,
+                descricao
             });
 
             await db.collection('centros_custo').doc(editId).set({
@@ -247,6 +257,7 @@ async function salvarNovoAtivo(e) {
                 numeroSerie,
                 setor,
                 status,
+                descricao,
                 criadoEm: firebase.firestore.FieldValue.serverTimestamp()
             });
 
@@ -303,6 +314,19 @@ async function abrirProntuarioAtivo(ativoId) {
     document.getElementById('prontuario-fab-mod').textContent = `${ativo.fabricante || '-'} / ${ativo.modelo || '-'}`;
     document.getElementById('prontuario-serie').textContent = ativo.numeroSerie || 'Não informado';
     document.getElementById('prontuario-status').textContent = ativo.status;
+
+    const boxDesc = document.getElementById('prontuario-descricao-box');
+    const txtDesc = document.getElementById('prontuario-descricao');
+    if (boxDesc && txtDesc) {
+        if ((ativo.descricao || '').trim()) {
+            txtDesc.textContent = ativo.descricao;
+            boxDesc.classList.remove('hidden');
+        } else {
+            txtDesc.textContent = '';
+            boxDesc.classList.add('hidden');
+        }
+    }
+
     document.getElementById('qrcode-label').textContent = `${ativo.codigoTag || ativo.nome} • OSync`;
 
     const qrContainer = document.getElementById('qrcode-container');
@@ -1115,6 +1139,7 @@ function processarPlanilhaAtivosTemp(event) {
             const idxSerie = cabecalhos.findIndex(c => c === 'nº serie' || c === 'no serie' || c === 'numero de serie' || c === 'serie');
             const idxStatus = cabecalhos.findIndex(c => c === 'status equipamento' || c === 'status');
             const idxLocal = cabecalhos.findIndex(c => c === 'localizacao' || c === 'setor');
+            const idxDesc = cabecalhos.findIndex(c => c === 'descricao' || c === 'observacoes' || c === 'detalhes');
 
             const listaExtraida = [];
             for (let r = idxHeader + 1; r < matriz.length; r++) {
@@ -1128,6 +1153,7 @@ function processarPlanilhaAtivosTemp(event) {
                 const numSerie = idxSerie >= 0 ? String(row[idxSerie] ?? '').trim() : '';
                 const statusBruto = idxStatus >= 0 ? String(row[idxStatus] ?? '').trim() : '';
                 const setorLocal = idxLocal >= 0 ? String(row[idxLocal] ?? '').trim() : '';
+                const descEquip = idxDesc >= 0 ? String(row[idxDesc] ?? '').trim() : '';
 
                 listaExtraida.push({
                     codigoTag: '',
@@ -1137,7 +1163,8 @@ function processarPlanilhaAtivosTemp(event) {
                     modelo: '',
                     numeroSerie: numSerie,
                     setor: setorLocal,
-                    status: mapearStatusPlanilhaAtivo(statusBruto)
+                    status: mapearStatusPlanilhaAtivo(statusBruto),
+                    descricao: descEquip
                 });
             }
 
@@ -1257,6 +1284,7 @@ async function confirmarImportacaoPlanilhaAtivos() {
                 numeroSerie: item.numeroSerie,
                 setor: item.setor,
                 status: item.status,
+                descricao: item.descricao || '',
                 criadoEm: firebase.firestore.FieldValue.serverTimestamp()
             });
 
