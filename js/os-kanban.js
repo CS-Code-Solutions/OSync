@@ -14,6 +14,27 @@ function formatarDuracaoParadaOS(minutos) {
     return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+// Helper universal para obter lista de manutentores (compatível com O.S. antigas e múltiplas)
+function obterManutentoresDaOS(os) {
+    if (Array.isArray(os?.manutentoresIds) && os.manutentoresIds.length > 0) {
+        const nomes = Array.isArray(os.manutentoresNomes) ? os.manutentoresNomes : [];
+        return os.manutentoresIds.map((id, idx) => ({
+            id,
+            nome: nomes[idx] || os.manutentorNome || 'Técnico'
+        }));
+    }
+    if (os?.manutentorId) {
+        return [{ id: os.manutentorId, nome: os.manutentorNome || 'Técnico' }];
+    }
+    return [];
+}
+
+function formatarNomesManutentoresOS(os) {
+    const lista = obterManutentoresDaOS(os);
+    if (lista.length === 0) return '';
+    return lista.map(m => m.nome).join(', ');
+}
+
 function ajustarLarguraContainerKanban(expandir) {
     const main = document.getElementById('app-content');
     if (!main) return;
@@ -84,7 +105,7 @@ function iniciarListenerOrdensServico() {
                 return;
             }
 
-          cacheOrdensServico = snap.docs
+            cacheOrdensServico = snap.docs
                 .map(d => ({ id: d.id, ...d.data() }))
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
 
@@ -106,9 +127,13 @@ function obterOrdensFiltradas() {
     return cacheOrdensServico.filter(os => {
         if (colId && os.colunaId !== colId) return false;
         if (prio && os.prioridade !== prio) return false;
-        if (manutId && os.manutentorId !== manutId) return false;
+        if (manutId) {
+            const listaManut = obterManutentoresDaOS(os);
+            if (!listaManut.some(m => m.id === manutId)) return false;
+        }
         if (busca) {
-            const texto = `${os.numeroOs} ${os.ativoTag} ${os.ativoNome} ${os.descricao} ${os.tipoNome}`.toLowerCase();
+            const nomesTecnicos = formatarNomesManutentoresOS(os);
+            const texto = `${os.numeroOs} ${os.ativoTag} ${os.ativoNome} ${os.descricao} ${os.tipoNome} ${nomesTecnicos}`.toLowerCase();
             if (!texto.includes(busca)) return false;
         }
         return true;
@@ -139,6 +164,8 @@ function renderizarCardsMobile(ordens) {
         const numFormatado = `#OS-${String(Number(os.numeroOs) || 0).padStart(4, '0')}`;
         const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
         const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
+        const nomesTecnicos = formatarNomesManutentoresOS(os);
+        const qtdTecnicos = obterManutentoresDaOS(os).length;
 
         return `
         <div onclick="abrirDetalhesOS('${osIdSeguro}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left-color: ${corStatus}">
@@ -163,10 +190,10 @@ function renderizarCardsMobile(ordens) {
                     ${escaparHTML(os.tipoNome || 'Manutenção')}
                 </span>
 
-                ${os.manutentorNome ? `
+                ${nomesTecnicos ? `
                 <span class="inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
-                    <i data-lucide="wrench" class="w-3 h-3"></i>
-                    ${escaparHTML(os.manutentorNome)}
+                    <i data-lucide="${qtdTecnicos > 1 ? 'users' : 'wrench'}" class="w-3 h-3"></i>
+                    ${escaparHTML(nomesTecnicos)}
                 </span>` : `
                 <span class="text-slate-400 italic">Sem técnico definido</span>`}
             </div>
@@ -206,6 +233,7 @@ function renderizarKanbanDesktop(ordens) {
                     const osIdSeguro = escaparHTML(os.id);
                     const ehParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true;
                     const ehParcial = os.condicaoMaquina === 'Parcialmente funcional';
+                    const nomesTecnicos = formatarNomesManutentoresOS(os) || 'Sem técnico';
                     return `
                 <div draggable="true" ondragstart="event.dataTransfer.setData('osId', '${osIdSeguro}')" onclick="abrirDetalhesOS('${osIdSeguro}')"
                      class="osync-card p-3 cursor-pointer hover:shadow-md transition" style="border-left-color: ${corCol}">
@@ -218,8 +246,8 @@ function renderizarKanbanDesktop(ordens) {
                     ${ehParcial ? `<span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Parcialmente Funcional</span>` : ''}
                     <p class="text-[11.5px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">${escaparHTML(os.descricao)}</p>
                     <div class="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-slate-100 text-[10.5px]">
-                        <span class="font-semibold text-slate-600 truncate">${escaparHTML(os.tipoNome || 'Geral')}</span>
-                        <span class="font-semibold text-blue-700 truncate text-right">${escaparHTML(os.manutentorNome || 'Sem técnico')}</span>
+                        <span class="font-semibold text-slate-600 truncate shrink-0">${escaparHTML(os.tipoNome || 'Geral')}</span>
+                        <span class="font-semibold text-blue-700 truncate text-right" title="${escaparHTML(nomesTecnicos)}">${escaparHTML(nomesTecnicos)}</span>
                     </div>
                 </div>`;
                 }).join('') : `
@@ -415,7 +443,7 @@ async function excluirColunaModalOS(colId) {
 }
 
 // ==========================================
-// MODAL NOVA O.S.
+// MODAL NOVA O.S. (COM MÚLTIPLOS MANUTENTORES)
 // ==========================================
 function verificarTipoManutencaoCriacao() {}
 
@@ -435,6 +463,14 @@ function alternarCampoParadaCriacaoOS() {
         box.classList.add('hidden');
         input.required = false;
         input.value = '';
+    }
+}
+
+function atualizarContadorManutentoresNovaOS() {
+    const marcados = document.querySelectorAll('input[name="os-manutentor-check"]:checked').length;
+    const badge = document.getElementById('os-manutentores-contador');
+    if (badge) {
+        badge.textContent = `${marcados} selecionado${marcados === 1 ? '' : 's'}`;
     }
 }
 
@@ -466,15 +502,30 @@ async function abrirModalNovaOS() {
         `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`
     ).join('');
 
-    const selectManut = document.getElementById('os-manutentor');
-    if (usuarioAtual.perfil === 'Manutentor') {
-        selectManut.innerHTML = `<option value="${escaparHTML(usuarioAtual.id)}" data-nome="${escaparHTML(usuarioAtual.nome)}" selected>${escaparHTML(usuarioAtual.nome)}</option>`;
-        selectManut.disabled = true;
+    const listaManut = document.getElementById('os-manutentores-lista');
+    const ehManutentorLogado = usuarioAtual.perfil === 'Manutentor';
+    const manutentoresOrdenados = manutSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+    if (manutentoresOrdenados.length === 0) {
+        listaManut.innerHTML = '<span class="text-xs text-slate-400 col-span-2 p-1">Nenhum manutentor cadastrado.</span>';
     } else {
-        selectManut.disabled = false;
-        selectManut.innerHTML = '<option value="">-- Não atribuído --</option>' +
-            manutSnap.docs.map(d => `<option value="${escaparHTML(d.id)}" data-nome="${escaparHTML(d.data().nome)}">${escaparHTML(d.data().nome)}</option>`).join('');
+        listaManut.innerHTML = manutentoresOrdenados.map(m => {
+            const idSeg = escaparHTML(m.id);
+            const nomeSeg = escaparHTML(m.nome);
+            const proprioManut = ehManutentorLogado && m.id === usuarioAtual.id;
+            return `
+            <label class="flex items-center gap-2 px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-blue-400 text-xs select-none">
+                <input type="checkbox" name="os-manutentor-check" value="${idSeg}" data-nome="${nomeSeg}"
+                    ${proprioManut ? 'checked' : ''}
+                    onchange="atualizarContadorManutentoresNovaOS()"
+                    class="w-3.5 h-3.5 accent-blue-600 rounded shrink-0">
+                <span class="font-semibold text-slate-800 truncate">${nomeSeg}</span>
+            </label>`;
+        }).join('');
     }
+    atualizarContadorManutentoresNovaOS();
 }
 
 function fecharModalNovaOS() {
@@ -494,12 +545,14 @@ async function salvarNovaOS(e) {
         const selTipo = document.getElementById('os-tipo');
         const optTipo = selTipo.options[selTipo.selectedIndex];
 
-        const selManut = document.getElementById('os-manutentor');
-        const optManut = selManut.options[selManut.selectedIndex];
+        const checksManut = Array.from(document.querySelectorAll('input[name="os-manutentor-check"]:checked'));
+        const manutentoresIds = checksManut.map(c => c.value);
+        const manutentoresNomes = checksManut.map(c => c.getAttribute('data-nome') || '');
 
         const condicaoMaquina = document.getElementById('os-condicao-maquina')?.value || 'Operacional';
         const ehMaquinaParada = condicaoMaquina === 'Maquina parada';
         const inicioParada = ehMaquinaParada ? (document.getElementById('os-inicio-parada')?.value || obterDataHoraLocalInput()) : '';
+        const inicioExecucao = obterDataHoraLocalInput();
 
         const maiorNum = cacheOrdensServico.reduce((max, o) => Math.max(max, o.numeroOs || 0), 0);
 
@@ -518,8 +571,15 @@ async function salvarNovaOS(e) {
             inicioParada,
             terminoParada: '',
             tempoParadaMinutos: 0,
-            manutentorId: selManut.value || '',
-            manutentorNome: selManut.value ? (optManut?.getAttribute('data-nome') || '') : '',
+            inicioExecucao,
+            tempoTrabalhoMinutos: 0,
+            // Compatibilidade com O.S. antigas + suporte a múltiplos manutentores
+            manutentorId: manutentoresIds[0] || '',
+            manutentorNome: manutentoresNomes.join(', '),
+            manutentoresIds,
+            manutentoresNomes,
+            abertoPorId: usuarioAtual.id || '',
+            abertoPorNome: usuarioAtual.nome || '',
             descricao: document.getElementById('os-descricao').value.trim(),
             custoTotal: 0,
             encerrada: false,
