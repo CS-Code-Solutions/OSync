@@ -146,62 +146,35 @@ async function carregarPreferenciasLayoutDashboard() {
     }
 }
 
-async function carregarDadosBrutosDashboard() {
-    const [osSnap, ativosSnap, solSnap, colSnap] = await Promise.all([
-        db.collection('ordens_servico').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('solicitacoes').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get()
+async function carregarDadosBrutosDashboard(completo = false) {
+    const [ordens, ativos, solicitacoes, colunas] = await Promise.all([
+        OSyncDataStore.getOrdensServico({ completo }),
+        OSyncDataStore.getAtivos(),
+        OSyncDataStore.getSolicitacoes(),
+        OSyncDataStore.getColunasKanban()
     ]);
 
-    cacheDashColunas = colSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-    cacheDashAtivos = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    cacheDashSolicitacoes = solSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    cacheDashOrdens = osSnap.docs.map(d => {
-        const data = d.data();
-        return {
-            id: d.id,
-            ...data,
-            dataISO: OSyncUtils.extrairDataISO(data)
-        };
-    });
+    cacheDashColunas = colunas;
+    cacheDashAtivos = ativos;
+    cacheDashSolicitacoes = solicitacoes;
+    cacheDashOrdens = ordens.map(data => ({
+        ...data,
+        dataISO: OSyncUtils.extrairDataISO(data)
+    }));
 }
 
-function obterOrdensFiltradasDashboard() {
-    const periodo = document.getElementById('dash-filtro-periodo')?.value || 'mes_atual';
-    const hoje = new Date();
-    const anoAtual = hoje.getFullYear();
-    const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
-
-    return cacheDashOrdens.filter(os => {
-        if (periodo === 'total') return true;
-        if (!os.dataISO) return true;
-
-        if (periodo === 'mes_atual') {
-            return os.dataISO.startsWith(`${anoAtual}-${mesAtual}`);
-        }
-        if (periodo === 'ano_atual') {
-            return os.dataISO.startsWith(`${anoAtual}-`);
-        }
-        if (periodo === 'ultimos_30d') {
-            const limite = new Date();
-            limite.setDate(limite.getDate() - 30);
-            return new Date(os.dataISO) >= limite;
-        }
-        return true;
-    });
-}
-
-function destruirGraficosAnteriores() {
-    Object.values(instanciasGraficosDash).forEach(chart => {
-        if (chart && typeof chart.destroy === 'function') chart.destroy();
-    });
-    instanciasGraficosDash = {};
-}
-
-function renderizarWidgetsDashboard() {
+async function renderizarWidgetsDashboard() {
     const container = document.getElementById('dashboard-widgets-container');
     if (!container) return;
+
+    const periodo = document.getElementById('dash-filtro-periodo')?.value || 'mes_atual';
+    const exigeCompleto = periodo === 'total' || periodo === 'ano_atual';
+
+    // Lazy Loading: busca histórico completo somente se o usuário pedir Ano Atual ou Total
+    if (exigeCompleto && !OSyncDataStore.isHistoricoCompletoCarregado()) {
+        renderizarSkeletonDashboard();
+        await carregarDadosBrutosDashboard(true);
+    }
 
     destruirGraficosAnteriores();
 
@@ -256,7 +229,6 @@ function renderizarWidgetsDashboard() {
         if (w.id === 'lista_os_urgentes') preencherListaOSUrgentes();
     });
 }
-
 // ==========================================
 // CONSTRUTORES DE HTML DOS BLOCOS
 // ==========================================
