@@ -15,9 +15,6 @@ async function carregarDadosCentrosCusto() {
         OSyncDataStore.getOrdensServico({ completo: true })
     ]);
 
-    const ativos = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const ordens = osSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
     let totalGeralFabrica = 0;
     let totalOSComCusto = 0;
 
