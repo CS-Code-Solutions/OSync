@@ -73,7 +73,7 @@ function fecharMenuRelatoriosMobile() {
 }
 
 // ==========================================
-// LEITOR DE QR CODE HÍBRIDO (NATIVO ANDROID/SAMSUNG + JSQR IPHONE)
+// LEITOR DE QR CODE UNIVERSAL (NATIVO + JSQR PARA IPHONE E ANDROID)
 // ==========================================
 async function abrirLeitorQRCodeCamera() {
     const modal = document.getElementById('modal-scanner-qr');
@@ -99,7 +99,7 @@ async function abrirLeitorQRCodeCamera() {
         video.srcObject = streamCameraQR;
         await video.play();
 
-        // 1. TENTA USAR O BARCODE DETECTOR NATIVO (Samsung / Android / Chrome)
+        // 1. Se o navegador tiver suporte nativo (Android / Chrome / Samsung)
         if (window.BarcodeDetector) {
             const detector = new BarcodeDetector({ formats: ['qr_code'] });
             scannerIntervalQR = setInterval(async () => {
@@ -111,12 +111,10 @@ async function abrirLeitorQRCodeCamera() {
                         pararEfecharLeitorQR();
                         tratarTextoQRLido(codigoLido);
                     }
-                } catch (e) {
-                    // Ignora erros de frame individual
-                }
+                } catch (e) {}
             }, 250);
         } 
-        // 2. SE NÃO TIVER NATIVO (iPhone / Safari), USA O JSQR
+        // 2. Se NÃO tiver suporte nativo (iPhone / Safari), usa o jsQR via canvas
         else {
             const canvasElement = document.createElement('canvas');
             const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
@@ -142,17 +140,34 @@ async function abrirLeitorQRCodeCamera() {
                             tratarTextoQRLido(codigoLido);
                         }
                     }
-                } catch (frameErr) {
-                    // Evita travamento de frame
-                }
+                } catch (frameErr) {}
             }, 250);
         }
 
     } catch (err) {
-        console.warn('Acesso à câmera indisponível ou negado:', err);
-        alert('Não foi possível acessar a câmera. Verifique as permissões do dispositivo.');
+        console.warn('Acesso direto à câmera indisponível ou negado:', err);
+        alert('Não foi possível acessar a câmera. Verifique as permissões nas configurações do dispositivo.');
         pararEfecharLeitorQR();
     }
+}
+
+function pararEfecharLeitorQR() {
+    if (scannerIntervalQR) {
+        clearInterval(scannerIntervalQR);
+        scannerIntervalQR = null;
+    }
+    if (streamCameraQR) {
+        streamCameraQR.getTracks().forEach(track => track.stop());
+        streamCameraQR = null;
+    }
+    const video = document.getElementById('video-scanner-qr');
+    if (video) video.srcObject = null;
+
+    document.getElementById('modal-scanner-qr')?.classList.add('hidden');
+}
+
+function fecharLeitorQRCodeCamera() {
+    pararEfecharLeitorQR();
 }
 
 async function processarArquivoQRCode(e) {
@@ -161,7 +176,7 @@ async function processarArquivoQRCode(e) {
 
     pararEfecharLeitorQR();
 
-    // Tenta primeiro via BarcodeDetector se disponível em imagem
+    // Tenta via BarcodeDetector de imagem se suportado
     if (window.BarcodeDetector) {
         try {
             const imageBitmap = await createImageBitmap(file);
@@ -171,12 +186,10 @@ async function processarArquivoQRCode(e) {
                 tratarTextoQRLido(barcodes[0].rawValue);
                 return;
             }
-        } catch (err) {
-            console.log('BarcodeDetector de imagem falhou, tentando via jsQR...');
-        }
+        } catch (err) {}
     }
 
-    // Fallback via FileReader + jsQR para fotos (iPhone e Android)
+    // Fallback universal via FileReader e jsQR para iPhone e Android (ao tirar foto)
     const reader = new FileReader();
     reader.onload = function (event) {
         const img = new Image();
@@ -198,13 +211,30 @@ async function processarArquivoQRCode(e) {
                         return;
                     }
                 }
-                alert('Nenhum QR Code legível foi encontrado nesta foto.');
+                alert('Nenhum QR Code legível foi encontrado nesta foto. Tente aproximar mais.');
             } catch (err) {
-                console.error('Erro ao ler pixels da imagem:', err);
                 alert('Erro ao processar os pixels da imagem.');
             }
         };
         img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+function tratarTextoQRLido(texto) {
+    try {
+        let ativoId = texto;
+        if (texto.includes('?ativo=')) {
+            const urlObj = new URL(texto);
+            ativoId = urlObj.searchParams.get('ativo') || texto;
+        }
+
+        if (typeof abrirModalFlutuanteQRMaquina === 'function' && ativoId) {
+            abrirModalFlutuanteQRMaquina(ativoId.trim());
+        } else {
+            alert('QR Code lido: ' + texto);
+        }
+    } catch (err) {
+        alert('Conteúdo do QR Code: ' + texto);
+    }
 }
