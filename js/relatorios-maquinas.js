@@ -6,20 +6,17 @@ async function initRelatoriosMaquinas() {
         grid.innerHTML = OSyncUtils.gerarSkeletonCards(6);
     }
 
-    const [ativosSnap, osSnap, colSnap] = await Promise.all([
-        db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('ordens_servico').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get()
+    const [ativos, ordensRaw, colunas] = await Promise.all([
+        OSyncDataStore.getAtivos(),
+        OSyncDataStore.getOrdensServico({ completo: true }),
+        OSyncDataStore.getColunasKanban()
     ]);
 
-    const colunas = colSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const ordens = osSnap.docs.map(d => {
-        const data = d.data();
+    const ordens = ordensRaw.map(data => {
         const col = colunas.find(c => c.id === data.colunaId);
         const dataISO = OSyncUtils.extrairDataISO(data);
         const minutosParada = OSyncUtils.calcularMinutosParada(data);
         return {
-            id: d.id,
             ...data,
             statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
             dataISO,
@@ -33,24 +30,11 @@ async function initRelatoriosMaquinas() {
 
     let totalOSGeral = 0;
 
-    cacheRelatorioMaquinas = ativosSnap.docs
-        .map(d => {
-            const ativo = { id: d.id, ...d.data() };
+    cacheRelatorioMaquinas = ativos
+        .map(ativo => {
             const ordensMaquina = ordens
                 .filter(o => o.ativoId === ativo.id)
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
-
-            totalOSGeral += ordensMaquina.length;
-            const totalMinutosParada = ordensMaquina.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
-
-            return {
-                ...ativo,
-                ordens: ordensMaquina,
-                qtdOS: ordensMaquina.length,
-                totalMinutosParada
-            };
-        })
-        .sort((a, b) => (a.codigoTag || '').localeCompare(b.codigoTag || ''));
 
     const operacionais = cacheRelatorioMaquinas.filter(m => m.status === 'Operacional').length;
 
