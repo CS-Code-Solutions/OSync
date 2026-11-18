@@ -73,7 +73,7 @@ function fecharMenuRelatoriosMobile() {
 }
 
 // ==========================================
-// LEITOR DE QR CODE VIA CÂMERA (COMPATÍVEL COM IPHONE / SAFARI / ANDROID)
+// LEITOR DE QR CODE HÍBRIDO (NATIVO ANDROID/SAMSUNG + JSQR IPHONE)
 // ==========================================
 async function abrirLeitorQRCodeCamera() {
     const modal = document.getElementById('modal-scanner-qr');
@@ -99,74 +99,112 @@ async function abrirLeitorQRCodeCamera() {
         video.srcObject = streamCameraQR;
         await video.play();
 
-        // Canvas oculto para processar os frames do vídeo e da foto via jsQR
-        const canvasElement = document.createElement('canvas');
-        const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
-
-        scannerIntervalQR = setInterval(() => {
-            if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
-
-            canvasElement.width = video.videoWidth;
-            canvasElement.height = video.videoHeight;
-            canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            
-            const imageData = canvasCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-            
-            // Tenta decodificar o QR Code usando a biblioteca jsQR
-            if (typeof jsQR !== 'undefined') {
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
-                });
-
-                if (code && code.data) {
-                    const codigoLido = code.data;
-                    pararEfecharLeitorQR();
-                    tratarTextoQRLido(codigoLido);
+        // 1. TENTA USAR O BARCODE DETECTOR NATIVO (Samsung / Android / Chrome)
+        if (window.BarcodeDetector) {
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            scannerIntervalQR = setInterval(async () => {
+                if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+                try {
+                    const barcodes = await detector.detect(video);
+                    if (barcodes.length > 0) {
+                        const codigoLido = barcodes[0].rawValue;
+                        pararEfecharLeitorQR();
+                        tratarTextoQRLido(codigoLido);
+                    }
+                } catch (e) {
+                    // Ignora erros de frame individual
                 }
-            }
-        }, 250); // Checa 4 vezes por segundo com alta performance
+            }, 250);
+        } 
+        // 2. SE NÃO TIVER NATIVO (iPhone / Safari), USA O JSQR
+        else {
+            const canvasElement = document.createElement('canvas');
+            const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
+
+            scannerIntervalQR = setInterval(() => {
+                if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+                if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+                canvasElement.width = video.videoWidth;
+                canvasElement.height = video.videoHeight;
+                canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                
+                try {
+                    const imageData = canvasCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    if (typeof jsQR !== 'undefined') {
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "dontInvert",
+                        });
+
+                        if (code && code.data) {
+                            const codigoLido = code.data;
+                            pararEfecharLeitorQR();
+                            tratarTextoQRLido(codigoLido);
+                        }
+                    }
+                } catch (frameErr) {
+                    // Evita travamento de frame
+                }
+            }, 250);
+        }
 
     } catch (err) {
         console.warn('Acesso à câmera indisponível ou negado:', err);
-        alert('Não foi possível acessar a câmera. Verifique as permissões do seu iPhone.');
+        alert('Não foi possível acessar a câmera. Verifique as permissões do dispositivo.');
         pararEfecharLeitorQR();
     }
 }
 
-// Leitura otimizada também para quando o usuário tira a foto pelo botão
 async function processarArquivoQRCode(e) {
     const file = e.target.files[0];
     if (!file) return;
 
     pararEfecharLeitorQR();
 
-    try {
-        const imageUrl = URL.createObjectURL(file);
+    // Tenta primeiro via BarcodeDetector se disponível em imagem
+    if (window.BarcodeDetector) {
+        try {
+            const imageBitmap = await createImageBitmap(file);
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            const barcodes = await detector.detect(imageBitmap);
+            if (barcodes.length > 0) {
+                tratarTextoQRLido(barcodes[0].rawValue);
+                return;
+            }
+        } catch (err) {
+            console.log('BarcodeDetector de imagem falhou, tentando via jsQR...');
+        }
+    }
+
+    // Fallback via FileReader + jsQR para fotos (iPhone e Android)
+    const reader = new FileReader();
+    reader.onload = function (event) {
         const img = new Image();
-        img.crossOrigin = "anonymous";
-        
-        img.onload = () => {
+        img.onload = function () {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
-            
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            if (typeof jsQR !== 'undefined') {
-                const code = jsQR(imgData.data, imgData.width, imgData.height);
-                if (code && code.data) {
-                    tratarTextoQRLido(code.data);
-                    return;
+
+            try {
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                if (typeof jsQR !== 'undefined') {
+                    const code = jsQR(imgData.data, imgData.width, imgData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+                    if (code && code.data) {
+                        tratarTextoQRLido(code.data);
+                        return;
+                    }
                 }
+                alert('Nenhum QR Code legível foi encontrado nesta foto.');
+            } catch (err) {
+                console.error('Erro ao ler pixels da imagem:', err);
+                alert('Erro ao processar os pixels da imagem.');
             }
-            alert('Não foi possível identificar um QR Code válido na imagem selecionada.');
         };
-        
-        img.src = imageUrl;
-    } catch (err) {
-        console.error('Erro ao processar imagem do QR code:', err);
-        alert('Erro ao ler a imagem enviada.');
-    }
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
 }
