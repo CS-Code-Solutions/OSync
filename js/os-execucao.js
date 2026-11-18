@@ -46,6 +46,45 @@ function recalcularTempoTrabalhoEncerramento() {
     badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+function resetarEstadoModalDetalhesOS() {
+    anexosOSAtual = [];
+    itensCustoOSAtual = [];
+    manutentoresDetalhesOSAtual = [];
+
+    const formEnc = document.getElementById('form-encerramento-os');
+    if (formEnc) formEnc.reset();
+
+    const camposTexto = [
+        'enc-servico-realizado',
+        'enc-observacoes',
+        'item-custo-desc',
+        'item-custo-valor',
+        'enc-inicio-trabalho',
+        'enc-data-hora',
+        'enc-inicio-parada',
+        'enc-termino-parada'
+    ];
+    camposTexto.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+
+    const inputFotos = document.getElementById('enc-input-fotos');
+    if (inputFotos) inputFotos.value = '';
+
+    const uploadStatus = document.getElementById('enc-upload-status');
+    if (uploadStatus) uploadStatus.classList.add('hidden');
+
+    const badgeTrab = document.getElementById('enc-tempo-trabalho-calculado');
+    if (badgeTrab) badgeTrab.textContent = '0h 00m';
+
+    const badgeParada = document.getElementById('enc-tempo-parada-calculado');
+    if (badgeParada) badgeParada.textContent = '0h 00m';
+
+    renderizarAnexosOS();
+    renderizarItensCustoOS();
+}
+
 function renderizarManutentoresDetalhesOS() {
     const selMan = document.getElementById('det-os-manutentor-select');
     const chipsBox = document.getElementById('det-os-manutentores-chips');
@@ -98,12 +137,8 @@ async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
 
-    // LIMPEZA PRÉVIA DE MEMÓRIA (Evita persistência de dados da O.S. anterior)
-    anexosOSAtual = [];
-    itensCustoOSAtual = [];
-    manutentoresDetalhesOSAtual = [];
-    const formEnc = document.getElementById('form-encerramento-os');
-    if (formEnc) formEnc.reset();
+    // Reseta 100% dos campos e variáveis antes de carregar a O.S. selecionada
+    resetarEstadoModalDetalhesOS();
 
     const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
     osAtualEhExterna = (os.tipoNome || '').trim().toLowerCase() === 'manutenção externa';
@@ -200,9 +235,10 @@ async function abrirDetalhesOS(osId) {
         inicioPadraoOS = dCriado.toISOString().slice(0, 16);
     }
 
+    // Horas de trabalho ficam vazias por padrão (só preenche se já estavam salvas na O.S.)
     const inpIniTrab = document.getElementById('enc-inicio-trabalho');
     if (inpIniTrab) {
-        inpIniTrab.value = os.inicioExecucao || ''; // Opcional, sem forçar agoraISO caso esteja em branco
+        inpIniTrab.value = os.inicioExecucao || '';
     }
     const inpEncerramento = document.getElementById('enc-data-hora');
     if (inpEncerramento) {
@@ -219,8 +255,8 @@ async function abrirDetalhesOS(osId) {
             inpIniParada.required = true;
             inpFimParada.required = true;
 
-            inpIniParada.value = os.inicioParada || inicioPadraoOS || '';
-            inpFimParada.value = os.terminoParada || '';
+            inpIniParada.value = os.inicioParada || inicioPadraoOS || agoraISO;
+            inpFimParada.value = os.terminoParada || agoraISO;
             recalcularTempoParadaEncerramento();
         } else {
             blocoParada.classList.add('hidden');
@@ -281,30 +317,13 @@ function aplicarLayoutCustosPorTipo(ehExterna) {
 }
 
 function fecharModalDetalhesOS() {
-    // LIMPEZA AO FECHAR O MODAL
-    anexosOSAtual = [];
-    itensCustoOSAtual = [];
-    manutentoresDetalhesOSAtual = [];
-    const formEnc = document.getElementById('form-encerramento-os');
-    if (formEnc) formEnc.reset();
+    resetarEstadoModalDetalhesOS();
     document.getElementById('modal-detalhes-os').classList.add('hidden');
 }
 
 function mostrarFormularioEncerramento() {
     document.getElementById('box-botao-abrir-encerramento').classList.add('hidden');
     document.getElementById('form-encerramento-os').classList.remove('hidden');
-
-    // Preenche data/hora atual automaticamente apenas ao abrir o encerramento se estiverem vazios
-    const agora = new Date();
-    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-    const agoraISO = agora.toISOString().slice(0, 16);
-
-    const inpIniTrab = document.getElementById('enc-inicio-trabalho');
-    if (inpIniTrab && !inpIniTrab.value) inpIniTrab.value = agoraISO;
-
-    const inpEncerramento = document.getElementById('enc-data-hora');
-    if (inpEncerramento && !inpEncerramento.value) inpEncerramento.value = agoraISO;
-
     recalcularTempoTrabalhoEncerramento();
     lucide.createIcons();
 }
@@ -359,23 +378,12 @@ async function processarUploadFotosOS(event) {
 
     try {
         for (const file of files) {
-            let url = '';
-            if (typeof compactarEEnviarImagemOS === 'function') {
-                url = await compactarEEnviarImagemOS(file, usuarioAtual.empresaId, osId);
-            } else {
-                // Fallback caso image-utils.js demore
-                url = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.readAsDataURL(file);
-                });
-            }
+            const url = await compactarEEnviarImagemOS(file, usuarioAtual.empresaId, osId);
             if (url) anexosOSAtual.push(url);
         }
         renderizarAnexosOS();
     } catch (err) {
-        console.error('Erro no upload de foto:', err);
-        alert('Erro ao enviar imagem: ' + err.message);
+        alert('Erro ao processar imagem: ' + err.message);
     } finally {
         if (statusEl) statusEl.classList.add('hidden');
         event.target.value = '';
@@ -500,17 +508,22 @@ async function confirmarEncerramentoOS(e) {
         if (osAtualTeveParada) {
             inicioParada = document.getElementById('enc-inicio-parada')?.value || '';
             terminoParada = document.getElementById('enc-termino-parada')?.value || '';
-            if (inicioParada && terminoParada && new Date(terminoParada) < new Date(inicioParada)) {
+            if (!inicioParada || !terminoParada) {
+                alert('Informe a data/hora de início e término da parada da máquina.');
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Encerramento';
+                return;
+            }
+            if (new Date(terminoParada) < new Date(inicioParada)) {
                 alert('O término da parada não pode ser anterior ao início da parada.');
                 btn.disabled = false;
                 btn.textContent = 'Confirmar Encerramento';
                 return;
             }
-            if (inicioParada && terminoParada) {
-                tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
-            }
+            tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
         }
 
+        // Horas de trabalho opcionais (só valida ordem se ambas forem preenchidas)
         const inicioExecucao = document.getElementById('enc-inicio-trabalho')?.value || '';
         const dataHoraEncerramento = document.getElementById('enc-data-hora')?.value || '';
         if (inicioExecucao && dataHoraEncerramento && new Date(dataHoraEncerramento) < new Date(inicioExecucao)) {
@@ -519,7 +532,9 @@ async function confirmarEncerramentoOS(e) {
             btn.textContent = 'Confirmar Encerramento';
             return;
         }
-        const tempoTrabalhoMinutos = calcularMinutosParadaEntreDatas(inicioExecucao, dataHoraEncerramento);
+        const tempoTrabalhoMinutos = (inicioExecucao && dataHoraEncerramento)
+            ? calcularMinutosParadaEntreDatas(inicioExecucao, dataHoraEncerramento)
+            : 0;
 
         const descPendente = document.getElementById('item-custo-desc')?.value.trim();
         const valorPendente = parseFloat(document.getElementById('item-custo-valor')?.value) || 0;
@@ -530,11 +545,6 @@ async function confirmarEncerramentoOS(e) {
                 valor: valorPendente,
                 tipoCusto: osAtualEhExterna ? 'Serviço Externo' : 'Peça/Material'
             });
-            const descInput = document.getElementById('item-custo-desc');
-            const valInput = document.getElementById('item-custo-valor');
-            if (descInput) descInput.value = '';
-            if (valInput) valInput.value = '';
-            renderizarItensCustoOS();
         }
 
         const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
@@ -566,7 +576,7 @@ async function confirmarEncerramentoOS(e) {
             encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        if (osAtualTeveParada && inicioParada && terminoParada) {
+        if (osAtualTeveParada) {
             dadosAtualizacao.inicioParada = inicioParada;
             dadosAtualizacao.terminoParada = terminoParada;
             dadosAtualizacao.tempoParadaMinutos = tempoParadaMinutos;
@@ -576,7 +586,6 @@ async function confirmarEncerramentoOS(e) {
             dadosAtualizacao.colunaId = ultimaColuna.id;
         }
 
-        // Atualização segura com tratamento de permissões do Firestore
         await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
 
         if (os?.ativoId) {
@@ -615,8 +624,8 @@ async function confirmarEncerramentoOS(e) {
             for (const solIdVinc of idsSolicitacoesAtualizar) {
                 await db.collection('solicitacoes').doc(solIdVinc).update(payloadSolicitacaoEncerrada).catch(() => {});
             }
-        } catch (errSolicitacao) {
-            console.warn('Aviso: Não foi possível atualizar solicitações vinculadas (permissão ou inexistência):', errSolicitacao);
+        } catch (errSol) {
+            console.warn('Solicitações vinculadas não atualizadas:', errSol.message);
         }
 
         fecharModalDetalhesOS();
@@ -624,7 +633,6 @@ async function confirmarEncerramentoOS(e) {
             mostrarNotificacaoOSync('O.S. encerrada com sucesso!', 'sucesso');
         }
     } catch (err) {
-        console.error('Erro crítico ao encerrar O.S.:', err);
         alert('Erro ao encerrar O.S.: ' + err.message);
     } finally {
         btn.disabled = false;
