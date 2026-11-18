@@ -6,6 +6,7 @@ async function initConfiguracoes() {
     carregarColunasConfig();
     carregarTiposConfig();
     carregarSetoresConfig();
+    carregarTiposEquipamentoConfig();
     carregarCentrosCustoConfig();
 
     document.getElementById('form-add-coluna')?.addEventListener('submit', async (e) => {
@@ -61,6 +62,23 @@ async function initConfiguracoes() {
 
         e.target.reset();
         carregarSetoresConfig();
+    });
+
+    document.getElementById('form-add-tipo-equipamento')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nome = document.getElementById('tipo-equip-nome').value.trim();
+        if (!nome) return;
+
+        await db.collection('tipos_equipamento').add({
+            empresaId: usuarioAtual.empresaId,
+            nome
+        });
+
+        e.target.reset();
+        carregarTiposEquipamentoConfig();
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Tipo de equipamento adicionado!', 'sucesso');
+        }
     });
 
     document.getElementById('form-add-centro-custo')?.addEventListener('submit', async (e) => {
@@ -332,7 +350,7 @@ async function excluirColunaConfig(colId) {
 }
 
 // ==========================================
-// TIPOS DE MANUTENÇÃO, SETORES E CENTROS DE CUSTO
+// TIPOS DE MANUTENÇÃO, SETORES, EQUIPAMENTOS E CENTROS DE CUSTO
 // ==========================================
 async function carregarTiposConfig() {
     const lista = document.getElementById('lista-tipos');
@@ -396,6 +414,31 @@ async function carregarSetoresConfig() {
             </button>` : `<span class="text-[11px] text-slate-400 italic pr-1">Sistema</span>`}
         </div>`;
     }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum setor cadastrado.</p>';
+    lucide.createIcons();
+}
+
+async function carregarTiposEquipamentoConfig() {
+    const lista = document.getElementById('lista-tipos-equipamento');
+    if (!lista) return;
+
+    const snap = await db.collection('tipos_equipamento')
+        .where('empresaId', '==', usuarioAtual.empresaId)
+        .get();
+
+    const tiposEquip = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+    lista.innerHTML = tiposEquip.map(te => {
+        const teIdSeguro = escaparHTML(te.id);
+        return `
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+            <span class="text-sm font-medium text-slate-700 truncate">${escaparHTML(te.nome)}</span>
+            <button onclick="deletarItemConfig('tipos_equipamento', '${teIdSeguro}', carregarTiposEquipamentoConfig)" class="text-slate-400 hover:text-rose-600 p-1 shrink-0">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 text-center py-4">Nenhum tipo de equipamento cadastrado.</p>';
     lucide.createIcons();
 }
 
