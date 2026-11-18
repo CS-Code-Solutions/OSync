@@ -116,11 +116,14 @@ function renderizarManutentoresDetalhesOS() {
     if (selMan) {
         const disponiveis = cacheManutentoresDetalhesOS.filter(m => !manutentoresDetalhesOSAtual.some(sel => sel.id === m.id));
         const textoPadrao = manutentoresDetalhesOSAtual.length > 0
-            ? '+ Adicionar parceria / técnico...'
+            ? '+ Adicionar parceria / responsável...'
             : 'Sem técnico — Toque para escolher';
 
         selMan.innerHTML = `<option value="">${textoPadrao}</option>` +
-            disponiveis.map(m => `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`).join('');
+            disponiveis.map(m => {
+                const rotulo = m.perfil === 'Admin' ? `${m.nome} (Gestão)` : m.nome;
+                return `<option value="${escaparHTML(m.id)}">${escaparHTML(rotulo)}</option>`;
+            }).join('');
         selMan.value = '';
     }
 
@@ -161,7 +164,6 @@ async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
 
-    // 1. Limpa completamente qualquer resquício de O.S. anterior
     resetarEstadoModalDetalhesOS();
 
     const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
@@ -202,12 +204,16 @@ async function abrirDetalhesOS(osId) {
     ).join('');
 
     const [manutSnap, ativosSnap] = await Promise.all([
-        db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId).where('perfil', '==', 'Manutentor').get(),
+        db.collection('usuarios')
+            .where('empresaId', '==', usuarioAtual.empresaId)
+            .where('perfil', 'in', ['Manutentor', 'Admin'])
+            .get(),
         db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get()
     ]);
 
     cacheManutentoresDetalhesOS = manutSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => u.ativo !== false)
         .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
     const idsSelecionados = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
@@ -509,9 +515,6 @@ function renderizarItensCustoOS() {
     `).join('');
 }
 
-// ==========================================
-// SALVAR ENCERRAMENTO FINAL DA O.S.
-// ==========================================
 async function confirmarEncerramentoOS(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-confirmar-encerramento');
@@ -577,7 +580,6 @@ async function confirmarEncerramentoOS(e) {
         const manutentoresIds = manutentoresDetalhesOSAtual.map(m => m.id);
         const manutentoresNomes = manutentoresDetalhesOSAtual.map(m => m.nome);
 
-        // Garante que cacheColunasOS está carregado e localiza a coluna de conclusão
         if (!Array.isArray(cacheColunasOS) || cacheColunasOS.length === 0) {
             const colSnap = await db.collection('kanban_colunas')
                 .where('empresaId', '==', usuarioAtual.empresaId)
