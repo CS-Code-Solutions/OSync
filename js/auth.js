@@ -75,8 +75,9 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
 
         // Oculta botão de Configurações dentro da gaveta mobile caso não tenha permissão
+        const temConfiguracoes = permitidas.includes('configuracoes');
         document.querySelectorAll(`[onclick*="navegarPara('configuracoes')"]`).forEach(btn => {
-            btn.classList.toggle('hidden', !permitidas.includes('configuracoes'));
+            btn.classList.toggle('hidden', !temConfiguracoes);
         });
 
         // Submenus de Cadastros (Desktop e Gaveta Mobile)
@@ -104,6 +105,12 @@ function aplicarPermissoesInterface(perfil) {
                 btn.classList.toggle('hidden', !liberado);
             });
         });
+
+        // Oculta o botão "Menu" mobile da Liderança (e de qualquer usuário sem itens na gaveta)
+        const temItensNaGaveta = exibirGrupoCadastros || temAlgumRelatorio || temConfiguracoes;
+        document.getElementById('btn-menu-geral-mobile')?.classList.toggle('hidden', !temItensNaGaveta);
+    } else {
+        document.getElementById('btn-menu-geral-mobile')?.classList.remove('hidden');
     }
 
     if (cargo === 'SuperAdmin') {
