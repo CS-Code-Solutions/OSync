@@ -364,7 +364,7 @@ async function soltarCardOS(e, novaColunaId) {
     if (!osId) return;
 
     const colDestino = cacheColunasOS.find(c => c.id === novaColunaId);
-    const ehConcluida = colDestino && colDestino.titulo.toLowerCase().includes('conclu');
+    const ehConcluida = colDestino && /conclu|finaliz|encerrad/i.test(colDestino.titulo || '');
 
     if (ehConcluida) {
         abrirDetalhesOS(osId);
@@ -382,8 +382,32 @@ async function soltarCardOS(e, novaColunaId) {
 }
 
 // ==========================================
-// MODAL NOVA O.S. (SELETOR NATIVO MÚLTIPLO)
+// MODAL NOVA O.S. (LIMPEZA COMPLETA + SELETOR MÚLTIPLO)
 // ==========================================
+function resetarFormularioNovaOS() {
+    const formNova = document.getElementById('form-nova-os');
+    if (formNova) formNova.reset();
+
+    manutentoresNovaOSSelecionados = [];
+
+    const descEl = document.getElementById('os-descricao');
+    if (descEl) descEl.value = '';
+
+    const prioEl = document.getElementById('os-prioridade');
+    if (prioEl) prioEl.value = 'Normal';
+
+    const condEl = document.getElementById('os-condicao-maquina');
+    if (condEl) condEl.value = 'Operacional';
+
+    const paradaEl = document.getElementById('os-inicio-parada');
+    if (paradaEl) paradaEl.value = '';
+
+    const boxParada = document.getElementById('box-os-inicio-parada');
+    if (boxParada) boxParada.classList.add('hidden');
+
+    renderizarManutentoresNovaOS();
+}
+
 function renderizarManutentoresNovaOS() {
     const selMan = document.getElementById('os-manutentor-select');
     const chipsBox = document.getElementById('os-manutentores-chips');
@@ -431,6 +455,9 @@ function removerManutentorNovaOS(manId) {
 }
 
 async function abrirModalNovaOS() {
+    // Limpa 100% de qualquer preenchimento anterior antes de abrir
+    resetarFormularioNovaOS();
+
     if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0) {
         await carregarDadosBaseOS();
     }
@@ -447,7 +474,6 @@ async function abrirModalNovaOS() {
         `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`
     ).join('');
 
-    manutentoresNovaOSSelecionados = [];
     if (usuarioAtual.perfil === 'Manutentor') {
         const uidAtual = usuarioAtual.id || usuarioAtual.uid;
         const proprio = cacheManutentoresOS.find(m => m.id === uidAtual);
@@ -457,8 +483,6 @@ async function abrirModalNovaOS() {
     }
     renderizarManutentoresNovaOS();
 
-    document.getElementById('os-condicao-maquina').value = 'Operacional';
-    document.getElementById('os-inicio-parada').value = '';
     alternarCampoParadaCriacaoOS();
     verificarTipoManutencaoCriacao();
 
@@ -495,6 +519,7 @@ function verificarTipoManutencaoCriacao() {
 }
 
 function fecharModalNovaOS() {
+    resetarFormularioNovaOS();
     document.getElementById('modal-nova-os')?.classList.add('hidden');
 }
 
@@ -567,16 +592,14 @@ async function salvarNovaOS(e) {
         }
 
         fecharModalNovaOS();
-        e.target.reset();
-        manutentoresNovaOSSelecionados = [];
         if (typeof mostrarNotificacaoOSync === 'function') {
             mostrarNotificacaoOSync(`#OS-${String(numeroGerado).padStart(4, '0')} criada com sucesso!`, 'sucesso');
         }
     } catch (err) {
         alert('Erro ao criar O.S.: ' + err.message);
+    } finally {
+        btn.disabled = false;
     }
-
-    btn.disabled = false;
 }
 
 // ==========================================
