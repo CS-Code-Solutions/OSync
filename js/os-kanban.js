@@ -84,9 +84,14 @@ function iniciarListenerOrdensServico() {
                 return;
             }
 
-            cacheOrdensServico = snap.docs
+          cacheOrdensServico = snap.docs
                 .map(d => ({ id: d.id, ...d.data() }))
                 .sort((a, b) => (b.numeroOs || 0) - (a.numeroOs || 0));
+
+            if (typeof OSyncDataStore !== 'undefined') {
+                OSyncDataStore.invalidarOrdens();
+                OSyncDataStore.invalidarAtivos();
+            }
 
             renderizarVisaoOS();
         });
