@@ -139,7 +139,7 @@
         © 2026 OSync • <a href="pages/privacidade.html" class="hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a> | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
     </footer>
 
-    <!-- MENU INFERIOR MOBILE (5 ITENS OTIMIZADOS) -->
+    <!-- MENU INFERIOR MOBILE (5 ITENS OTIMIZADOS E CENTRALIZADOS) -->
     <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
         <button id="mob-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
             <i data-lucide="layout-dashboard" class="w-5 h-5 mb-0.5"></i>
@@ -151,13 +151,15 @@
             <span class="text-[10px] font-medium">O.S.</span>
         </button>
 
-        <!-- BOTÃO CENTRAL DE ESCANEAR (CÂMERA) EM DESTAQUE -->
-        <button onclick="abrirLeitorQRCodeCamera()" class="flex flex-col items-center justify-center py-1 px-2 text-[#00E5B0] transition active:scale-95 shrink-0 -mt-3" title="Ler QR Code da Máquina">
-            <div class="w-11 h-11 rounded-full bg-[#00E5B0] text-[#0B1120] flex items-center justify-center shadow-lg border-2 border-[#0B1120]">
-                <i data-lucide="scan-line" class="w-6 h-6 stroke-[2.4]"></i>
-            </div>
-            <span class="text-[10px] font-bold mt-0.5">Scanner</span>
-        </button>
+        <!-- BOTÃO CENTRAL DE ESCANEAR (CÂMERA) PERFEITAMENTE CENTRALIZADO -->
+        <div class="flex-1 flex flex-col items-center justify-center -mt-3">
+            <button onclick="abrirLeitorQRCodeCamera()" class="flex flex-col items-center justify-center text-[#00E5B0] transition active:scale-95 group" title="Ler QR Code da Máquina">
+                <div class="w-11 h-11 rounded-full bg-[#00E5B0] text-[#0B1120] flex items-center justify-center shadow-lg border-2 border-[#0B1120] group-hover:scale-105 transition">
+                    <i data-lucide="scan-line" class="w-6 h-6 stroke-[2.4]"></i>
+                </div>
+                <span class="text-[10px] font-bold mt-0.5 text-center leading-none">Scanner</span>
+            </button>
+        </div>
 
         <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
             <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
@@ -389,7 +391,7 @@
         </div>
     </div>
 
-     <script src="js/firebase-config.js?v=9"></script>
+    <script src="js/firebase-config.js?v=9"></script>
     <script src="js/ui-alerts.js?v=9"></script>
     <script src="js/utils.js?v=9"></script>
     <script src="js/data-store.js?v=9"></script>
@@ -407,7 +409,6 @@
     <script src="js/saas-master.js?v=9"></script>
     <script src="js/os-kanban.js?v=9"></script>
     <script src="js/os-execucao.js?v=9"></script>
-
 
 </body>
 </html>
