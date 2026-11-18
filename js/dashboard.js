@@ -3,7 +3,7 @@ let cacheDashAtivos = [];
 let cacheDashSolicitacoes = [];
 let cacheDashColunas = [];
 let instanciasGraficosDash = {};
-let periodoWidgetParadas = 'mes'; // 'semana' | 'mes' | 'ano' | 'total'
+let periodoWidgetParadas = 'mes';
 
 const CATALOGO_WIDGETS_DASHBOARD = [
     {
@@ -90,35 +90,36 @@ const CATALOGO_WIDGETS_DASHBOARD = [
 
 let layoutWidgetsAtual = [];
 
-function calcularMinutosParadaDash(os) {
-    if (Number(os.tempoParadaMinutos) > 0) return Number(os.tempoParadaMinutos);
-    if (os.inicioParada && os.terminoParada) {
-        const d1 = new Date(os.inicioParada);
-        const d2 = new Date(os.terminoParada);
-        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
-            return Math.round((d2.getTime() - d1.getTime()) / 60000);
-        }
-    }
-    return 0;
-}
+function renderizarSkeletonDashboard() {
+    const container = document.getElementById('dashboard-widgets-container');
+    if (!container) return;
 
-function formatarHorasParadasDash(minutos) {
-    const mins = Math.max(0, Math.round(Number(minutos) || 0));
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${String(m).padStart(2, '0')}m`;
-}
+    const kpisSkeleton = Array.from({ length: 5 }).map(() => `
+        <div class="osync-card p-5 space-y-2.5 animate-pulse">
+            <div class="h-3 w-24 bg-slate-200 rounded"></div>
+            <div class="h-7 w-20 bg-slate-200 rounded"></div>
+            <div class="h-3 w-32 bg-slate-100 rounded"></div>
+        </div>
+    `).join('');
 
-function osTeveParadaDash(os) {
-    return (
-        calcularMinutosParadaDash(os) > 0 ||
-        os.maquinaParada === true ||
-        os.condicaoMaquina === 'Maquina parada' ||
-        Boolean(os.inicioParada)
-    );
+    const cardsSkeleton = Array.from({ length: 4 }).map(() => `
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 animate-pulse">
+            <div class="space-y-1.5 pb-3 border-b border-slate-100">
+                <div class="h-4 w-48 bg-slate-200 rounded"></div>
+                <div class="h-3 w-64 bg-slate-100 rounded"></div>
+            </div>
+            <div class="h-56 w-full bg-slate-100 rounded-xl"></div>
+        </div>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">${kpisSkeleton}</div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">${cardsSkeleton}</div>
+    `;
 }
 
 async function initDashboard() {
+    renderizarSkeletonDashboard();
     await carregarPreferenciasLayoutDashboard();
     await carregarDadosBrutosDashboard();
     renderizarWidgetsDashboard();
@@ -161,16 +162,9 @@ async function carregarDadosBrutosDashboard() {
         return {
             id: d.id,
             ...data,
-            dataISO: extrairDataISODash(data)
+            dataISO: OSyncUtils.extrairDataISO(data)
         };
     });
-}
-
-function extrairDataISODash(os) {
-    if (os.dataHoraEncerramento) return os.dataHoraEncerramento.slice(0, 10);
-    if (os.inicioParada) return os.inicioParada.slice(0, 10);
-    if (os.criadoEm?.toDate) return os.criadoEm.toDate().toISOString().slice(0, 10);
-    return new Date().toISOString().slice(0, 10);
 }
 
 function obterOrdensFiltradasDashboard() {
@@ -284,8 +278,8 @@ function construirHTML_KPIs(ordens) {
     });
     const qtdMaquinasParadasAgora = idsMaquinasParadasAgora.size;
 
-    const ordensParadasPeriodo = ordens.filter(osTeveParadaDash);
-    const totalMinutosParados = ordensParadasPeriodo.reduce((acc, o) => acc + calcularMinutosParadaDash(o), 0);
+    const ordensParadasPeriodo = ordens.filter(o => OSyncUtils.osTeveParada(o));
+    const totalMinutosParados = ordensParadasPeriodo.reduce((acc, o) => acc + OSyncUtils.calcularMinutosParada(o), 0);
 
     const totalMaquinas = cacheDashAtivos.length;
     const operacionais = cacheDashAtivos.filter(a => a.status === 'Operacional').length;
@@ -314,7 +308,7 @@ function construirHTML_KPIs(ordens) {
             </div>
             <p class="text-[11px] text-slate-500 mt-1">
                 ${ordensParadasPeriodo.length > 0
-                    ? `<strong>${ordensParadasPeriodo.length}</strong> ${ordensParadasPeriodo.length === 1 ? 'parada' : 'paradas'} no período${totalMinutosParados > 0 ? ` • <strong>${formatarHorasParadasDash(totalMinutosParados)}</strong>` : ''}`
+                    ? `<strong>${ordensParadasPeriodo.length}</strong> ${ordensParadasPeriodo.length === 1 ? 'parada' : 'paradas'} no período${totalMinutosParados > 0 ? ` • <strong>${OSyncUtils.formatarHorasParadas(totalMinutosParados)}</strong>` : ''}`
                     : 'Nenhuma parada registrada no período'}
             </p>
         </div>
@@ -342,7 +336,7 @@ function construirHTML_KPIs(ordens) {
                 <span class="text-xs font-bold uppercase text-slate-400">Custo no Período</span>
                 <i data-lucide="wallet" class="w-4 h-4 text-purple-600"></i>
             </div>
-            <div class="text-2xl font-extrabold text-slate-900 mt-1.5">${custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+            <div class="text-2xl font-extrabold text-slate-900 mt-1.5">${OSyncUtils.formatarMoedaBR(custoTotal)}</div>
             <p class="text-[11px] text-slate-500 mt-1">Peças internas + serviços externos</p>
         </div>
     </div>`;
@@ -448,7 +442,7 @@ function montarGraficoMaquinasParadasPeriodo() {
     const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
 
     const ordensNoIntervalo = cacheDashOrdens.filter(os => {
-        if (!osTeveParadaDash(os)) return false;
+        if (!OSyncUtils.osTeveParada(os)) return false;
         if (!os.dataISO) return false;
 
         if (periodoWidgetParadas === 'semana') {
@@ -471,7 +465,7 @@ function montarGraficoMaquinasParadasPeriodo() {
         if (!mapaMaquinas[chave]) {
             mapaMaquinas[chave] = { minutos: 0, ocorrencias: 0 };
         }
-        mapaMaquinas[chave].minutos += calcularMinutosParadaDash(os);
+        mapaMaquinas[chave].minutos += OSyncUtils.calcularMinutosParada(os);
         mapaMaquinas[chave].ocorrencias += 1;
     });
 
@@ -527,7 +521,7 @@ function montarGraficoMaquinasParadasPeriodo() {
                             const idx = context.dataIndex;
                             const mins = minutosOriginais[idx] || 0;
                             const qtd = ocorrenciasOriginais[idx] || 1;
-                            const tempoFmt = mins > 0 ? formatarHorasParadasDash(mins) : 'Em aberto';
+                            const tempoFmt = mins > 0 ? OSyncUtils.formatarHorasParadas(mins) : 'Em aberto';
                             return ` Parada: ${tempoFmt} (${qtd} ${qtd === 1 ? 'ocorrência' : 'ocorrências'})`;
                         }
                     }
@@ -854,7 +848,9 @@ async function salvarConfiguracaoDashboard() {
             mostrarNotificacaoOSync('Layout do Dashboard atualizado com sucesso!', 'sucesso');
         }
     } catch (err) {
-        alert('Erro ao salvar layout do dashboard: ' + err.message);
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Erro ao salvar layout do dashboard: ' + err.message, 'erro');
+        }
     }
 
     if (btn) {
