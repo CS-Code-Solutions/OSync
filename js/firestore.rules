@@ -1,83 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // ==========================================
+    // FUNÇÕES AUXILIARES DE IDENTIDADE E TENANT
+    // ==========================================
+    function isAutenticado() {
+      return request.auth != null;
+    }
+
     function getUserData() {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
     }
-    
+
     function isAtivo() {
-      return request.auth != null 
+      return isAutenticado()
         && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
         && getUserData().ativo == true;
-    }
-    
-    function isGestor() {
-      return isAtivo() && (getUserData().perfil == 'Admin' || getUserData().perfil == 'SuperAdmin');
     }
 
     function isSuperAdmin() {
       return isAtivo() && getUserData().perfil == 'SuperAdmin';
     }
 
-    // Empresas: leitura individual aberta para validar código no auto-cadastro; gestão só SuperAdmin
-    match /empresas/{empresaId} {
-      allow get: if true;
-      allow list, create, update, delete: if isSuperAdmin();
-    }
-
-    // Usuários: auto-cadastro entra bloqueado OU Gestor/SuperAdmin cria já aprovado
-    match /usuarios/{userId} {
-      allow get: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && (
-        (request.resource.data.ativo == false && request.resource.data.statusAcesso == 'pendente')
-        || isGestor()
-      );
-      allow read: if isAtivo();
-      allow update, delete: if isGestor();
-    }
-
-    // Aceite da Política de Privacidade e LGPD: somente o próprio titular lê/grava seu registro
-    match /termos_aceites/{userId} {
-      allow get, create, update: if request.auth != null && request.auth.uid == userId;
-      allow list: if isGestor();
-      allow delete: if false;
-    }
-
-    // Configurações Estruturais (Colunas, Tipos, Setores, Centros de Custo): só Gestor altera
-    match /kanban_colunas/{id} {
-      allow read: if isAtivo();
-      allow write: if isGestor();
-    }
-    match /tipos_manutencao/{id} {
-      allow read: if isAtivo();
-      allow write: if isGestor();
-    }
-    match /setores_executantes/{id} {
-      allow read: if isAtivo();
-      allow write: if isGestor();
-    }
-    match /centros_custo/{id} {
-      allow read: if isAtivo();
-      allow write: if isGestor();
-    }
-
-    // Ativos (Máquinas): todos leem e atualizam status (Parada/Operacional); só Gestor cria/exclui
-    match /ativos/{id} {
-      allow read, update: if isAtivo();
-      allow create, delete: if isGestor();
-    }
-
-    // Solicitações (Chamados): todos abrem e leem; só Gestor aprova/recusa/exclui
-    match /solicitacoes/{id} {
-      allow read, create: if isAtivo();
-      allow update, delete: if isGestor();
-    }
-
-    // Ordens de Serviço: Gestor e Manutentor abrem e executam; Líder não acessa; só Gestor exclui
-    match /ordens_servico/{id} {
-      allow read, create, update: if isAtivo() && getUserData().perfil != 'Lideranca';
-      allow delete: if isGestor();
-    }
-  }
-}
+    function mesmaEmpresa(empresaId) {
+      return isSuperAdmin() || (isAtivo() && getUserData().empresaId == empresaId);
