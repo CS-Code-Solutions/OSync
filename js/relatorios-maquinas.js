@@ -1,28 +1,9 @@
 let cacheRelatorioMaquinas = [];
 
-function calcularMinutosParadaMaq(os) {
-    if (Number(os.tempoParadaMinutos) > 0) return Number(os.tempoParadaMinutos);
-    if (os.inicioParada && os.terminoParada) {
-        const d1 = new Date(os.inicioParada);
-        const d2 = new Date(os.terminoParada);
-        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
-            return Math.round((d2.getTime() - d1.getTime()) / 60000);
-        }
-    }
-    return 0;
-}
-
-function formatarHorasParadasMaq(minutos) {
-    const mins = Math.max(0, Math.round(Number(minutos) || 0));
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${String(m).padStart(2, '0')}m`;
-}
-
 async function initRelatoriosMaquinas() {
     const grid = document.getElementById('lista-relatorios-maquinas');
     if (grid) {
-        grid.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400 text-sm">Carregando histórico das máquinas...</div>';
+        grid.innerHTML = OSyncUtils.gerarSkeletonCards(6);
     }
 
     const [ativosSnap, osSnap, colSnap] = await Promise.all([
@@ -35,16 +16,18 @@ async function initRelatoriosMaquinas() {
     const ordens = osSnap.docs.map(d => {
         const data = d.data();
         const col = colunas.find(c => c.id === data.colunaId);
-        const dataISO = extrairDataISO_Maq(data);
-        const minutosParada = calcularMinutosParadaMaq(data);
+        const dataISO = OSyncUtils.extrairDataISO(data);
+        const minutosParada = OSyncUtils.calcularMinutosParada(data);
         return {
             id: d.id,
             ...data,
             statusTitulo: col ? col.titulo : (data.encerrada ? 'Concluída' : 'Aberta'),
             dataISO,
-            dataBR: formatarDataBR_Maq(dataISO),
+            dataBR: OSyncUtils.formatarDataBR(dataISO),
             minutosParada,
-            paradaLabel: minutosParada > 0 ? formatarHorasParadasMaq(minutosParada) : (data.maquinaParada || data.condicaoMaquina === 'Maquina parada' ? 'Em aberto' : '-')
+            paradaLabel: minutosParada > 0
+                ? OSyncUtils.formatarHorasParadas(minutosParada)
+                : (data.maquinaParada || data.condicaoMaquina === 'Maquina parada' ? 'Em aberto' : '-')
         };
     });
 
@@ -76,18 +59,6 @@ async function initRelatoriosMaquinas() {
     document.getElementById('rel-maq-kpi-operacionais').textContent = operacionais;
 
     filtrarRelatorioMaquinas();
-}
-
-function extrairDataISO_Maq(os) {
-    if (os.dataHoraEncerramento) return os.dataHoraEncerramento.slice(0, 10);
-    if (os.criadoEm?.toDate) return os.criadoEm.toDate().toISOString().slice(0, 10);
-    return new Date().toISOString().slice(0, 10);
-}
-
-function formatarDataBR_Maq(iso) {
-    if (!iso || iso.length < 10) return '-';
-    const [a, m, d] = iso.slice(0, 10).split('-');
-    return `${d}/${m}/${a}`;
 }
 
 function filtrarRelatorioMaquinas() {
@@ -139,7 +110,7 @@ function renderizarCardsRelatorioMaquinas(lista) {
             <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <div>
                     <span class="text-[11px] font-semibold text-slate-400 block">O.S. • Horas Paradas</span>
-                    <span class="text-sm font-extrabold text-slate-900">${m.qtdOS} O.S. <span class="text-rose-600">(${formatarHorasParadasMaq(m.totalMinutosParada)})</span></span>
+                    <span class="text-sm font-extrabold text-slate-900">${m.qtdOS} O.S. <span class="text-rose-600">(${OSyncUtils.formatarHorasParadas(m.totalMinutosParada)})</span></span>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button onclick="abrirModalHistoricoMaquina('${mIdSeguro}')" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold transition flex items-center gap-1">
@@ -167,7 +138,7 @@ function abrirModalHistoricoMaquina(ativoId) {
     document.getElementById('det-rel-maq-fab').textContent = m.fabricante || '-';
     document.getElementById('det-rel-maq-mod').textContent = m.modelo || '-';
     document.getElementById('det-rel-maq-status').textContent = m.status || 'Operacional';
-    document.getElementById('det-rel-maq-qtd-os').textContent = `${m.qtdOS} O.S. • Parada: ${formatarHorasParadasMaq(m.totalMinutosParada)}`;
+    document.getElementById('det-rel-maq-qtd-os').textContent = `${m.qtdOS} O.S. • Parada: ${OSyncUtils.formatarHorasParadas(m.totalMinutosParada)}`;
 
     document.getElementById('btn-abrir-pdf-maquina').onclick = () => abrirModalFiltroPDF_Maquina(m.id);
 
@@ -246,7 +217,9 @@ function alternarPeriodoPDF_Maquina() {
 async function gerarPDFIndividualMaquina(e) {
     e.preventDefault();
     if (!window.jspdf) {
-        alert('Biblioteca de PDF carregando. Aguarde instantes e tente novamente.');
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Biblioteca de PDF carregando. Aguarde instantes.', 'aviso');
+        }
         return;
     }
 
@@ -280,10 +253,7 @@ async function gerarPDFIndividualMaquina(e) {
     );
 
     const minutosParadaTotal = ordensFiltradas.reduce((acc, o) => acc + (Number(o.minutosParada) || 0), 0);
-
-    const logoObj = typeof carregarImagemLogoBase64 === 'function'
-        ? await carregarImagemLogoBase64('images/cabe.png')
-        : null;
+    const logoObj = await OSyncUtils.carregarImagemLogoBase64('images/cabe.png');
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -325,7 +295,7 @@ async function gerarPDFIndividualMaquina(e) {
     doc.text(`Fabricante: ${m.fabricante || '-'}`, 85, 48);
     doc.text(`Modelo: ${m.modelo || '-'}`, 145, 48);
     doc.text(`Status Atual: ${m.status || 'Operacional'}`, 18, 55);
-    doc.text(`Total Horas Paradas: ${formatarHorasParadasMaq(minutosParadaTotal)}`, 85, 55);
+    doc.text(`Total Horas Paradas: ${OSyncUtils.formatarHorasParadas(minutosParadaTotal)}`, 85, 55);
     doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 55);
 
     const linhas = ordensFiltradas.map(os => [
@@ -346,7 +316,7 @@ async function gerarPDFIndividualMaquina(e) {
         startY: 67,
         head: [['Nº O.S.', 'Data', 'Tipo', 'Técnico', 'Parada', 'Status', 'Problema / Serviço Realizado']],
         body: linhas,
-        foot: [['', '', '', 'TOTAL PARADO:', formatarHorasParadasMaq(minutosParadaTotal), 'TOTAL O.S.:', `${ordensFiltradas.length} O.S.`]],
+        foot: [['', '', '', 'TOTAL PARADO:', OSyncUtils.formatarHorasParadas(minutosParadaTotal), 'TOTAL O.S.:', `${ordensFiltradas.length} O.S.`]],
         theme: 'grid',
         headStyles: { fillColor: [11, 17, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
