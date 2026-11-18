@@ -58,7 +58,6 @@ async function carregarTiposEquipamentoSelect(valorSelecionado = '') {
         let opcoesHtml = '<option value="">Selecione o tipo (Opcional)...</option>' +
             cacheTiposEquipamento.map(t => `<option value="${escaparHTML(t.nome)}">${escaparHTML(t.nome)}</option>`).join('');
 
-        // Garante que um tipo antigo continue visível na edição caso tenha sido removido das configurações
         if (valorSelecionado && !cacheTiposEquipamento.some(t => t.nome === valorSelecionado)) {
             opcoesHtml += `<option value="${escaparHTML(valorSelecionado)}">${escaparHTML(valorSelecionado)}</option>`;
         }
@@ -1017,5 +1016,264 @@ async function excluirUsuarioPerfil(userId, nome) {
         carregarUsuariosPorPerfil(perfilAtualCadastro);
     } catch (err) {
         alert('Erro ao excluir: ' + err.message);
+    }
+}
+
+// =========================================================================
+// IMPORTADOR TEMPORÁRIO DE ATIVOS VIA PLANILHA (.XLSX / .XLS / .CSV)
+// =========================================================================
+let itensPlanilhaBrutosTemp = [];
+let itensPlanilhaFiltradosTemp = [];
+
+function normalizarTextoColunaPlanilha(texto) {
+    return String(texto || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+}
+
+function mapearStatusPlanilhaAtivo(valorStatus) {
+    const norm = normalizarTextoColunaPlanilha(valorStatus);
+    if (!norm || norm === 'ativo' || norm === 'operacional' || norm === 'em operacao') {
+        return 'Operacional';
+    }
+    if (norm.includes('manutenc')) {
+        return 'Manutencao';
+    }
+    if (norm.includes('desativad') || norm.includes('inativ') || norm.includes('parad')) {
+        return 'Parada';
+    }
+    return 'Operacional';
+}
+
+function processarPlanilhaAtivosTemp(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    if (typeof XLSX === 'undefined') {
+        alert('Biblioteca de leitura Excel ainda não carregou. Atualize a página e tente novamente.');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const primeiraAba = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[primeiraAba];
+
+            const matriz = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            let idxHeader = -1;
+            for (let i = 0; i < Math.min(matriz.length, 15); i++) {
+                const linhaNorm = matriz[i].map(normalizarTextoColunaPlanilha);
+                if (linhaNorm.includes('equipamento codigo') || linhaNorm.includes('equipamento')) {
+                    idxHeader = i;
+                    break;
+                }
+            }
+
+            if (idxHeader === -1) {
+                alert('Não foi possível encontrar a coluna "Equipamento Código" na planilha selecionada.');
+                event.target.value = '';
+                return;
+            }
+
+            const cabecalhos = matriz[idxHeader].map(normalizarTextoColunaPlanilha);
+            const idxEquip = cabecalhos.findIndex(c => c === 'equipamento codigo' || c === 'equipamento');
+            const idxTipo = cabecalhos.findIndex(c => c === 'tipo de equipamento' || c === 'tipo');
+            const idxSerie = cabecalhos.findIndex(c => c === 'nº serie' || c === 'no serie' || c === 'numero de serie' || c === 'serie');
+            const idxStatus = cabecalhos.findIndex(c => c === 'status equipamento' || c === 'status');
+            const idxLocal = cabecalhos.findIndex(c => c === 'localizacao' || c === 'setor');
+
+            const listaExtraida = [];
+            for (let r = idxHeader + 1; r < matriz.length; r++) {
+                const row = matriz[r];
+                if (!row || row.length === 0) continue;
+
+                const nomeEquip = String(row[idxEquip] ?? '').trim();
+                if (!nomeEquip) continue;
+
+                const tipoEquip = idxTipo >= 0 ? String(row[idxTipo] ?? '').trim() : '';
+                const numSerie = idxSerie >= 0 ? String(row[idxSerie] ?? '').trim() : '';
+                const statusBruto = idxStatus >= 0 ? String(row[idxStatus] ?? '').trim() : '';
+                const setorLocal = idxLocal >= 0 ? String(row[idxLocal] ?? '').trim() : '';
+
+                listaExtraida.push({
+                    codigoTag: '',
+                    nome: nomeEquip,
+                    tipoEquipamento: tipoEquip,
+                    fabricante: '',
+                    modelo: '',
+                    numeroSerie: numSerie,
+                    setor: setorLocal,
+                    status: mapearStatusPlanilhaAtivo(statusBruto)
+                });
+            }
+
+            if (listaExtraida.length === 0) {
+                alert('Nenhum equipamento válido encontrado abaixo do cabeçalho.');
+                event.target.value = '';
+                return;
+            }
+
+            itensPlanilhaBrutosTemp = listaExtraida;
+            document.getElementById('modal-importar-ativos-temp').classList.remove('hidden');
+            recalcularPreviaImportacaoAtivos();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } catch (err) {
+            alert('Erro ao ler a planilha: ' + err.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+function recalcularPreviaImportacaoAtivos() {
+    const ignorarDuplicados = document.getElementById('chk-ignorar-duplicados-ativos')?.checked ?? true;
+    const nomesExistentes = new Set(cacheAtivos.map(a => normalizarTextoColunaPlanilha(a.nome)));
+
+    itensPlanilhaFiltradosTemp = itensPlanilhaBrutosTemp.filter(item => {
+        if (!ignorarDuplicados) return true;
+        return !nomesExistentes.has(normalizarTextoColunaPlanilha(item.nome));
+    });
+
+    const qtdIgnorados = itensPlanilhaBrutosTemp.length - itensPlanilhaFiltradosTemp.length;
+    const resumo = document.getElementById('resumo-importacao-ativos');
+    if (resumo) {
+        resumo.innerHTML = `
+            <p><strong>${itensPlanilhaBrutosTemp.length}</strong> equipamentos lidos da planilha.</p>
+            <p><strong>${itensPlanilhaFiltradosTemp.length}</strong> serão importados agora ${qtdIgnorados > 0 ? `(${qtdIgnorados} já cadastrados foram ignorados)` : ''}.</p>
+            <p class="text-[11px] text-amber-800">Os respectivos <strong>Centros de Custo</strong> e novos <strong>Tipos de Equipamento</strong> também serão criados automaticamente.</p>
+        `;
+    }
+
+    const contador = document.getElementById('contador-linhas-validas-import');
+    if (contador) contador.textContent = `${itensPlanilhaFiltradosTemp.length} itens prontos`;
+
+    const tbody = document.getElementById('tabela-previa-importacao-ativos');
+    if (tbody) {
+        if (itensPlanilhaFiltradosTemp.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Todos os equipamentos desta planilha já estão cadastrados.</td></tr>`;
+        } else {
+            tbody.innerHTML = itensPlanilhaFiltradosTemp.map((item, idx) => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2 text-slate-400 font-bold">${idx + 1}</td>
+                    <td class="p-2 font-bold text-slate-900">${escaparHTML(item.nome)}</td>
+                    <td class="p-2 text-slate-600">${escaparHTML(item.tipoEquipamento || '-')}</td>
+                    <td class="p-2 text-slate-600">${escaparHTML(item.numeroSerie || '-')}</td>
+                    <td class="p-2 text-slate-600">${escaparHTML(item.setor || '-')}</td>
+                    <td class="p-2 font-semibold ${item.status === 'Operacional' ? 'text-emerald-700' : 'text-rose-700'}">${escaparHTML(item.status)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    const btnConfirmar = document.getElementById('btn-confirmar-importacao-ativos');
+    if (btnConfirmar) btnConfirmar.disabled = itensPlanilhaFiltradosTemp.length === 0;
+}
+
+function fecharModalImportarAtivosTemp() {
+    document.getElementById('modal-importar-ativos-temp')?.classList.add('hidden');
+    itensPlanilhaBrutosTemp = [];
+    itensPlanilhaFiltradosTemp = [];
+}
+
+async function confirmarImportacaoPlanilhaAtivos() {
+    if (itensPlanilhaFiltradosTemp.length === 0) return;
+
+    const btn = document.getElementById('btn-confirmar-importacao-ativos');
+    btn.disabled = true;
+    btn.innerHTML = `<span>Importando ${itensPlanilhaFiltradosTemp.length} máquinas...</span>`;
+
+    try {
+        const empId = usuarioAtual.empresaId;
+
+        const tiposExistentesNorm = new Set(cacheTiposEquipamento.map(t => normalizarTextoColunaPlanilha(t.nome)));
+        const tiposNovos = new Map();
+        itensPlanilhaFiltradosTemp.forEach(item => {
+            if (item.tipoEquipamento) {
+                const norm = normalizarTextoColunaPlanilha(item.tipoEquipamento);
+                if (!tiposExistentesNorm.has(norm) && !tiposNovos.has(norm)) {
+                    tiposNovos.set(norm, item.tipoEquipamento);
+                }
+            }
+        });
+
+        let batch = db.batch();
+        let opsNoBatch = 0;
+
+        for (const nomeTipo of tiposNovos.values()) {
+            const tipoRef = db.collection('tipos_equipamento').doc();
+            batch.set(tipoRef, {
+                empresaId: empId,
+                nome: nomeTipo,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            opsNoBatch++;
+        }
+
+        for (const item of itensPlanilhaFiltradosTemp) {
+            const ativoRef = db.collection('ativos').doc();
+            batch.set(ativoRef, {
+                empresaId: empId,
+                codigoTag: '',
+                nome: item.nome,
+                tipoEquipamento: item.tipoEquipamento,
+                fabricante: '',
+                modelo: '',
+                numeroSerie: item.numeroSerie,
+                setor: item.setor,
+                status: item.status,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            const ccRef = db.collection('centros_custo').doc(ativoRef.id);
+            batch.set(ccRef, {
+                empresaId: empId,
+                ativoId: ativoRef.id,
+                codigo: `EQ-${ativoRef.id.slice(0, 4).toUpperCase()}`,
+                nome: item.nome,
+                setor: item.setor || 'Geral',
+                ativo: true,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            opsNoBatch += 2;
+
+            if (opsNoBatch >= 400) {
+                await batch.commit();
+                batch = db.batch();
+                opsNoBatch = 0;
+            }
+        }
+
+        if (opsNoBatch > 0) {
+            await batch.commit();
+        }
+
+        const totalImportado = itensPlanilhaFiltradosTemp.length;
+        fecharModalImportarAtivosTemp();
+        await Promise.all([
+            carregarTiposEquipamentoSelect(),
+            carregarAtivos()
+        ]);
+
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync(`${totalImportado} equipamentos importados com sucesso!`, 'sucesso');
+        } else {
+            alert(`${totalImportado} equipamentos importados com sucesso!`);
+        }
+    } catch (err) {
+        alert('Erro durante a importação: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="upload-cloud" class="w-4 h-4"></i><span>Confirmar Importação</span>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
