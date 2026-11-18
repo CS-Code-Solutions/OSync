@@ -1,16 +1,17 @@
 /**
- * Compacta a imagem no cliente (máx 1024px, WebP/JPEG 75%)
- * e envia ao Firebase Storage retornando apenas a URL leve.
+ * Compacta a imagem no cliente e tenta enviar ao Firebase Storage (com timeout de 8s).
+ * Caso o Storage não esteja habilitado ou falhe, retorna a imagem compactada em Base64 leve
+ * para que a foto seja anexada instantaneamente sem travar o usuário.
  */
 async function compactarEEnviarImagemOS(file, empresaId, osId) {
-    const blobCompactado = await new Promise((resolve, reject) => {
+    const { blob, dataUrlLeve } = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-                const maxDim = 1024;
-                let w = img.width;
-                let h = img.height;
+                const maxDim = 800;
+                let w = img.width || 800;
+                let h = img.height || 600;
 
                 if (w > maxDim || h > maxDim) {
                     if (w > h) {
@@ -28,22 +29,42 @@ async function compactarEEnviarImagemOS(file, empresaId, osId) {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
 
-                canvas.toBlob(
-                    (blob) => (blob ? resolve(blob) : reject(new Error('Falha ao compactar imagem'))),
-                    'image/webp',
-                    0.75
-                );
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+
+                if (canvas.toBlob) {
+                    canvas.toBlob(
+                        (b) => resolve({ blob: b, dataUrlLeve: dataUrl }),
+                        'image/jpeg',
+                        0.65
+                    );
+                } else {
+                    resolve({ blob: null, dataUrlLeve: dataUrl });
+                }
             };
-            img.onerror = reject;
+            img.onerror = () => reject(new Error('Não foi possível ler a imagem selecionada.'));
             img.src = e.target.result;
         };
-        reader.onerror = reject;
+        reader.onerror = () => reject(new Error('Erro ao abrir o arquivo de imagem.'));
         reader.readAsDataURL(file);
     });
 
-    // Envia para o Firebase Storage e devolve somente a URL
-    const nomeArquivo = `empresas/${empresaId}/os/${osId}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.webp`;
-    const ref = storage.ref().child(nomeArquivo);
-    await ref.put(blobCompactado, { contentType: 'image/webp' });
-    return await ref.getDownloadURL();
+    // Tenta enviar para o Firebase Storage com limite máximo de 8 segundos
+    if (typeof storage !== 'undefined' && storage && blob) {
+        try {
+            const nomeArquivo = `empresas/${empresaId}/os/${osId}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+            const ref = storage.ref().child(nomeArquivo);
+
+            const uploadComTimeout = Promise.race([
+                ref.put(blob, { contentType: 'image/jpeg' }).then(() => ref.getDownloadURL()),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Storage')), 8000))
+            ]);
+
+            const urlStorage = await uploadComTimeout;
+            if (urlStorage) return urlStorage;
+        } catch (errStorage) {
+            console.warn('Storage indisponível ou lento, usando fallback compactado:', errStorage.message);
+        }
+    }
+
+    return dataUrlLeve;
 }
