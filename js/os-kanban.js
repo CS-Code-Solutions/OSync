@@ -3,6 +3,7 @@ let cacheColunasOS = [];
 let cacheAtivosOS = [];
 let cacheTiposOS = [];
 let cacheManutentoresOS = [];
+let manutentoresNovaOSSelecionados = [];
 let osArrastadaId = null;
 let unsubscribeOrdensOS = null;
 
@@ -44,9 +45,9 @@ async function carregarDadosBaseOS() {
     const btnEditarKanban = document.getElementById('btn-editar-kanban-os');
     if (btnEditarKanban) {
         if (usuarioAtual.perfil === 'Admin' || usuarioAtual.perfil === 'SuperAdmin') {
-            btnEditarKanban.classList.remove('hidden');
+            btnEditarKanban.classList.add('md:flex');
         } else {
-            btnEditarKanban.classList.add('hidden');
+            btnEditarKanban.classList.remove('md:flex');
         }
     }
 
@@ -284,8 +285,54 @@ async function soltarCardOS(e, novaColunaId) {
 }
 
 // ==========================================
-// MODAL NOVA O.S.
+// MODAL NOVA O.S. (SELETOR NATIVO MÚLTIPLO)
 // ==========================================
+function renderizarManutentoresNovaOS() {
+    const selMan = document.getElementById('os-manutentor-select');
+    const chipsBox = document.getElementById('os-manutentores-chips');
+
+    if (selMan) {
+        const disponiveis = cacheManutentoresOS.filter(m => !manutentoresNovaOSSelecionados.some(sel => sel.id === m.id));
+        const textoPadrao = manutentoresNovaOSSelecionados.length > 0
+            ? '+ Adicionar outro manutentor...'
+            : 'Não atribuído (Livre) — Toque para escolher';
+
+        selMan.innerHTML = `<option value="">${textoPadrao}</option>` +
+            disponiveis.map(m => `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`).join('');
+        selMan.value = '';
+    }
+
+    if (chipsBox) {
+        if (manutentoresNovaOSSelecionados.length === 0) {
+            chipsBox.innerHTML = '';
+        } else {
+            chipsBox.innerHTML = manutentoresNovaOSSelecionados.map(m => `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                    <span>${escaparHTML(m.nome)}</span>
+                    <button type="button" onclick="removerManutentorNovaOS('${escaparHTML(m.id)}')" class="text-blue-500 hover:text-rose-600 font-extrabold leading-none">×</button>
+                </span>
+            `).join('');
+        }
+    }
+}
+
+function adicionarManutentorNovaOS() {
+    const selMan = document.getElementById('os-manutentor-select');
+    const manId = selMan?.value || '';
+    if (!manId) return;
+
+    const manObj = cacheManutentoresOS.find(m => m.id === manId);
+    if (manObj && !manutentoresNovaOSSelecionados.some(s => s.id === manObj.id)) {
+        manutentoresNovaOSSelecionados.push({ id: manObj.id, nome: manObj.nome });
+    }
+    renderizarManutentoresNovaOS();
+}
+
+function removerManutentorNovaOS(manId) {
+    manutentoresNovaOSSelecionados = manutentoresNovaOSSelecionados.filter(m => m.id !== manId);
+    renderizarManutentoresNovaOS();
+}
+
 async function abrirModalNovaOS() {
     if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0) {
         await carregarDadosBaseOS();
@@ -303,17 +350,14 @@ async function abrirModalNovaOS() {
         `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`
     ).join('');
 
-    const selMan = document.getElementById('os-manutentor');
-    if (selMan) {
-        selMan.innerHTML = '<option value="">Não atribuído (Livre)</option>' +
-            cacheManutentoresOS.map(m =>
-                `<option value="${escaparHTML(m.id)}">${escaparHTML(m.nome)}</option>`
-            ).join('');
-
-        if (usuarioAtual.perfil === 'Manutentor' && cacheManutentoresOS.some(m => m.id === usuarioAtual.uid)) {
-            selMan.value = usuarioAtual.uid;
+    manutentoresNovaOSSelecionados = [];
+    if (usuarioAtual.perfil === 'Manutentor') {
+        const proprio = cacheManutentoresOS.find(m => m.id === usuarioAtual.uid);
+        if (proprio) {
+            manutentoresNovaOSSelecionados.push({ id: proprio.id, nome: proprio.nome });
         }
     }
+    renderizarManutentoresNovaOS();
 
     document.getElementById('os-condicao-maquina').value = 'Operacional';
     document.getElementById('os-inicio-parada').value = '';
@@ -386,11 +430,8 @@ async function salvarNovaOS(e) {
             ? document.getElementById('os-inicio-parada').value
             : '';
 
-        const manIdSelecionado = document.getElementById('os-manutentor')?.value || '';
-        const manObj = cacheManutentoresOS.find(m => m.id === manIdSelecionado);
-
-        const manutentoresIds = manObj ? [manObj.id] : [];
-        const manutentoresNomes = manObj ? [manObj.nome] : [];
+        const manutentoresIds = manutentoresNovaOSSelecionados.map(m => m.id);
+        const manutentoresNomes = manutentoresNovaOSSelecionados.map(m => m.nome);
 
         const descricao = document.getElementById('os-descricao').value.trim();
 
@@ -429,6 +470,7 @@ async function salvarNovaOS(e) {
 
         fecharModalNovaOS();
         e.target.reset();
+        manutentoresNovaOSSelecionados = [];
         if (typeof mostrarNotificacaoOSync === 'function') {
             mostrarNotificacaoOSync(`#OS-${String(numeroGerado).padStart(4, '0')} criada com sucesso!`, 'sucesso');
         }
