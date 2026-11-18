@@ -215,14 +215,14 @@ function renderizarKanbanOS(ordens) {
         const corCol = sanitizarCorHex(col.corTopo, '#1D4ED8');
         const colIdSeguro = escaparHTML(col.id);
         return `
-        <div class="w-80 shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200 flex flex-col max-h-full overflow-hidden"
+        <div class="flex-1 min-w-[230px] bg-slate-100/90 rounded-2xl border border-slate-200 flex flex-col max-h-full overflow-hidden"
             ondragover="permitirDropOS(event)" ondrop="soltarCardOS(event, '${colIdSeguro}')">
-            <div class="p-3.5 bg-white rounded-t-2xl border-b border-slate-200 flex items-center justify-between shrink-0" style="border-top: 4px solid ${corCol}">
-                <h3 class="font-bold text-slate-800 text-sm">${escaparHTML(col.titulo)}</h3>
-                <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">${cardsColuna.length}</span>
+            <div class="p-3 bg-white rounded-t-2xl border-b border-slate-200 flex items-center justify-between gap-2 shrink-0" style="border-top: 4px solid ${corCol}">
+                <h3 class="font-bold text-slate-800 text-sm truncate" title="${escaparHTML(col.titulo)}">${escaparHTML(col.titulo)}</h3>
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 shrink-0">${cardsColuna.length}</span>
             </div>
 
-            <div class="p-2.5 space-y-2.5 flex-1 overflow-y-auto min-h-[120px]">
+            <div class="p-2 space-y-2 flex-1 overflow-y-auto min-h-[120px] kanban-scroll">
                 ${cardsColuna.map(os => {
                     const osIdSeguro = escaparHTML(os.id);
                     const tituloAtivo = escaparHTML(formatarRotuloAtivoOS(os.ativoTag, os.ativoNome));
@@ -231,19 +231,19 @@ function renderizarKanbanOS(ordens) {
                         : (os.manutentorNome || 'Livre');
                     return `
                     <div draggable="true" ondragstart="iniciarDragOS(event, '${osIdSeguro}')" onclick="abrirDetalhesOS('${osIdSeguro}')"
-                        class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-400 transition cursor-pointer space-y-2">
+                        class="bg-white p-3 rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-400 transition cursor-pointer space-y-1.5">
                         <div class="flex items-center justify-between gap-1">
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1 flex-wrap">
                                 <span class="text-[11px] font-extrabold text-slate-400">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
                                 ${badgeCondicao[os.condicaoMaquina] || ''}
                             </div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${corPrioridade[os.prioridade] || 'bg-slate-100'}">${escaparHTML(os.prioridade)}</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${corPrioridade[os.prioridade] || 'bg-slate-100'}">${escaparHTML(os.prioridade)}</span>
                         </div>
                         <div class="font-bold text-slate-900 text-xs leading-snug">${tituloAtivo}</div>
                         <p class="text-xs text-slate-600 line-clamp-2">${escaparHTML(os.descricao)}</p>
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                            <span class="truncate max-w-[140px]"><i data-lucide="users" class="w-3 h-3 inline mr-1"></i>${escaparHTML(nomesEquipe)}</span>
-                            <span class="font-semibold text-blue-600">${escaparHTML(os.tipoNome || '')}</span>
+                        <div class="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                            <span class="truncate min-w-0"><i data-lucide="users" class="w-3 h-3 inline mr-1"></i>${escaparHTML(nomesEquipe)}</span>
+                            <span class="font-semibold text-blue-600 shrink-0">${escaparHTML(os.tipoNome || '')}</span>
                         </div>
                     </div>`;
                 }).join('')}
@@ -251,6 +251,7 @@ function renderizarKanbanOS(ordens) {
         </div>`;
     }).join('');
 }
+
 
 function iniciarDragOS(e, osId) {
     osArrastadaId = osId;
