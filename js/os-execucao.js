@@ -14,6 +14,15 @@ function sanitizarURLImagem(url) {
     return '';
 }
 
+function obterColunaConclusaoOS() {
+    if (!Array.isArray(cacheColunasOS) || cacheColunasOS.length === 0) return null;
+    const ordenadas = [...cacheColunasOS].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    return (
+        ordenadas.find(c => /conclu|finaliz|encerrad/i.test(c.titulo || '')) ||
+        ordenadas[ordenadas.length - 1]
+    );
+}
+
 function calcularMinutosParadaEntreDatas(inicioISO, terminoISO) {
     if (!inicioISO || !terminoISO) return 0;
     const d1 = new Date(inicioISO);
@@ -50,11 +59,20 @@ function resetarEstadoModalDetalhesOS() {
     anexosOSAtual = [];
     itensCustoOSAtual = [];
     manutentoresDetalhesOSAtual = [];
+    osAtualEhExterna = false;
+    osAtualTeveParada = false;
 
     const formEnc = document.getElementById('form-encerramento-os');
-    if (formEnc) formEnc.reset();
+    if (formEnc) {
+        formEnc.reset();
+        formEnc.classList.add('hidden');
+    }
+
+    const boxAbrir = document.getElementById('box-botao-abrir-encerramento');
+    if (boxAbrir) boxAbrir.classList.remove('hidden');
 
     const camposTexto = [
+        'det-os-id',
         'enc-servico-realizado',
         'enc-observacoes',
         'item-custo-desc',
@@ -81,8 +99,14 @@ function resetarEstadoModalDetalhesOS() {
     const badgeParada = document.getElementById('enc-tempo-parada-calculado');
     if (badgeParada) badgeParada.textContent = '0h 00m';
 
-    renderizarAnexosOS();
-    renderizarItensCustoOS();
+    const listaAnexos = document.getElementById('enc-lista-anexos');
+    if (listaAnexos) listaAnexos.innerHTML = '<span class="text-[11px] text-slate-400">Nenhuma foto anexada.</span>';
+
+    const listaCustos = document.getElementById('enc-lista-custos');
+    if (listaCustos) listaCustos.innerHTML = '<p class="text-[11px] text-slate-400">Nenhum item de custo lançado.</p>';
+
+    const totalLabel = document.getElementById('enc-custo-total-label');
+    if (totalLabel) totalLabel.textContent = '0,00';
 }
 
 function renderizarManutentoresDetalhesOS() {
@@ -137,7 +161,7 @@ async function abrirDetalhesOS(osId) {
     const os = cacheOrdensServico.find(o => o.id === osId);
     if (!os) return;
 
-    // Reseta 100% dos campos e variáveis antes de carregar a O.S. selecionada
+    // 1. Limpa completamente qualquer resquício de O.S. anterior
     resetarEstadoModalDetalhesOS();
 
     const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
@@ -235,15 +259,12 @@ async function abrirDetalhesOS(osId) {
         inicioPadraoOS = dCriado.toISOString().slice(0, 16);
     }
 
-    // Horas de trabalho ficam vazias por padrão (só preenche se já estavam salvas na O.S.)
     const inpIniTrab = document.getElementById('enc-inicio-trabalho');
-    if (inpIniTrab) {
-        inpIniTrab.value = os.inicioExecucao || '';
-    }
+    if (inpIniTrab) inpIniTrab.value = os.inicioExecucao || '';
+
     const inpEncerramento = document.getElementById('enc-data-hora');
-    if (inpEncerramento) {
-        inpEncerramento.value = os.dataHoraEncerramento || '';
-    }
+    if (inpEncerramento) inpEncerramento.value = os.dataHoraEncerramento || '';
+
     recalcularTempoTrabalhoEncerramento();
 
     const blocoParada = document.getElementById('bloco-encerramento-parada');
@@ -278,7 +299,7 @@ async function abrirDetalhesOS(osId) {
     }
 
     document.getElementById('modal-detalhes-os').classList.remove('hidden');
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function aplicarLayoutCustosPorTipo(ehExterna) {
@@ -325,7 +346,7 @@ function mostrarFormularioEncerramento() {
     document.getElementById('box-botao-abrir-encerramento').classList.add('hidden');
     document.getElementById('form-encerramento-os').classList.remove('hidden');
     recalcularTempoTrabalhoEncerramento();
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 async function atualizarStatusRapidoOS() {
@@ -333,8 +354,8 @@ async function atualizarStatusRapidoOS() {
     const novaColId = document.getElementById('det-os-coluna-select').value;
     const os = cacheOrdensServico.find(o => o.id === osId);
 
-    const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
-    const ehColunaFinal = ultimaColuna && ultimaColuna.id === novaColId;
+    const colunaConclusao = obterColunaConclusaoOS();
+    const ehColunaFinal = colunaConclusao && colunaConclusao.id === novaColId;
 
     if (ehColunaFinal && os && !os.encerrada) {
         document.getElementById('det-os-coluna-select').value = os.colunaId;
@@ -345,7 +366,10 @@ async function atualizarStatusRapidoOS() {
         return;
     }
 
-    await db.collection('ordens_servico').doc(osId).update({ colunaId: novaColId });
+    await db.collection('ordens_servico').doc(osId).update({
+        colunaId: novaColId,
+        encerrada: ehColunaFinal ? true : false
+    });
 
     const col = cacheColunasOS.find(c => c.id === novaColId);
     if (col) {
@@ -523,7 +547,6 @@ async function confirmarEncerramentoOS(e) {
             tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
         }
 
-        // Horas de trabalho opcionais (só valida ordem se ambas forem preenchidas)
         const inicioExecucao = document.getElementById('enc-inicio-trabalho')?.value || '';
         const dataHoraEncerramento = document.getElementById('enc-data-hora')?.value || '';
         if (inicioExecucao && dataHoraEncerramento && new Date(dataHoraEncerramento) < new Date(inicioExecucao)) {
@@ -554,7 +577,17 @@ async function confirmarEncerramentoOS(e) {
         const manutentoresIds = manutentoresDetalhesOSAtual.map(m => m.id);
         const manutentoresNomes = manutentoresDetalhesOSAtual.map(m => m.nome);
 
-        const ultimaColuna = cacheColunasOS[cacheColunasOS.length - 1];
+        // Garante que cacheColunasOS está carregado e localiza a coluna de conclusão
+        if (!Array.isArray(cacheColunasOS) || cacheColunasOS.length === 0) {
+            const colSnap = await db.collection('kanban_colunas')
+                .where('empresaId', '==', usuarioAtual.empresaId)
+                .get();
+            cacheColunasOS = colSnap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+        }
+
+        const colunaConclusao = obterColunaConclusaoOS();
 
         const dadosAtualizacao = {
             servicoRealizado,
@@ -582,8 +615,8 @@ async function confirmarEncerramentoOS(e) {
             dadosAtualizacao.tempoParadaMinutos = tempoParadaMinutos;
         }
 
-        if (ultimaColuna) {
-            dadosAtualizacao.colunaId = ultimaColuna.id;
+        if (colunaConclusao && colunaConclusao.id) {
+            dadosAtualizacao.colunaId = colunaConclusao.id;
         }
 
         await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
