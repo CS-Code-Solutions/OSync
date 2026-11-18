@@ -501,13 +501,51 @@ async function confirmarExclusaoOSLixeira(e) {
 }
 
 // ==========================================
-// MODAL NOVA O.S. (LIMPEZA COMPLETA + SELETOR MÚLTIPLO)
+// MODAL NOVA O.S. (BUSCA DE MÁQUINA + SELETOR MÚLTIPLO)
 // ==========================================
+function filtrarSelectAtivosNovaOS(ativoIdForcado = '') {
+    const selAtivo = document.getElementById('os-ativo');
+    if (!selAtivo) return;
+
+    const termo = (document.getElementById('os-ativo-busca')?.value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+
+    const valorAtual = ativoIdForcado || selAtivo.value;
+
+    const filtrados = cacheAtivosOS.filter(a => {
+        if (!termo) return true;
+        const texto = `${a.codigoTag || ''} ${a.nome || ''} ${a.setor || ''} ${a.tipoEquipamento || ''}`
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+        return texto.includes(termo);
+    });
+
+    if (filtrados.length === 0) {
+        selAtivo.innerHTML = '<option value="">Nenhuma máquina encontrada...</option>';
+        return;
+    }
+
+    selAtivo.innerHTML = filtrados.map(a =>
+        `<option value="${escaparHTML(a.id)}">${escaparHTML(formatarRotuloAtivoOS(a.codigoTag, a.nome))}</option>`
+    ).join('');
+
+    if (valorAtual && filtrados.some(a => a.id === valorAtual)) {
+        selAtivo.value = valorAtual;
+    }
+}
+
 function resetarFormularioNovaOS() {
     const formNova = document.getElementById('form-nova-os');
     if (formNova) formNova.reset();
 
     manutentoresNovaOSSelecionados = [];
+
+    const buscaAtivoEl = document.getElementById('os-ativo-busca');
+    if (buscaAtivoEl) buscaAtivoEl.value = '';
 
     const descEl = document.getElementById('os-descricao');
     if (descEl) descEl.value = '';
@@ -583,9 +621,7 @@ async function abrirModalNovaOS() {
         await carregarDadosBaseOS();
     }
 
-    document.getElementById('os-ativo').innerHTML = cacheAtivosOS.map(a =>
-        `<option value="${escaparHTML(a.id)}">${escaparHTML(formatarRotuloAtivoOS(a.codigoTag, a.nome))}</option>`
-    ).join('');
+    filtrarSelectAtivosNovaOS();
 
     document.getElementById('os-tipo').innerHTML = cacheTiposOS.map(t =>
         `<option value="${escaparHTML(t.id)}">${escaparHTML(t.nome)}</option>`
@@ -595,7 +631,6 @@ async function abrirModalNovaOS() {
         `<option value="${escaparHTML(c.id)}">${escaparHTML(c.titulo)}</option>`
     ).join('');
 
-    // Pré-seleciona o usuário logado se ele for Manutentor ou Gestão (Admin)
     if (usuarioAtual.perfil === 'Manutentor' || usuarioAtual.perfil === 'Admin') {
         const uidAtual = usuarioAtual.id || usuarioAtual.uid;
         const proprio = cacheManutentoresOS.find(m => m.id === uidAtual);
@@ -609,6 +644,7 @@ async function abrirModalNovaOS() {
     verificarTipoManutencaoCriacao();
 
     document.getElementById('modal-nova-os').classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function alternarCampoParadaCriacaoOS() {
@@ -663,6 +699,11 @@ async function salvarNovaOS(e) {
         });
 
         const ativoId = document.getElementById('os-ativo').value;
+        if (!ativoId) {
+            alert('Selecione uma máquina válida na lista.');
+            btn.disabled = false;
+            return;
+        }
         const ativoObj = cacheAtivosOS.find(a => a.id === ativoId) || {};
 
         const tipoId = document.getElementById('os-tipo').value;
