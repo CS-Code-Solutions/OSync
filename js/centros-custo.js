@@ -10,9 +10,9 @@ async function carregarDadosCentrosCusto() {
 
     grid.innerHTML = OSyncUtils.gerarSkeletonCards(6);
 
-    const [ativosSnap, osSnap] = await Promise.all([
-        db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('ordens_servico').where('empresaId', '==', usuarioAtual.empresaId).get()
+    const [ativos, ordens] = await Promise.all([
+        OSyncDataStore.getAtivos(),
+        OSyncDataStore.getOrdensServico({ completo: true })
     ]);
 
     const ativos = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
