@@ -13,15 +13,18 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-    const titulo = payload?.notification?.title || payload?.data?.title || 'OSync';
-    const corpo = payload?.notification?.body || payload?.data?.body || '';
+    const titulo = payload?.data?.title || payload?.notification?.title || 'OSync';
+    const corpo = payload?.data?.body || payload?.notification?.body || '';
     const url = payload?.data?.url || '/';
+    const tag = payload?.data?.eventoId || `osync-${Date.now()}`;
 
     return self.registration.showNotification(titulo, {
         body: corpo,
         icon: '/images/ico192.png',
         badge: '/images/ico.png',
         vibrate: [200, 100, 200],
+        tag: tag,
+        renotify: false,
         data: { url }
     });
 });
@@ -45,7 +48,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = 'osync-pwa-v2.2.0';
+const CACHE_NAME = 'osync-pwa-v2.3.0';
 const ASSETS_ESSENCIAIS = [
     './',
     './index.html',
