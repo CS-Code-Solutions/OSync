@@ -37,7 +37,8 @@ module.exports = async (req, res) => {
             titulo,
             corpo,
             urlDestino,
-            remetenteUid
+            remetenteUid,
+            eventoId
         } = req.body || {};
 
         if (!empresaId || !titulo || !corpo) {
@@ -87,28 +88,19 @@ module.exports = async (req, res) => {
             return res.status(200).json({ enviados: 0, motivo: 'Nenhum aparelho inscrito.' });
         }
 
+        const eventoTag = String(eventoId || `osync-${tipo || 'alerta'}-${Date.now()}`);
+
         const response = await fbAdmin.messaging().sendEachForMulticast({
             tokens,
-            notification: {
-                title: String(titulo),
-                body: String(corpo)
-            },
             data: {
                 url: String(urlDestino || '/'),
                 tipo: String(tipo || 'geral'),
                 title: String(titulo),
-                body: String(corpo)
+                body: String(corpo),
+                eventoId: eventoTag
             },
             webpush: {
                 headers: { Urgency: 'high' },
-                notification: {
-                    title: String(titulo),
-                    body: String(corpo),
-                    icon: '/images/ico192.png',
-                    badge: '/images/ico.png',
-                    vibrate: [200, 100, 200],
-                    tag: `osync-${tipo || 'alerta'}-${Date.now()}`
-                },
                 fcmOptions: {
                     link: String(urlDestino || '/')
                 }
