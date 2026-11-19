@@ -231,6 +231,18 @@ async function salvarNovaSolicitacao(e) {
         await db.collection('ativos').doc(sel.value).update({ status: 'Parada' });
     }
 
+    if (typeof dispararPushOSync === 'function') {
+        const tag = opt?.getAttribute('data-tag') || '';
+        const nomeMaq = opt?.getAttribute('data-nome') || 'Equipamento';
+        dispararPushOSync({
+            tipo: 'nova_solicitacao',
+            perfisAlvo: ['Admin', 'Manutentor'],
+            titulo: parada ? '🚨 Nova Solicitação (MÁQUINA PARADA)' : 'Nova Solicitação de Manutenção',
+            corpo: `${tag ? tag + ' - ' : ''}${nomeMaq} • Aberta por ${usuarioAtual.nome}`,
+            urlDestino: '/'
+        });
+    }
+
     fecharModalNovaSolicitacao();
     e.target.reset();
 }
@@ -285,6 +297,16 @@ async function aprovarEConverterEmOS(solId) {
         osId: novaOSRef.id,
         numeroOs: novoNumeroOs
     });
+
+    if (sol.solicitanteId && typeof dispararPushOSync === 'function') {
+        dispararPushOSync({
+            tipo: 'status_os',
+            destinatariosIds: [sol.solicitanteId],
+            titulo: `Solicitação Convertida em #OS-${String(novoNumeroOs).padStart(4, '0')}`,
+            corpo: `Seu chamado para ${sol.ativoNome || 'Equipamento'} entrou na fila de manutenção.`,
+            urlDestino: '/'
+        });
+    }
 
     if (typeof mostrarNotificacaoOSync === 'function') {
         mostrarNotificacaoOSync(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`, 'sucesso');
