@@ -29,7 +29,7 @@ window.fecharMenuGeralMobile = function () {
 // Registro do Service Worker (movido do HTML inline)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('/sw.js')
             .catch((err) => console.warn('Aviso SW:', err));
     });
 }
@@ -177,7 +177,7 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                     <span>Entrar em contato</span>
                 </a>
 
-                <button type="button" onclick="window.location.href='pages/login.html'"
+                <button type="button" onclick="window.location.href='/login'"
                     class="w-full py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition">
                     Voltar para a tela de login
                 </button>
@@ -195,7 +195,7 @@ auth.onAuthStateChanged(async (user) => {
     if (!user) {
         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
         if (!document.getElementById('modal-licenca-expirada')) {
-            window.location.href = 'pages/login.html';
+            window.location.href = '/login';
         }
         return;
     }
@@ -206,7 +206,7 @@ auth.onAuthStateChanged(async (user) => {
         if (!doc.exists || doc.data().ativo === false) {
             alert('Seu acesso foi revogado ou está pendente de aprovação pelo gestor.');
             await auth.signOut();
-            window.location.href = 'pages/login.html';
+            window.location.href = '/login';
             return;
         }
 
@@ -271,12 +271,12 @@ auth.onAuthStateChanged(async (user) => {
     }, async (err) => {
         console.error('Erro ao validar permissão:', err);
         await auth.signOut();
-        window.location.href = 'pages/login.html';
+        window.location.href = '/login';
     });
 });
 
 async function sairDoSistema() {
     if (unsubscribePerfilAtual) unsubscribePerfilAtual();
     await auth.signOut();
-    window.location.href = 'pages/login.html';
+    window.location.href = '/login';
 }
