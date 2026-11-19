@@ -1,443 +1,379 @@
-<div class="space-y-3">
-    <!-- Cabeçalho -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-3 flex-wrap">
-            <!-- Botão de Edição do Kanban (Apenas Engrenagem - Exclusivo Desktop para Gestores) -->
-            <button id="btn-editar-kanban-os" onclick="abrirModalEditarKanbanOS()" title="Configurar Colunas do Kanban"
-                class="hidden bg-white hover:bg-slate-100 text-slate-700 hover:text-blue-600 border border-slate-300 p-2.5 rounded-xl shadow-xs transition items-center justify-center shrink-0">
-                <i data-lucide="settings" class="w-4 h-4"></i>
+<div class="space-y-6">
+    <!-- Cabeçalho da Página -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Ordens de Serviço</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Gerencie o fluxo de manutenção, apontamentos de horas e custos operacionais.</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+            <button onclick="carregarOrdensServico()" title="Atualizar Quadro"
+                class="p-2.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl shadow-xs transition-colors">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
             </button>
+            <button onclick="abrirModalNovaOS()"
+                class="px-4 py-2.5 bg-slate-900 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-2 transition-colors">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Nova O.S.</span>
+            </button>
+        </div>
+    </div>
 
-            <div>
-                <h1 class="text-2xl font-bold text-slate-900">Ordens de Serviço</h1>
-                <p class="text-xs sm:text-sm text-slate-500">Toque em um cartão para ver detalhes, lançar custos ou encerrar a O.S.</p>
+    <!-- Barra de Filtros -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="filtro-os-busca" oninput="renderizarKanbanOS()" placeholder="Buscar número, título ou ativo..."
+                class="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-500 focus:outline-none">
+        </div>
+
+        <select id="filtro-os-tipo" onchange="renderizarKanbanOS()"
+            class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none">
+            <option value="">Todos os Tipos</option>
+            <option value="Corretiva">Corretiva</option>
+            <option value="Preventiva">Preventiva</option>
+            <option value="Preditiva">Preditiva</option>
+            <option value="Melhoria">Melhoria</option>
+        </select>
+
+        <select id="filtro-os-prioridade" onchange="renderizarKanbanOS()"
+            class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none">
+            <option value="">Todas as Prioridades</option>
+            <option value="Urgente">Urgente</option>
+            <option value="Alta">Alta</option>
+            <option value="Media">Média</option>
+            <option value="Baixa">Baixa</option>
+        </select>
+
+        <select id="filtro-os-responsavel" onchange="renderizarKanbanOS()"
+            class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none">
+            <option value="">Todos os Responsáveis</option>
+        </select>
+    </div>
+
+    <!-- Quadro Kanban (3 Colunas) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+        <!-- Coluna 1: Aberta -->
+        <div class="bg-slate-100/80 border border-slate-200/80 rounded-2xl p-3.5">
+            <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <h2 class="text-sm font-bold text-slate-800">Abertas / Pendentes</h2>
+                </div>
+                <span id="count-os-aberta" class="px-2 py-0.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600">0</span>
             </div>
+            <div id="col-os-aberta" class="space-y-3 min-h-[200px]"></div>
         </div>
 
-        <!-- Ações do Topo: Lixeira (Drag & Drop Desktop) + Botão Filtros + Nova Ordem -->
-        <div class="flex items-center gap-2">
-            <!-- Zona de Exclusão por Arraste (Desktop Gestores) -->
-            <button type="button" id="btn-lixeira-kanban-os"
-                onclick="avisarUsoLixeiraOS()"
-                ondragover="permitirDropLixeiraOS(event)"
-                ondragleave="sairDropLixeiraOS(event)"
-                ondrop="soltarCardNaLixeiraOS(event)"
-                title="Arraste um cartão de O.S. até aqui para excluir"
-                class="hidden bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-dashed border-slate-300 hover:border-rose-400 p-3 rounded-xl shadow-xs transition items-center justify-center shrink-0">
-                <i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i>
-            </button>
-
-            <button type="button" id="btn-toggle-filtros-os" onclick="alternarPainelFiltrosOS()"
-                class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold px-4 py-3 rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-sm shrink-0">
-                <i data-lucide="sliders-horizontal" class="w-4 h-4 text-blue-600"></i>
-                <span>Filtros</span>
-                <span id="badge-filtros-ativos-os" class="hidden text-[11px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-600 text-white">0</span>
-            </button>
-
-            <button onclick="abrirModalNovaOS()" class="flex-1 sm:flex-initial bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm">
-                <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                <span>+ Nova Ordem</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Barra de Filtros (Oculta inicialmente; abre ao clicar em Filtros) -->
-    <div id="painel-filtros-os" class="hidden bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-2.5">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            <div class="relative">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-                <input type="text" id="filtro-os-busca" oninput="renderizarVisaoOS()" placeholder="Buscar nº O.S., máquina, tag..."
-                    class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
+        <!-- Coluna 2: Em Execução -->
+        <div class="bg-blue-50/50 border border-blue-200/60 rounded-2xl p-3.5">
+            <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                    <h2 class="text-sm font-bold text-slate-800">Em Execução</h2>
+                </div>
+                <span id="count-os-execucao" class="px-2 py-0.5 bg-white border border-blue-200 rounded-full text-xs font-bold text-blue-700">0</span>
             </div>
-            <select id="filtro-os-coluna" onchange="renderizarVisaoOS()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
-                <option value="">Todos Status / Colunas</option>
-            </select>
-            <select id="filtro-os-prioridade" onchange="renderizarVisaoOS()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
-                <option value="">Todas Prioridades</option>
-                <option value="Normal">Normal</option>
-                <option value="Alta">Alta</option>
-                <option value="Urgente">Urgente</option>
-            </select>
-            <select id="filtro-os-manutentor" onchange="renderizarVisaoOS()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
-                <option value="">Todos Manutentores</option>
-            </select>
+            <div id="col-os-execucao" class="space-y-3 min-h-[200px]"></div>
         </div>
-        <div class="flex justify-end">
-            <button type="button" onclick="limparFiltrosOS()" class="text-xs font-semibold text-slate-500 hover:text-rose-600 transition">
-                Limpar filtros
-            </button>
+
+        <!-- Coluna 3: Encerrada -->
+        <div class="bg-emerald-50/50 border border-emerald-200/60 rounded-2xl p-3.5">
+            <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                    <h2 class="text-sm font-bold text-slate-800">Encerradas</h2>
+                </div>
+                <span id="count-os-encerrada" class="px-2 py-0.5 bg-white border border-emerald-200 rounded-full text-xs font-bold text-emerald-700">0</span>
+            </div>
+            <div id="col-os-encerrada" class="space-y-3 min-h-[200px]"></div>
         </div>
     </div>
-
-    <!-- ABAS ESTILO PLANILHA DO EXCEL -->
-    <div class="border-b border-slate-300 flex items-end gap-1 overflow-x-auto pt-1">
-        <button type="button" id="aba-os-minhas" onclick="selecionarAbaOS('minhas')"
-            class="px-4 py-2 text-xs sm:text-sm font-bold rounded-t-xl border border-b-0 border-slate-300 bg-white text-blue-700 shadow-2xs -mb-px flex items-center gap-1.5 shrink-0 transition">
-            <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
-            <span>Minhas O.S.</span>
-            <span id="cont-aba-minhas" class="text-[11px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">0</span>
-        </button>
-
-        <button type="button" id="aba-os-todas" onclick="selecionarAbaOS('todas')"
-            class="px-4 py-2 text-xs sm:text-sm font-semibold rounded-t-xl border border-b-0 border-transparent bg-slate-200/70 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 shrink-0 transition">
-            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-            <span>Todas as O.S.</span>
-            <span id="cont-aba-todas" class="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-slate-300/80 text-slate-700">0</span>
-        </button>
-
-        <button type="button" id="aba-os-solicitacoes" onclick="selecionarAbaOS('solicitacoes')"
-            class="px-4 py-2 text-xs sm:text-sm font-semibold rounded-t-xl border border-b-0 border-transparent bg-slate-200/70 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 shrink-0 transition">
-            <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i>
-            <span>De Solicitações</span>
-            <span id="cont-aba-solicitacoes" class="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-slate-300/80 text-slate-700">0</span>
-        </button>
-    </div>
-
-    <!-- VISÃO MOBILE: LISTA DE CARDS LIMPA -->
-    <div id="os-mobile-list" class="md:hidden space-y-3 pt-1"></div>
-
-    <!-- VISÃO DESKTOP: QUADRO KANBAN -->
-    <div id="kanban-board" class="hidden md:flex items-stretch gap-3 overflow-x-auto pb-3 pt-1 h-[calc(100vh-225px)] min-h-[500px] kanban-scroll"></div>
 </div>
 
-<!-- MODAL FLUTUANTE: CONFIRMAR EXCLUSÃO DE O.S. VIA LIXEIRA -->
-<div id="modal-excluir-os-lixeira" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-rose-500">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="trash-2" class="w-5 h-5 text-rose-500"></i>
-                <span>Excluir Ordem de Serviço</span>
-            </h3>
-            <button type="button" onclick="fecharModalExcluirOSLixeira()" class="text-slate-400 hover:text-white">
+<!-- ============================================================================
+     MODAL 1: NOVA ORDEM DE SERVIÇO
+============================================================================ -->
+<div id="modal-nova-os" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+                    <i data-lucide="clipboard-plus" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Abrir Nova Ordem de Serviço</h3>
+                    <p class="text-xs text-slate-500">Preencha os dados técnicos do atendimento</p>
+                </div>
+            </div>
+            <button onclick="fecharModalNovaOS()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
 
-        <form id="form-excluir-os-lixeira" onsubmit="confirmarExclusaoOSLixeira(event)" class="p-5 space-y-4">
-            <input type="hidden" id="excluir-os-id" value="">
-
-            <div class="bg-rose-50 border border-rose-200 rounded-xl p-3.5 space-y-1">
-                <div class="flex items-center gap-2">
-                    <span id="excluir-os-numero" class="text-xs font-extrabold px-2 py-0.5 rounded bg-rose-600 text-white">#OS-0000</span>
-                    <span id="excluir-os-maquina" class="text-xs font-bold text-slate-800 truncate">Máquina</span>
-                </div>
-                <p class="text-xs text-rose-700 pt-1">Esta ação removerá permanentemente a Ordem de Serviço do quadro.</p>
-            </div>
-
+        <form id="form-nova-os" onsubmit="salvarNovaOS(event)" class="p-6 space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Motivo da Exclusão *</label>
-                <textarea id="excluir-os-motivo" rows="3" required placeholder="Informe o motivo do cancelamento ou exclusão desta O.S..."
-                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:bg-white focus:border-rose-600"></textarea>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Título / Problema Identificado *</label>
+                <input type="text" id="os-titulo" required placeholder="Ex: Vazamento hidráulico na prensa 02"
+                    class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none">
             </div>
 
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onclick="fecharModalExcluirOSLixeira()" class="px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">
-                    Cancelar
-                </button>
-                <button type="submit" id="btn-confirmar-exclusao-os" class="px-5 py-2.5 text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm flex items-center gap-1.5">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    <span>Confirmar Exclusão</span>
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- MODAL FLUTUANTE: EDITAR COLUNAS DO KANBAN -->
-<div id="modal-editar-kanban-os" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
-        <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="columns" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span>Colunas do Kanban (O.S.)</span>
-            </h3>
-            <button onclick="fecharModalEditarKanbanOS()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-        </div>
-
-        <div class="p-5 flex flex-col overflow-y-auto">
-            <form id="form-kanban-modal-os" onsubmit="salvarColunaModalOS(event)" class="space-y-3 mb-4">
-                <input type="hidden" id="os-col-edit-id" value="">
-                <div class="flex items-center gap-1.5">
-                    <input type="text" id="os-col-titulo" required placeholder="Ex: Aguardando Peça"
-                        class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:border-blue-600 outline-none">
-                    <input type="number" id="os-col-ordem" required value="1" min="1" title="Posição"
-                        class="w-12 shrink-0 px-1 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-center focus:border-blue-600 outline-none">
-                    <input type="color" id="os-col-cor" value="#1D4ED8" title="Cor de destaque"
-                        class="w-10 h-10 shrink-0 p-0.5 bg-white border border-slate-300 rounded-lg cursor-pointer">
-                </div>
-                <div class="flex gap-2">
-                    <button type="submit" id="btn-os-salvar-coluna" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
-                        <span>Adicionar Coluna</span>
-                    </button>
-                    <button type="button" id="btn-os-cancelar-edit-coluna" onclick="cancelarEdicaoColunaModalOS()" class="hidden px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-lg text-xs transition">
-                        Cancelar
-                    </button>
-                </div>
-            </form>
-
-            <div id="lista-colunas-modal-os" class="space-y-2 overflow-y-auto max-h-72"></div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL 1: CRIAR NOVA O.S. -->
-<div id="modal-nova-os" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
-        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="clipboard-plus" class="w-5 h-5 text-[#00E5B0]"></i>
-                <span>Abrir Ordem de Serviço</span>
-            </h3>
-            <button onclick="fecharModalNovaOS()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-        </div>
-
-        <form id="form-nova-os" class="p-6 space-y-4 overflow-y-auto">
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Máquina / Equipamento *</label>
-                <div class="space-y-1.5">
-                    <div class="relative">
-                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-                        <input type="text" id="os-ativo-busca" oninput="filtrarSelectAtivosNovaOS()" placeholder="Digite o nome, código ou setor da máquina..."
-                            class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs outline-none focus:border-blue-600">
-                    </div>
-                    <select id="os-ativo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Manutenção *</label>
-                    <select id="os-tipo" required onchange="verificarTipoManutencaoCriacao()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de Manutenção *</label>
+                    <select id="os-tipo" required
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:border-blue-500 focus:outline-none">
+                        <option value="Corretiva">Corretiva</option>
+                        <option value="Preventiva">Preventiva</option>
+                        <option value="Preditiva">Preditiva</option>
+                        <option value="Melhoria">Melhoria</option>
+                    </select>
                 </div>
+
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Prioridade *</label>
-                    <select id="os-prioridade" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
-                        <option value="Normal">Normal</option>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Prioridade *</label>
+                    <select id="os-prioridade" required
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:border-blue-500 focus:outline-none">
+                        <option value="Baixa">Baixa</option>
+                        <option value="Media" selected>Média</option>
                         <option value="Alta">Alta</option>
                         <option value="Urgente">Urgente</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Condição da Máquina + Início da Parada -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Condição da Máquina *</label>
-                    <select id="os-condicao-maquina" onchange="alternarCampoParadaCriacaoOS()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold outline-none focus:border-blue-600">
-                        <option value="Operacional">Operacional (Normal)</option>
-                        <option value="Parcialmente funcional">Parcialmente funcional</option>
-                        <option value="Maquina parada">Máquina parada</option>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Ativo / Equipamento *</label>
+                <select id="os-ativo" required onchange="atualizarOpcoesPlanosNovaOS()"
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:border-blue-500 focus:outline-none">
+                    <option value="">Selecione o equipamento...</option>
+                </select>
+            </div>
+
+            <!-- VINCULAR PLANO DE MANUTENÇÃO -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                    <label for="os-usar-plano" class="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                        <i data-lucide="clipboard-check" class="w-4 h-4 text-blue-600"></i>
+                        <span>Deseja usar um Plano de Manutenção?</span>
+                    </label>
+                    <select id="os-usar-plano" onchange="alternarSeletorPlanoNovaOS()"
+                        class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold bg-white text-slate-700 focus:border-blue-500 focus:outline-none">
+                        <option value="nao" selected>Não</option>
+                        <option value="sim">Sim</option>
                     </select>
                 </div>
 
-                <div id="box-os-inicio-parada" class="hidden">
-                    <label class="block text-xs font-bold text-rose-600 mb-1">Início da Parada *</label>
-                    <input type="datetime-local" id="os-inicio-parada"
-                        class="w-full px-3 py-2.5 bg-rose-50/70 border border-rose-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-600">
+                <div id="box-os-seletor-plano" class="hidden pt-1 border-t border-slate-200/80 space-y-1.5">
+                    <label for="os-plano-id" class="block text-[11px] font-semibold text-slate-600">Selecione o Plano / Checklist:</label>
+                    <select id="os-plano-id"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-700 focus:border-blue-500 focus:outline-none">
+                        <option value="">Selecione um plano...</option>
+                    </select>
+                    <p id="os-plano-info-qtd" class="text-[11px] text-slate-500"></p>
                 </div>
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Status / Coluna Inicial *</label>
-                <select id="os-coluna-inicial" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
-            </div>
-
-            <!-- Seletor Nativo com Múltiplos Manutentores Responsáveis -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Manutentor(es) Responsável(is)</label>
-                <select id="os-manutentor-select" onchange="adicionarManutentorNovaOS()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
-                    <option value="">Não atribuído (Livre)</option>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Responsável Técnico (Opcional)</label>
+                <select id="os-responsavel"
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:border-blue-500 focus:outline-none">
+                    <option value="">A definir / Fila geral</option>
                 </select>
-                <div id="os-manutentores-chips" class="flex flex-wrap gap-1.5 mt-2"></div>
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Descrição do Problema / Solicitação *</label>
-                <textarea id="os-descricao" rows="3" required placeholder="Descreva o serviço necessário..."
-                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></textarea>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição Detalhada</label>
+                <textarea id="os-descricao" rows="3" placeholder="Descreva sintomas, falhas observadas ou instruções..."
+                    class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none"></textarea>
             </div>
 
-            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onclick="fecharModalNovaOS()" class="px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
-                <button type="submit" id="btn-criar-os" class="px-5 py-2.5 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">Criar O.S.</button>
+            <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button type="button" onclick="fecharModalNovaOS()"
+                    class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-salvar-nova-os"
+                    class="px-5 py-2.5 bg-slate-900 hover:bg-blue-600 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors">
+                    Criar Ordem de Serviço
+                </button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL 2: DETALHES E ENCERRAMENTO DA O.S. -->
-<div id="modal-detalhes-os" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] flex flex-col">
-        <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
-            <div class="flex items-center gap-2.5 flex-wrap">
-                <span id="det-os-numero" class="text-base font-extrabold text-white">#OS-0001</span>
-                <span id="det-os-status-badge" class="text-xs font-bold px-2.5 py-0.5 rounded-full text-white">Aberta</span>
-                <span id="det-os-condicao-badge" class="hidden text-xs font-bold px-2.5 py-0.5 rounded-full"></span>
+<!-- ============================================================================
+     MODAL 2: DETALHES, APONTAMENTO DE HORAS, CHECKLIST, CUSTOS E ENCERRAMENTO
+============================================================================ -->
+<div id="modal-detalhes-os" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+        <!-- Cabeçalho -->
+        <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span id="det-os-numero" class="font-mono text-xs font-bold px-2.5 py-0.5 bg-slate-900 text-white rounded-md">OS-000</span>
+                    <span id="det-os-status-badge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full">Status</span>
+                    <span id="det-os-prioridade-badge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full">Prioridade</span>
+                </div>
+                <h3 id="det-os-titulo" class="text-lg font-bold text-slate-900 mt-1.5">Título da O.S.</h3>
+                <p id="det-os-subtitulo" class="text-xs text-slate-500 mt-0.5">Ativo • Tipo • Abertura</p>
             </div>
-            <button onclick="fecharModalDetalhesOS()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <button onclick="fecharModalDetalhesOS()" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
         </div>
 
-        <div class="p-5 space-y-5 overflow-y-auto flex-1">
-            <input type="hidden" id="det-os-id">
+        <div class="p-6 space-y-6 max-h-[78vh] overflow-y-auto">
+            <!-- Descrição e Ações de Status -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
+                <p id="det-os-descricao" class="text-sm text-slate-700 whitespace-pre-line">Sem descrição.</p>
 
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                        <span class="text-[11px] font-bold uppercase text-slate-400 block">Máquina / Equipamento</span>
-                        <h4 id="det-os-maquina" class="font-bold text-slate-900 text-base">TAG - Nome</h4>
+                <!-- CHECKLIST DO PLANO DE MANUTENÇÃO -->
+                <div id="det-box-checklist-plano" class="hidden pt-3 border-t border-slate-200/80 space-y-3">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 block">Plano de Manutenção Vinculado</span>
+                            <h5 id="det-plano-titulo" class="text-sm font-bold text-slate-900">Checklist</h5>
+                        </div>
+                        <span id="det-plano-progresso" class="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-700">
+                            0 / 0 verificados
+                        </span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span id="det-os-tipo" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700">Corretiva</span>
-                        <span id="det-os-prioridade" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700">Normal</span>
-                    </div>
+
+                    <p id="det-plano-instrucoes" class="hidden text-xs text-slate-600 bg-white border border-slate-200/80 rounded-lg p-2.5 whitespace-pre-line"></p>
+
+                    <div id="det-lista-checklist-plano" class="space-y-2.5"></div>
                 </div>
 
-                <p id="det-os-descricao" class="text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-200"></p>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 mb-1">Status / Etapa Atual</label>
-                        <select id="det-os-coluna-select" onchange="atualizarStatusRapidoOS()"
-                            class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-blue-600"></select>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70">
+                    <div class="text-xs text-slate-500">
+                        Responsável: <strong id="det-os-responsavel" class="text-slate-800">-</strong>
                     </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 mb-1">Manutentor(es) / Parcerias</label>
-                        <select id="det-os-manutentor-select" onchange="adicionarManutentorDetalhesOS()"
-                            class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-blue-600">
-                            <option value="">+ Adicionar manutentor...</option>
+                    <div class="flex items-center gap-2" id="det-os-botoes-acao"></div>
+                </div>
+            </div>
+
+            <!-- Seção 1: Apontamento de Horas (Mão de Obra) -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="clock" class="w-4 h-4 text-blue-600"></i>
+                        <span>Apontamento de Horas (Mão de Obra)</span>
+                    </h4>
+                    <span id="det-total-horas-badge" class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">0.0h • R$ 0,00</span>
+                </div>
+
+                <!-- Formulário de Novo Apontamento -->
+                <form id="form-apontamento-horas" onsubmit="registrarApontamentoHoras(event)"
+                    class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="sm:col-span-4">
+                        <select id="apont-manutentor" required
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-blue-500 focus:outline-none">
+                            <option value="">Manutentor...</option>
                         </select>
-                        <div id="det-os-manutentores-chips" class="flex flex-wrap gap-1.5 mt-2"></div>
                     </div>
+                    <div class="sm:col-span-2">
+                        <input type="number" id="apont-horas" step="0.1" min="0.1" required placeholder="Horas (ex: 1.5)"
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-4">
+                        <input type="text" id="apont-atividade" required placeholder="Atividade realizada..."
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <button type="submit" id="btn-add-apontamento"
+                            class="w-full h-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                            + Lançar
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Lista de Apontamentos -->
+                <div id="lista-apontamentos-os" class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    <p class="p-4 text-xs text-slate-400 text-center">Nenhum apontamento registrado.</p>
                 </div>
             </div>
 
-            <div id="box-botao-abrir-encerramento" class="flex justify-end">
-                <button type="button" onclick="mostrarFormularioEncerramento()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
-                    <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-                    <span>Encerrar O.S. / Registrar Execução</span>
-                </button>
+            <!-- Seção 2: Materiais, Peças e Serviços Terceiros -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="package" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Materiais, Peças e Serviços</span>
+                    </h4>
+                    <span id="det-total-materiais-badge" class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">R$ 0,00</span>
+                </div>
+
+                <!-- Formulário de Material/Serviço -->
+                <form id="form-item-custo" onsubmit="adicionarItemCustoOS(event)"
+                    class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="sm:col-span-3">
+                        <select id="custo-categoria"
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-blue-500 focus:outline-none">
+                            <option value="Peça / Material">Peça / Material</option>
+                            <option value="Serviço Terceiro">Serviço Terceiro</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-4">
+                        <input type="text" id="custo-descricao" required placeholder="Descrição da peça ou serviço..."
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-1">
+                        <input type="number" id="custo-qtd" step="1" min="1" value="1" required placeholder="Qtd"
+                            class="w-full px-2 py-2 bg-white border border-slate-200 rounded-lg text-xs text-center focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <input type="number" id="custo-valor-unit" step="0.01" min="0" required placeholder="Unit. (R$)"
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <button type="submit"
+                            class="w-full h-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                            + Incluir
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Lista de Materiais/Serviços -->
+                <div id="lista-itens-custo-os" class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    <p class="p-4 text-xs text-slate-400 text-center">Nenhum material ou serviço lançado.</p>
+                </div>
             </div>
 
-            <form id="form-encerramento-os" class="hidden space-y-4 border-t-2 border-slate-200 pt-4">
-                <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <i data-lucide="wrench" class="w-4 h-4 text-emerald-600"></i>
-                    <span>Relatório Técnico de Encerramento</span>
+            <!-- Resumo Financeiro Consolidado da O.S. -->
+            <div class="bg-slate-900 text-white p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs text-slate-400">Custo Total Consolidado da O.S.</p>
+                    <p class="text-[11px] text-slate-400">Mão de obra + Peças/Materiais + Serviços</p>
+                </div>
+                <div class="text-right">
+                    <span id="det-custo-total-geral" class="text-xl font-extrabold text-white">R$ 0,00</span>
+                </div>
+            </div>
+
+            <!-- Painel de Encerramento Técnico (Exibido ao clicar em Encerrar O.S.) -->
+            <div id="painel-encerramento-os" class="hidden bg-emerald-50 border border-emerald-200 p-4 rounded-xl space-y-3">
+                <h4 class="text-sm font-bold text-emerald-900 flex items-center gap-2">
+                    <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+                    <span>Encerramento Técnico da Ordem de Serviço</span>
                 </h4>
-
-                <!-- BLOCO DE PARADA DE MÁQUINA (APARECE SE O.S. FOI ABERTA COMO MÁQUINA PARADA) -->
-                <div id="bloco-encerramento-parada" class="hidden bg-rose-50/70 border border-rose-200 rounded-xl p-3.5 space-y-2.5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-extrabold text-rose-700 flex items-center gap-1.5">
-                            <i data-lucide="clock" class="w-4 h-4"></i>
-                            <span>Registro de Máquina Parada</span>
-                        </span>
-                        <span id="enc-tempo-parada-calculado" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-rose-600 text-white">
-                            0h 00m
-                        </span>
+                <form onsubmit="confirmarEncerramentoOS(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-emerald-900 mb-1">Laudo / Serviço Realizado *</label>
+                        <textarea id="enc-servico-realizado" rows="3" required placeholder="Descreva a solução aplicada, testes realizados e condições de liberação da máquina..."
+                            class="w-full px-3 py-2 bg-white border border-emerald-200 rounded-xl text-xs focus:border-emerald-500 focus:outline-none"></textarea>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Início da Parada *</label>
-                            <input type="datetime-local" id="enc-inicio-parada" onchange="recalcularTempoParadaEncerramento()"
-                                class="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-rose-600">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-rose-700 mb-1">Término da Parada *</label>
-                            <input type="datetime-local" id="enc-termino-parada" onchange="recalcularTempoParadaEncerramento()"
-                                class="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-rose-600">
-                        </div>
+                    <div class="flex items-center justify-end gap-2">
+                        <button type="button" onclick="ocultarPainelEncerramento()"
+                            class="px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 rounded-lg">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="btn-confirmar-encerramento"
+                            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs">
+                            Confirmar Encerramento
+                        </button>
                     </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Serviço Realizado *</label>
-                    <textarea id="enc-servico-realizado" rows="3" required placeholder="Descreva detalhadamente o que foi reparado, ajustado ou substituído..."
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-600"></textarea>
-                </div>
-
-                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <i data-lucide="camera" class="w-4 h-4 text-blue-600"></i>
-                            <span>Anexos / Evidências (Otimizado)</span>
-                        </label>
-                        <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-                            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-                            <span>Adicionar Foto</span>
-                            <input type="file" id="enc-input-fotos" accept="image/*" multiple onchange="processarUploadFotosOS(event)" class="hidden">
-                        </label>
-                    </div>
-                    <p id="enc-upload-status" class="hidden text-xs text-blue-600 font-semibold animate-pulse">Compactando e enviando imagem...</p>
-                    <div id="enc-lista-anexos" class="flex gap-2 overflow-x-auto py-1"></div>
-                </div>
-
-                <div id="bloco-custos-os" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <label id="label-titulo-custos" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-600"></i>
-                            <span>Peças, Materiais & Custos</span>
-                        </label>
-                        <span class="text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">
-                            Total: R$ <span id="enc-custo-total-label">0,00</span>
-                        </span>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                        <input type="text" id="item-custo-desc" placeholder="Item / Peça utilizada"
-                            class="sm:col-span-5 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none">
-                        <select id="item-custo-cc" class="sm:col-span-4 px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none">
-                            <option value="">Centro de Custo</option>
-                        </select>
-                        <div class="sm:col-span-3 flex gap-1.5">
-                            <input type="number" id="item-custo-valor" step="0.01" min="0" placeholder="R$ 0,00"
-                                class="w-full min-w-0 px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none">
-                            <button type="button" onclick="adicionarItemCustoOS()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold shrink-0">+</button>
-                        </div>
-                    </div>
-
-                    <div id="enc-lista-custos" class="space-y-1.5"></div>
-                </div>
-
-                <!-- Tempo de Trabalho (Opcional) -->
-                <div class="bg-blue-50/60 border border-blue-200 rounded-xl p-3.5 space-y-2.5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-extrabold text-blue-800 flex items-center gap-1.5">
-                            <i data-lucide="timer" class="w-4 h-4"></i>
-                            <span>Apontamento de Horas de Trabalho (Opcional)</span>
-                        </span>
-                        <span id="enc-tempo-trabalho-calculado" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-blue-600 text-white">
-                            0h 00m
-                        </span>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Início do Trabalho</label>
-                            <input type="datetime-local" id="enc-inicio-trabalho" onchange="recalcularTempoTrabalhoEncerramento()"
-                                class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Data e Hora do Encerramento</label>
-                            <input type="datetime-local" id="enc-data-hora" onchange="recalcularTempoTrabalhoEncerramento()"
-                                class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600">
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Observações Gerais</label>
-                    <input type="text" id="enc-observacoes" placeholder="Pendências futuras, recomendações..."
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs outline-none focus:border-blue-600">
-                </div>
-
-                <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                    <button type="button" onclick="fecharModalDetalhesOS()" class="px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Fechar</button>
-                    <button type="submit" id="btn-confirmar-encerramento" class="px-5 py-2.5 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm flex items-center gap-1.5">
-                        <i data-lucide="check" class="w-4 h-4"></i>
-                        <span>Confirmar Encerramento</span>
-                    </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 </div>
