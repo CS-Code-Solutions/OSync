@@ -1,8 +1,8 @@
 {
-  "name": "osync",
+  "name": "osync-saas",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "firebase-admin": "^12.1.0"
+    "firebase-admin": "^12.7.0"
   }
 }
