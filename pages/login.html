@@ -246,7 +246,7 @@
             }
         });
 
-        // Enviar Solicitação de Cadastro + Registro de Aceite LGPD
+        // Enviar Solicitação de Cadastro + Registro de Aceite LGPD + Push para Gestão
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-register');
@@ -312,7 +312,22 @@
                     userAgent: navigator.userAgent || ''
                 });
 
-                // 5. Desloga imediatamente para impedir entrada automática
+                // 5. Notifica a Gestão via Push antes de encerrar sessão
+                await fetch('/api/notificar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tipo: 'novo_cadastro',
+                        empresaId: empresaId,
+                        remetenteUid: uid,
+                        perfisAlvo: ['Admin'],
+                        titulo: 'Nova Solicitação de Cadastro',
+                        corpo: `${nome} (${perfil} - ${setor}) solicitou acesso ao sistema.`,
+                        urlDestino: '/'
+                    })
+                }).catch(() => {});
+
+                // 6. Desloga imediatamente para impedir entrada automática
                 await auth.signOut();
 
                 e.target.reset();
