@@ -17,7 +17,7 @@ messaging.onBackgroundMessage((payload) => {
     const corpo = payload?.notification?.body || payload?.data?.body || '';
     const url = payload?.data?.url || '/';
 
-    self.registration.showNotification(titulo, {
+    return self.registration.showNotification(titulo, {
         body: corpo,
         icon: '/images/ico192.png',
         badge: '/images/ico.png',
@@ -45,7 +45,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = 'osync-pwa-v2.1.0';
+const CACHE_NAME = 'osync-pwa-v2.2.0';
 const ASSETS_ESSENCIAIS = [
     './',
     './index.html',
