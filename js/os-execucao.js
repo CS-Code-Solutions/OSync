@@ -383,6 +383,21 @@ async function atualizarStatusRapidoOS() {
         badge.textContent = col.titulo;
         badge.style.backgroundColor = sanitizarCorHex(col.corTopo, '#00E5B0');
     }
+
+    if (os && col && typeof dispararPushOSync === 'function') {
+        const idsAlvo = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
+            ? os.manutentoresIds
+            : (os.manutentorId ? [os.manutentorId] : []);
+        const numFmt = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
+        dispararPushOSync({
+            tipo: 'status_os',
+            destinatariosIds: idsAlvo,
+            perfisAlvo: ['Admin'],
+            titulo: `Status Atualizado: ${numFmt}`,
+            corpo: `${os.ativoNome || 'Equipamento'} agora está em "${col.titulo}".`,
+            urlDestino: `/?os=${osId}`
+        });
+    }
 }
 
 async function atualizarManutentorRapidoOS() {
@@ -661,6 +676,21 @@ async function confirmarEncerramentoOS(e) {
             }
         } catch (errSol) {
             console.warn('Solicitações vinculadas não atualizadas:', errSol.message);
+        }
+
+        if (os && typeof dispararPushOSync === 'function') {
+            const idsAlvo = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
+                ? os.manutentoresIds
+                : (os.manutentorId ? [os.manutentorId] : []);
+            const numFmt = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
+            dispararPushOSync({
+                tipo: 'status_os',
+                destinatariosIds: idsAlvo,
+                perfisAlvo: ['Admin'],
+                titulo: `O.S. Concluída: ${numFmt}`,
+                corpo: `${os.ativoNome || 'Equipamento'} foi encerrada por ${usuarioAtual.nome}.`,
+                urlDestino: `/?os=${osId}`
+            });
         }
 
         fecharModalDetalhesOS();
