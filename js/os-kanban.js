@@ -401,6 +401,24 @@ async function soltarCardOS(e, novaColunaId) {
         colunaId: novaColunaId,
         encerrada: false
     });
+
+    const osAtualizada = cacheOrdensServico.find(o => o.id === osId);
+    if (osAtualizada && typeof dispararPushOSync === 'function') {
+        const idsAlvo = Array.isArray(osAtualizada.manutentoresIds) && osAtualizada.manutentoresIds.length > 0
+            ? osAtualizada.manutentoresIds
+            : (osAtualizada.manutentorId ? [osAtualizada.manutentorId] : []);
+        const numFmt = `#OS-${String(osAtualizada.numeroOs || 0).padStart(4, '0')}`;
+        const tituloCol = colDestino?.titulo || 'Novo Status';
+
+        dispararPushOSync({
+            tipo: 'status_os',
+            destinatariosIds: idsAlvo,
+            perfisAlvo: idsAlvo.length === 0 ? ['Admin'] : [],
+            titulo: `Status Atualizado: ${numFmt}`,
+            corpo: `${formatarRotuloAtivoOS(osAtualizada.ativoTag, osAtualizada.ativoNome)} movida para "${tituloCol}".`,
+            urlDestino: `/?os=${osId}`
+        });
+    }
 }
 
 // ==========================================
@@ -721,7 +739,7 @@ async function salvarNovaOS(e) {
 
         const descricao = document.getElementById('os-descricao').value.trim();
 
-        await db.collection('ordens_servico').add({
+        const novaOSRef = await db.collection('ordens_servico').add({
             empresaId: empId,
             numeroOs: numeroGerado,
             ativoId,
@@ -752,6 +770,16 @@ async function salvarNovaOS(e) {
             await db.collection('ativos').doc(ativoId).update({ status: 'Parada' }).catch(() => {});
         } else if (condicaoMaquina === 'Parcialmente funcional' && ativoId) {
             await db.collection('ativos').doc(ativoId).update({ status: 'Manutencao' }).catch(() => {});
+        }
+
+        if (manutentoresIds.length > 0 && typeof dispararPushOSync === 'function') {
+            dispararPushOSync({
+                tipo: 'nova_os',
+                destinatariosIds: manutentoresIds,
+                titulo: `Nova O.S. Atribuída: #OS-${String(numeroGerado).padStart(4, '0')}`,
+                corpo: `${formatarRotuloAtivoOS(ativoObj.codigoTag, ativoObj.nome)} (${prioridade}) - ${descricao.slice(0, 80)}`,
+                urlDestino: `/?os=${novaOSRef.id}`
+            });
         }
 
         fecharModalNovaOS();
