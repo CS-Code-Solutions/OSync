@@ -9,29 +9,29 @@
     <meta property="og:site_name" content="OSync">
     <meta property="og:title" content="OSync | Acesso ao Sistema de Manutenção">
     <meta property="og:description" content="Faça login para gerenciar ordens de serviço, solicitações de setor e histórico de máquinas.">
-    <meta property="og:url" content="https://cs-code-solutions.github.io/OSync/pages/login.html">
-    <meta property="og:image" content="https://cs-code-solutions.github.io/OSync/images/osync1200x630.png">
-    <meta property="og:image:secure_url" content="https://cs-code-solutions.github.io/OSync/images/osync1200x630.png">
+    <meta property="og:url" content="https://osync.vercel.app/login">
+    <meta property="og:image" content="https://osync.vercel.app/images/osync1200x630.png">
+    <meta property="og:image:secure_url" content="https://osync.vercel.app/images/osync1200x630.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="OSync | Acesso ao Sistema de Manutenção">
     <meta name="twitter:description" content="Faça login para gerenciar ordens de serviço, solicitações de setor e histórico de máquinas.">
-    <meta name="twitter:image" content="https://cs-code-solutions.github.io/OSync/images/osync1200x630.png">
-    <link rel="icon" type="image/png" href="../images/ico.png">
-    <link rel="apple-touch-icon" href="../images/ico.png">
+    <meta name="twitter:image" content="https://osync.vercel.app/images/osync1200x630.png">
+    <link rel="icon" type="image/png" href="/images/ico.png">
+    <link rel="apple-touch-icon" href="/images/ico.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-    <link rel="stylesheet" href="../css/style.css?v=2">
+    <link rel="stylesheet" href="/css/style.css?v=2">
     <style>
         .bg-login-responsivo {
             background-color: #0B1120;
-            background-image: linear-gradient(to bottom, rgba(11, 17, 32, 0.72), rgba(11, 17, 32, 0.85)), url('../images/loginmob.png');
+            background-image: linear-gradient(to bottom, rgba(11, 17, 32, 0.72), rgba(11, 17, 32, 0.85)), url('/images/loginmob.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -39,7 +39,7 @@
         }
         @media (min-width: 768px) {
             .bg-login-responsivo {
-                background-image: linear-gradient(to bottom, rgba(11, 17, 32, 0.68), rgba(11, 17, 32, 0.82)), url('../images/loginpc.png');
+                background-image: linear-gradient(to bottom, rgba(11, 17, 32, 0.68), rgba(11, 17, 32, 0.82)), url('/images/loginpc.png');
             }
         }
     </style>
@@ -50,7 +50,7 @@
         <div class="bg-[#131C31]/90 backdrop-blur-md w-full max-w-md rounded-2xl shadow-2xl border border-slate-700/80 p-8">
             <!-- Logo OSync -->
             <div class="flex flex-col items-center mb-8">
-                <img src="../images/log.png" alt="OSync" draggable="false" class="max-h-40 w-auto object-contain mb-2">
+                <img src="/images/log.png" alt="OSync" draggable="false" class="max-h-40 w-auto object-contain mb-2">
             </div>
 
             <!-- FORMULÁRIO DE LOGIN -->
@@ -139,7 +139,7 @@
                     <input type="checkbox" id="reg-lgpd-aceite" required
                         class="mt-0.5 w-4 h-4 accent-[#00E5B0] rounded cursor-pointer shrink-0">
                     <span class="text-[11px] text-slate-300 leading-relaxed">
-                        Li e concordo com a <a href="privacidade.html" target="_blank" rel="noopener noreferrer" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
+                        Li e concordo com a <a href="/privacidade" target="_blank" rel="noopener noreferrer" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
                     </span>
                 </label>
 
@@ -160,14 +160,14 @@
 
     <footer class="py-4 px-4 text-center text-xs text-slate-300 bg-[#0B1120]/75 backdrop-blur-xs border-t border-slate-800/80 space-y-1">
         <div>
-            <a href="privacidade.html" class="text-slate-300 hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a>
+            <a href="/privacidade" class="text-slate-300 hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a>
         </div>
         <div>
             © 2026 OSync | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
         </div>
     </footer>
 
-    <script src="../js/firebase-config.js"></script>
+    <script src="/js/firebase-config.js"></script>
     <script>
         lucide.createIcons();
 
@@ -236,7 +236,7 @@
                     throw new Error('Seu acesso foi desativado pelo administrador.');
                 }
 
-                window.location.href = '../index.html';
+                window.location.href = '/';
             } catch (err) {
                 errorBox.textContent = err.message.includes('auth/') ? 'E-mail ou senha inválidos.' : err.message;
                 errorBox.classList.remove('hidden');
