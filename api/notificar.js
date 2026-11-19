@@ -1,17 +1,21 @@
 const admin = require('firebase-admin');
 
-if (!admin.apps.length) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT || '{}';
-    const serviceAccount = JSON.parse(raw);
-    if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+function getFirebaseAdmin() {
+    if (!admin.apps.length) {
+        const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+        if (!raw) {
+            throw new Error('Variável FIREBASE_SERVICE_ACCOUNT não configurada na Vercel.');
+        }
+        const serviceAccount = JSON.parse(raw);
+        if (serviceAccount.private_key) {
+            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
     }
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
+    return admin;
 }
-
-const db = admin.firestore();
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
@@ -19,6 +23,9 @@ module.exports = async (req, res) => {
     }
 
     try {
+        const fbAdmin = getFirebaseAdmin();
+        const db = fbAdmin.firestore();
+
         const authHeader = req.headers.authorization || '';
         const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
@@ -40,7 +47,7 @@ module.exports = async (req, res) => {
         let uidAutenticado = remetenteUid || '';
         if (tipo !== 'novo_cadastro') {
             if (!idToken) return res.status(401).json({ error: 'Não autorizado.' });
-            const decoded = await admin.auth().verifyIdToken(idToken);
+            const decoded = await fbAdmin.auth().verifyIdToken(idToken);
             uidAutenticado = decoded.uid;
         }
 
@@ -80,7 +87,7 @@ module.exports = async (req, res) => {
             return res.status(200).json({ enviados: 0, motivo: 'Nenhum aparelho inscrito.' });
         }
 
-        const response = await admin.messaging().sendEachForMulticast({
+        const response = await fbAdmin.messaging().sendEachForMulticast({
             tokens,
             notification: {
                 title: String(titulo),
@@ -121,7 +128,7 @@ module.exports = async (req, res) => {
         if (tokensInvalidos.length > 0) {
             for (const doc of refsUsuarios) {
                 await doc.ref.update({
-                    fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensInvalidos)
+                    fcmTokens: fbAdmin.firestore.FieldValue.arrayRemove(...tokensInvalidos)
                 }).catch(() => {});
             }
         }
