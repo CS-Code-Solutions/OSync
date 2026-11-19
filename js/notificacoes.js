@@ -1,0 +1,161 @@
+const OSYNC_VAPID_KEY = 'BCwSWdvi1ygplErUgFDcqfFCK1gh6g-JSo2of6mU-HQxYX67SKiO8lcHVU9Eg4s-GTfMFZZ9_DcLsoy8jUjYWLY';
+let messagingOSync = null;
+let listenerForegroundRegistrado = false;
+
+function tocarSomNotificacaoOSync() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const agora = ctx.currentTime;
+
+        [880, 1174.66].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, agora + i * 0.12);
+            gain.gain.setValueAtTime(0.001, agora + i * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.18, agora + i * 0.12 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, agora + i * 0.12 + 0.25);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(agora + i * 0.12);
+            osc.stop(agora + i * 0.12 + 0.26);
+        });
+    } catch (_) {}
+}
+
+function atualizarBotaoNotificacoesUI() {
+    const btn = document.getElementById('btn-notificacoes-push');
+    const icone = document.getElementById('icon-notificacoes-push');
+    if (!btn) return;
+
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+        btn.classList.add('hidden');
+        return;
+    }
+
+    btn.classList.remove('hidden');
+    if (Notification.permission === 'granted') {
+        btn.title = 'Notificações Ativas neste Aparelho';
+        btn.className = 'p-2 rounded-lg text-[#00E5B0] hover:bg-emerald-500/10 transition relative';
+        if (icone) icone.setAttribute('data-lucide', 'bell-ring');
+    } else if (Notification.permission === 'denied') {
+        btn.title = 'Notificações Bloqueadas no Navegador';
+        btn.className = 'p-2 rounded-lg text-slate-500 hover:bg-slate-800 transition relative';
+        if (icone) icone.setAttribute('data-lucide', 'bell-off');
+    } else {
+        btn.title = 'Ativar Notificações no Celular';
+        btn.className = 'p-2 rounded-lg text-amber-400 hover:bg-amber-500/10 transition relative animate-pulse';
+        if (icone) icone.setAttribute('data-lucide', 'bell');
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function inicializarNotificacoesOSync(userObj) {
+    atualizarBotaoNotificacoesUI();
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !firebase.messaging) return;
+
+    try {
+        if (!messagingOSync) {
+            messagingOSync = firebase.messaging();
+        }
+
+        if (!listenerForegroundRegistrado) {
+            listenerForegroundRegistrado = true;
+            messagingOSync.onMessage(async (payload) => {
+                const titulo = payload?.notification?.title || payload?.data?.title || 'OSync';
+                const corpo = payload?.notification?.body || payload?.data?.body || '';
+                const url = payload?.data?.url || '/';
+
+                tocarSomNotificacaoOSync();
+                if (typeof mostrarNotificacaoOSync === 'function') {
+                    mostrarNotificacaoOSync(`${titulo}: ${corpo}`, 'aviso');
+                }
+
+                if (Notification.permission === 'granted') {
+                    const reg = await navigator.serviceWorker.ready;
+                    reg.showNotification(titulo, {
+                        body: corpo,
+                        icon: '/images/ico192.png',
+                        badge: '/images/ico.png',
+                        vibrate: [200, 100, 200],
+                        data: { url }
+                    });
+                }
+            });
+        }
+
+        if (Notification.permission === 'granted' && userObj?.id) {
+            await registrarTokenFCMUsuario(userObj.id);
+        }
+    } catch (err) {
+        console.warn('Aviso FCM:', err.message);
+    }
+}
+
+async function registrarTokenFCMUsuario(uid) {
+    const reg = await navigator.serviceWorker.ready;
+    const token = await messagingOSync.getToken({
+        vapidKey: OSYNC_VAPID_KEY,
+        serviceWorkerRegistration: reg
+    });
+
+    if (token && uid) {
+        await db.collection('usuarios').doc(uid).update({
+            fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
+        });
+    }
+    return token;
+}
+
+window.ativarNotificacoesPushOSync = async function () {
+    if (!('Notification' in window)) {
+        alert('Este navegador não suporta notificações push.');
+        return;
+    }
+
+    if (Notification.permission === 'denied') {
+        alert('As notificações estão bloqueadas nas configurações do navegador. Libere as permissões do site para receber alertas.');
+        return;
+    }
+
+    try {
+        const perm = await Notification.requestPermission();
+        atualizarBotaoNotificacoesUI();
+
+        if (perm === 'granted') {
+            if (!messagingOSync && firebase.messaging) {
+                messagingOSync = firebase.messaging();
+            }
+            const uid = usuarioAtual?.id || auth.currentUser?.uid;
+            await registrarTokenFCMUsuario(uid);
+            tocarSomNotificacaoOSync();
+            if (typeof mostrarNotificacaoOSync === 'function') {
+                mostrarNotificacaoOSync('Notificações e alerta sonoro ativados neste aparelho!', 'sucesso');
+            }
+        }
+    } catch (err) {
+        alert('Não foi possível ativar as notificações: ' + err.message);
+    }
+};
+
+window.dispararPushOSync = async function (dados) {
+    try {
+        const tokenAuth = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+        await fetch('/api/notificar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(tokenAuth ? { 'Authorization': `Bearer ${tokenAuth}` } : {})
+            },
+            body: JSON.stringify({
+                empresaId: dados.empresaId || usuarioAtual?.empresaId,
+                remetenteUid: usuarioAtual?.id || auth.currentUser?.uid || '',
+                ...dados
+            })
+        });
+    } catch (err) {
+        console.warn('Aviso envio push:', err.message);
+    }
+};
