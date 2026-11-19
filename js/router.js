@@ -1,246 +1,174 @@
-let streamCameraQR = null;
-let scannerIntervalQR = null;
+/**
+ * ============================================================================
+ * OSync — Roteador SPA Modular (js/router.js)
+ * ============================================================================
+ */
 
-async function navegarPara(pagina) {
+const ROTAS_VALIDAS = [
+    'dashboard',
+    'os',
+    'solicitacoes',
+    'cad-manutentores',
+    'cad-lideranca',
+    'cad-ativos',
+    'planos-manutencao',
+    'relatorios',
+    'empresas'
+];
+
+let paginaAtual = null;
+
+/**
+ * Navega para uma rota interna do App Shell
+ */
+async function navegarPara(pagina, atualizarHash = true) {
+    if (!window.usuarioLogado) return;
+
+    // Verifica permissão RBAC antes de carregar
+    let paginaSegura = pagina;
+    if (!ROTAS_VALIDAS.includes(paginaSegura) || !usuarioPodeAcessarPagina(paginaSegura)) {
+        paginaSegura = obterPaginaInicialPermitida();
+    }
+
     const container = document.getElementById('app-content');
-    const perfil = usuarioAtual?.perfil;
-    const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
+    if (!container) return;
 
-    // Verifica permissão de acesso à rota para perfis não-gestores
-    if (!isGestor) {
-        const permitidas = typeof obterPaginasPermitidasUsuario === 'function'
-            ? (obterPaginasPermitidasUsuario(usuarioAtual) || [])
-            : (perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes']);
-
-        if (!permitidas.includes(pagina)) {
-            pagina = permitidas[0] || (perfil === 'Lideranca' ? 'solicitacoes' : 'os');
-        }
-    }
-
-        // Proteção contra Path Traversal no nome da página
-    const paginaSegura = String(pagina || 'os').replace(/[^a-z0-9\-]/gi, '');
-
-    // Libera largura total e reduz margens no Kanban (O.S.) mantendo padrão nas demais telas
-    if (container) {
-        if (paginaSegura === 'os') {
-            container.className = 'flex-1 max-w-full w-full mx-auto p-3 md:px-4 md:py-4';
-        } else {
-            container.className = 'flex-1 max-w-7xl w-full mx-auto p-4 md:p-6';
-        }
-    }
-
-    document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
-
-
-    if (paginaSegura.startsWith('cad-')) {
-        document.getElementById('btn-menu-cadastros')?.classList.add('active');
-        document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
-    } else if (paginaSegura === 'centros-custo' || paginaSegura.startsWith('relatorios-')) {
-        document.getElementById('btn-menu-relatorios')?.classList.add('active');
-        document.querySelector('.mobile-nav-btn[data-page="relatorios"]')?.classList.add('active');
-    } else {
-        document.querySelectorAll(`[data-page="${paginaSegura}"]`).forEach(btn => btn.classList.add('active'));
-    }
+    // Estado de carregamento suave
+    container.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-20 text-slate-400">
+            <i data-lucide="loader-2" class="w-8 h-8 animate-spin mb-3 text-slate-600"></i>
+            <p class="text-sm font-medium">Carregando módulo...</p>
+        </div>
+    `;
+    if (window.lucide) lucide.createIcons();
 
     try {
-        const resposta = await fetch(`pages/${paginaSegura}.html`);
-        if (!resposta.ok) throw new Error('Página não encontrada');
+        const resposta = await fetch(`pages/${paginaSegura}.html?v=${Date.now()}`);
+        if (!resposta.ok) {
+            throw new Error(`Erro HTTP ${resposta.status} ao carregar pages/${paginaSegura}.html`);
+        }
+
         const html = await resposta.text();
         container.innerHTML = html;
-        lucide.createIcons();
+        paginaAtual = paginaSegura;
 
-        if (paginaSegura === 'dashboard' && typeof initDashboard === 'function') initDashboard();
-        if (paginaSegura === 'os' && typeof initKanbanOS === 'function') initKanbanOS();
-        if (paginaSegura === 'solicitacoes' && typeof initSolicitacoes === 'function') initSolicitacoes();
-        if (paginaSegura === 'configuracoes' && typeof initConfiguracoes === 'function') initConfiguracoes();
-        if (paginaSegura === 'saas-empresas' && typeof initSaaSEmpresas === 'function') initSaaSEmpresas();
-        if (paginaSegura === 'centros-custo' && typeof initCentrosCusto === 'function') initCentrosCusto();
-        if (paginaSegura === 'relatorios-os' && typeof initRelatoriosOS === 'function') initRelatoriosOS();
-        if (paginaSegura === 'relatorios-maquinas' && typeof initRelatoriosMaquinas === 'function') initRelatoriosMaquinas();
-        if (paginaSegura === 'relatorios-manutentores' && typeof initRelatoriosManutentores === 'function') initRelatoriosManutentores();
-        if (paginaSegura === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
-        if (paginaSegura === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
-        if (paginaSegura === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
+        if (atualizarHash) {
+            window.history.replaceState(null, '', `#${paginaSegura}`);
+        }
 
-    } catch (err) {
-        container.innerHTML = `<div class="p-8 text-center text-slate-500">Tela <b>${escaparHTML(paginaSegura)}.html</b> não encontrada.</div>`;
+        atualizarDestaqueMenu(paginaSegura);
+
+        if (window.lucide) lucide.createIcons();
+
+        // Inicializa o controlador JS específico de cada módulo
+        if (paginaSegura === 'dashboard' && typeof initDashboard === 'function') {
+            await initDashboard();
+        } else if (paginaSegura === 'os' && typeof initOS === 'function') {
+            await initOS();
+        } else if (paginaSegura === 'solicitacoes' && typeof initSolicitacoes === 'function') {
+            await initSolicitacoes();
+        } else if (paginaSegura === 'cad-manutentores' && typeof initCadastros === 'function') {
+            await initCadastros('manutentores');
+        } else if (paginaSegura === 'cad-lideranca' && typeof initCadastros === 'function') {
+            await initCadastros('lideranca');
+        } else if (paginaSegura === 'cad-ativos' && typeof initCadastros === 'function') {
+            await initCadastros('ativos');
+        } else if (paginaSegura === 'planos-manutencao' && typeof initPlanosManutencao === 'function') {
+            await initPlanosManutencao();
+        } else if (paginaSegura === 'relatorios' && typeof initRelatorios === 'function') {
+            await initRelatorios();
+        } else if (paginaSegura === 'empresas' && typeof initEmpresas === 'function') {
+            await initEmpresas();
+        }
+
+    } catch (erro) {
+        console.error('Erro ao navegar para página:', erro);
+        container.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-md mx-auto my-12">
+                <i data-lucide="alert-triangle" class="w-8 h-8 text-red-500 mx-auto mb-2"></i>
+                <h3 class="text-base font-bold text-red-800">Falha ao carregar o módulo</h3>
+                <p class="text-xs text-red-600 mt-1">${erro.message}</p>
+                <button onclick="navegarPara('${paginaSegura}')" class="mt-4 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg">
+                    Tentar Novamente
+                </button>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
     }
 }
 
-function abrirMenuCadastrosMobile() {
-    document.getElementById('mobile-cadastros-drawer')?.classList.remove('hidden');
-}
-
-function fecharMenuCadastrosMobile() {
-    document.getElementById('mobile-cadastros-drawer')?.classList.add('hidden');
-}
-
-function abrirMenuRelatoriosMobile() {
-    document.getElementById('mobile-relatorios-drawer')?.classList.remove('hidden');
-}
-
-function fecharMenuRelatoriosMobile() {
-    document.getElementById('mobile-relatorios-drawer')?.classList.add('hidden');
-}
-
-// ==========================================
-// LEITOR DE QR CODE UNIVERSAL (NATIVO + JSQR PARA IPHONE E ANDROID)
-// ==========================================
-async function abrirLeitorQRCodeCamera() {
-    const modal = document.getElementById('modal-scanner-qr');
-    const video = document.getElementById('video-scanner-qr');
-    if (!modal || !video) return;
-
-    modal.classList.remove('hidden');
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-
-    try {
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('muted', 'true');
-        video.setAttribute('autoplay', 'true');
-
-        streamCameraQR = await navigator.mediaDevices.getUserMedia({
-            video: { 
-                facingMode: { ideal: 'environment' },
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        });
-        
-        video.srcObject = streamCameraQR;
-        await video.play();
-
-        if (window.BarcodeDetector) {
-            const detector = new BarcodeDetector({ formats: ['qr_code'] });
-            scannerIntervalQR = setInterval(async () => {
-                if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
-                try {
-                    const barcodes = await detector.detect(video);
-                    if (barcodes.length > 0) {
-                        const codigoLido = barcodes[0].rawValue;
-                        pararEfecharLeitorQR();
-                        tratarTextoQRLido(codigoLido);
-                    }
-                } catch (e) {}
-            }, 250);
+/**
+ * Destaca o botão ativo na barra superior e na gaveta mobile
+ */
+function atualizarDestaqueMenu(paginaSegura) {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600', 'active-nav');
+        if (btn.dataset.nav === 'empresas') {
+            btn.classList.add('text-indigo-600');
         } else {
-            const canvasElement = document.createElement('canvas');
-            const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
-
-            scannerIntervalQR = setInterval(() => {
-                if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
-                if (video.videoWidth === 0 || video.videoHeight === 0) return;
-
-                canvasElement.width = video.videoWidth;
-                canvasElement.height = video.videoHeight;
-                canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-                
-                try {
-                    const imageData = canvasCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                    if (typeof jsQR !== 'undefined') {
-                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                            inversionAttempts: "dontInvert",
-                        });
-
-                        if (code && code.data) {
-                            const codigoLido = code.data;
-                            pararEfecharLeitorQR();
-                            tratarTextoQRLido(codigoLido);
-                        }
-                    }
-                } catch (frameErr) {}
-            }, 250);
+            btn.classList.add('text-slate-600');
         }
+    });
 
-    } catch (err) {
-        console.warn('Acesso direto à câmera indisponível ou negado:', err);
-        alert('Não foi possível acessar a câmera. Verifique as permissões nas configurações do dispositivo.');
-        pararEfecharLeitorQR();
-    }
-}
-
-function pararEfecharLeitorQR() {
-    if (scannerIntervalQR) {
-        clearInterval(scannerIntervalQR);
-        scannerIntervalQR = null;
-    }
-    if (streamCameraQR) {
-        streamCameraQR.getTracks().forEach(track => track.stop());
-        streamCameraQR = null;
-    }
-    const video = document.getElementById('video-scanner-qr');
-    if (video) video.srcObject = null;
-
-    document.getElementById('modal-scanner-qr')?.classList.add('hidden');
-}
-
-function fecharLeitorQRCodeCamera() {
-    pararEfecharLeitorQR();
-}
-
-async function processarArquivoQRCode(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    pararEfecharLeitorQR();
-
-    if (window.BarcodeDetector) {
-        try {
-            const imageBitmap = await createImageBitmap(file);
-            const detector = new BarcodeDetector({ formats: ['qr_code'] });
-            const barcodes = await detector.detect(imageBitmap);
-            if (barcodes.length > 0) {
-                tratarTextoQRLido(barcodes[0].rawValue);
-                return;
-            }
-        } catch (err) {}
-    }
-
-    const reader = new FileReader();
-    reader.onload = function (event) {
-        const img = new Image();
-        img.onload = function () {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-
-            try {
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                if (typeof jsQR !== 'undefined') {
-                    const code = jsQR(imgData.data, imgData.width, imgData.height, {
-                        inversionAttempts: "attemptBoth"
-                    });
-                    if (code && code.data) {
-                        tratarTextoQRLido(code.data);
-                        return;
-                    }
-                }
-                alert('Nenhum QR Code legível foi encontrado nesta foto. Tente aproximar mais.');
-            } catch (err) {
-                alert('Erro ao processar os pixels da imagem.');
-            }
-        };
-        img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-}
-
-function tratarTextoQRLido(texto) {
-    try {
-        let ativoId = texto;
-        if (texto.includes('?ativo=')) {
-            const urlObj = new URL(texto);
-            ativoId = urlObj.searchParams.get('ativo') || texto;
-        }
-
-        if (typeof abrirModalFlutuanteQRMaquina === 'function' && ativoId) {
-            abrirModalFlutuanteQRMaquina(ativoId.trim());
+    // Destaca os botões correspondentes à rota atual
+    document.querySelectorAll(`.nav-item[data-nav="${paginaSegura}"]`).forEach(btn => {
+        btn.classList.remove('text-slate-600', 'text-indigo-600', 'hover:bg-slate-100', 'hover:bg-slate-50');
+        if (paginaSegura === 'empresas') {
+            btn.classList.add('bg-indigo-600', 'text-white', 'active-nav');
         } else {
-            alert('QR Code lido: ' + texto);
+            btn.classList.add('bg-slate-900', 'text-white', 'active-nav');
         }
-    } catch (err) {
-        alert('Conteúdo do QR Code: ' + texto);
+    });
+
+    // Se for uma subpágina de Cadastros, destaca o botão pai "Cadastros" no desktop
+    if (paginaSegura.startsWith('cad-') || paginaSegura === 'planos-manutencao') {
+        const btnPai = document.getElementById('btn-dropdown-cadastros');
+        if (btnPai) {
+            btnPai.classList.remove('text-slate-600');
+            btnPai.classList.add('bg-slate-900', 'text-white', 'active-nav');
+        }
     }
 }
+
+/* ============================================================================
+   CONTROLES DE UI DO APP SHELL (DROPDOWN DESKTOP & DRAWER MOBILE)
+   ============================================================================ */
+
+function toggleDropdownCadastros(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('dropdown-cadastros-menu');
+    if (menu) menu.classList.toggle('hidden');
+}
+
+function fecharDropdownCadastros() {
+    const menu = document.getElementById('dropdown-cadastros-menu');
+    if (menu) menu.classList.add('hidden');
+}
+
+document.addEventListener('click', (e) => {
+    const wrapper = document.getElementById('dropdown-cadastros-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        fecharDropdownCadastros();
+    }
+});
+
+function abrirDrawerMobile() {
+    const overlay = document.getElementById('mobile-drawer-overlay');
+    const drawer = document.getElementById('mobile-drawer');
+    if (overlay) overlay.classList.remove('hidden');
+    if (drawer) drawer.classList.remove('translate-x-full');
+}
+
+function fecharDrawerMobile() {
+    const overlay = document.getElementById('mobile-drawer-overlay');
+    const drawer = document.getElementById('mobile-drawer');
+    if (overlay) overlay.classList.add('hidden');
+    if (drawer) drawer.classList.add('translate-x-full');
+}
+
+window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.replace('#', '').trim();
+    if (hash && hash !== paginaAtual) {
+        navegarPara(hash, false);
+    }
+});
