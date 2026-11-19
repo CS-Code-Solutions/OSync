@@ -1,0 +1,25 @@
+{
+  "name": "OSync | Gestão de Manutenção",
+  "short_name": "OSync",
+  "description": "Sistema inteligente de gestão de Ordens de Serviço e Manutenção Industrial.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1120",
+  "theme_color": "#0B1120",
+  "icons": [
+    {
+      "src": "images/ico192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/ico512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

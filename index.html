@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>OSync | Gestão de Manutenção</title>
+    <meta name="description" content="Sistema inteligente de gestão de manutenção, ordens de serviço, QR Code de máquinas e indicadores em tempo real.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="OSync">
+    <meta property="og:title" content="OSync | Gestão de Manutenção Industrial">
+    <meta property="og:description" content="Controle ordens de serviço, solicitações de setor, prontuário via QR Code e custos de manutenção em tempo real.">
+    <meta property="og:url" content="https://cs-code-solutions.github.io/OSync/">
+    <meta property="og:image" content="https://cs-code-solutions.github.io/OSync/images/osync1200x630.png">
+    <meta property="og:image:secure_url" content="https://cs-code-solutions.github.io/OSync/images/osync1200x630.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="OSync | Gestão de Manutenção Industrial">
+    <meta name="twitter:description" content="Controle ordens de serviço, solicitações de setor, prontuário via QR Code e custos de manutenção em tempo real.">
+    <meta name="twitter:image" content="https://cs-code-solutions.github.io/OSync/images/osync1200x630.png">
+    <link rel="icon" type="image/png" href="images/ico.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OSync">
+    <link rel="apple-touch-icon" sizes="192x192" href="images/ico192.png">
+    <link rel="apple-touch-icon" href="images/ico.png">
+    <style>body.auth-loading { opacity: 0; }</style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- Biblioteca para Leitura de Planilhas Excel (.xlsx / .xls / .csv) utilizada no importador temporário -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <!-- SDKs Firebase Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+    <link rel="stylesheet" href="css/style.css?v=7">
+</head>
+<body class="auth-loading min-h-screen flex flex-col justify-between pb-16 md:pb-0">
+
+    <!-- CABEÇALHO SUPERIOR -->
+    <header class="osync-navbar sticky top-0 z-40 px-4 h-16 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-6">
+            <a href="#" onclick="navegarPara('dashboard')" class="flex items-center gap-2 shrink-0">
+                <img src="images/cabe.png" alt="OSync" class="h-9 w-auto object-contain">
+            </a>
+
+            <!-- Menu Superior Desktop -->
+            <nav class="hidden md:flex items-center gap-1.5" id="desktop-nav">
+                <button id="nav-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Dashboard</span>
+                </button>
+
+                <button id="nav-os" onclick="navegarPara('os')" data-page="os" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="kanban" class="w-4 h-4"></i>
+                    <span>O.S.</span>
+                </button>
+
+                <button id="nav-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="bell-ring" class="w-4 h-4"></i>
+                    <span>Solicitações</span>
+                </button>
+
+                <!-- Dropdown Cadastros -->
+                <div id="nav-cadastros-group" class="relative dropdown">
+                    <button id="btn-menu-cadastros" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i>
+                        <span>Cadastros</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
+                    </button>
+                    <div class="dropdown-menu hidden absolute left-0 mt-1 w-52 bg-[#131C31] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+                        <button onclick="navegarPara('cad-manutentores')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="wrench" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Manutentores</span>
+                        </button>
+                        <button onclick="navegarPara('cad-lideranca')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="user-check" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Liderança</span>
+                        </button>
+                        <button onclick="navegarPara('cad-ativos')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Ativos (Máquinas)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dropdown Relatórios -->
+                <div id="nav-relatorios-group" class="relative dropdown">
+                    <button id="btn-menu-relatorios" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        <span>Relatórios</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
+                    </button>
+                    <div class="dropdown-menu hidden absolute left-0 mt-1 w-64 bg-[#131C31] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+                        <button onclick="navegarPara('centros-custo')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="wallet" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Centros de Custo</span>
+                        </button>
+                        <button onclick="navegarPara('relatorios-os')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="clipboard-list" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Relatórios de O.S.</span>
+                        </button>
+                        <button onclick="navegarPara('relatorios-maquinas')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Relatório de Máquinas</span>
+                        </button>
+                        <button onclick="navegarPara('relatorios-manutentores')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="users" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Relatório de Manutentores</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="nav-configuracoes" onclick="navegarPara('configuracoes')" data-page="configuracoes" class="nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>Configurações</span>
+                </button>
+
+                <button id="btn-menu-saas" onclick="navegarPara('saas-empresas')" data-page="saas-empresas" class="hidden nav-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm border border-[#00E5B0]/30 text-[#00E5B0]">
+                    <i data-lucide="building-2" class="w-4 h-4"></i>
+                    <span>Empresas (SaaS)</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Direita: Status Nuvem + Notificações + Usuário + Sair -->
+        <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <div id="cloud-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-[#00E5B0] border border-[#00E5B0]/30">
+                <span id="cloud-dot" class="w-2 h-2 rounded-full bg-[#00E5B0] animate-pulse"></span>
+                <span id="cloud-label">Online</span>
+            </div>
+
+            <button id="btn-notificacoes-push" onclick="ativarNotificacoesPushOSync()" title="Ativar Notificações no Celular" class="p-2 rounded-lg text-amber-400 hover:bg-amber-500/10 transition relative">
+                <i id="icon-notificacoes-push" data-lucide="bell" class="w-5 h-5"></i>
+            </button>
+
+            <div class="hidden sm:flex flex-col text-right">
+                <span id="header-user-name" class="text-xs font-semibold text-white">Carregando...</span>
+                <span id="header-user-role" class="text-[10px] text-slate-400">Admin</span>
+            </div>
+
+            <button onclick="sairDoSistema()" title="Sair do Sistema" class="p-2 rounded-lg text-rose-500 hover:bg-rose-500/10 transition">
+                <i data-lucide="power" class="w-5 h-5 stroke-[2.2]"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ÁREA DINÂMICA DAS TELAS -->
+    <main id="app-content" class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6"></main>
+
+    <!-- RODAPÉ DESKTOP -->
+    <footer class="hidden md:block bg-[#0B1120] text-slate-400 text-xs py-3.5 text-center border-t border-slate-800">
+        © 2026 OSync • <a href="pages/privacidade.html" class="hover:text-[#00E5B0] underline transition">Política de Privacidade e LGPD</a> | Powered by <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#00E5B0] hover:underline">CS Code Solutions</a>
+    </footer>
+
+    <!-- MENU INFERIOR MOBILE (5 ITENS OTIMIZADOS E CENTRALIZADOS) -->
+    <nav class="osync-bottom-nav md:hidden fixed bottom-0 left-0 right-0 h-16 px-2 flex items-center justify-around z-40">
+        <button id="mob-dashboard" onclick="navegarPara('dashboard')" data-page="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
+            <i data-lucide="layout-dashboard" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">Painel</span>
+        </button>
+
+        <button id="mob-os" onclick="navegarPara('os')" data-page="os" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
+            <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">O.S.</span>
+        </button>
+
+        <!-- BOTÃO CENTRAL DE ESCANEAR (CÂMERA) PERFEITAMENTE CENTRALIZADO -->
+        <div class="flex-1 flex flex-col items-center justify-center -mt-3">
+            <button onclick="abrirLeitorQRCodeCamera()" class="flex flex-col items-center justify-center text-[#00E5B0] transition active:scale-95 group" title="Ler QR Code da Máquina">
+                <div class="w-11 h-11 rounded-full bg-[#00E5B0] text-[#0B1120] flex items-center justify-center shadow-lg border-2 border-[#0B1120] group-hover:scale-105 transition">
+                    <i data-lucide="scan-line" class="w-6 h-6 stroke-[2.4]"></i>
+                </div>
+                <span class="text-[10px] font-bold mt-0.5 text-center leading-none">Scanner</span>
+            </button>
+        </div>
+
+        <button id="mob-solicitacoes" onclick="navegarPara('solicitacoes')" data-page="solicitacoes" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
+            <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">Solicitação</span>
+        </button>
+
+        <button onclick="abrirMenuGeralMobile()" id="btn-menu-geral-mobile" class="mobile-nav-btn flex flex-col items-center justify-center py-1.5 px-1 flex-1">
+            <i data-lucide="menu" class="w-5 h-5 mb-0.5"></i>
+            <span class="text-[10px] font-medium">Menu</span>
+        </button>
+    </nav>
+
+    <!-- MODAL DO LEITOR DE QR CODE VIA CÂMERA -->
+    <div id="modal-scanner-qr" class="hidden fixed inset-0 bg-slate-900/95 z-[90] flex flex-col items-center justify-between p-4">
+        <div class="w-full flex items-center justify-between text-white max-w-md pt-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="scan" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span class="font-bold text-sm">Apontar Câmera para o QR Code</span>
+            </div>
+            <button onclick="fecharLeitorQRCodeCamera()" class="p-2 rounded-full bg-slate-800 text-slate-300 hover:text-white">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <div class="relative w-full max-w-sm aspect-square rounded-2xl overflow-hidden border-2 border-[#00E5B0] shadow-2xl bg-black flex items-center justify-center">
+            <video id="video-scanner-qr" class="w-full h-full object-cover" autoplay playsinline muted></video>
+            <div class="absolute inset-0 border-[30px] border-black/40 pointer-events-none flex items-center justify-center">
+                <div class="w-48 h-48 border-2 border-dashed border-[#00E5B0] rounded-xl animate-pulse"></div>
+            </div>
+        </div>
+
+        <div class="w-full max-w-md text-center pb-6 space-y-3">
+            <p class="text-xs text-slate-400">Posicione o QR Code da máquina no centro da câmera para abrir o prontuário instantaneamente.</p>
+            <label class="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl cursor-pointer border border-slate-700 transition">
+                <i data-lucide="camera" class="w-4 h-4 text-[#00E5B0]"></i>
+                <span>Tirar Foto / Enviar Imagem do QR Code</span>
+                <input type="file" id="input-arquivo-qr" accept="image/*" capture="environment" onchange="processarArquivoQRCode(event)" class="hidden">
+            </label>
+        </div>
+    </div>
+
+    <!-- GAVETA MOBILE UNIFICADA (MENU GERAL) -->
+    <div id="mobile-menu-drawer" class="hidden fixed inset-0 bg-black/60 z-50 md:hidden flex items-end">
+        <div class="bg-[#131C31] w-full rounded-t-2xl border-t-2 border-[#00E5B0] p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl animate-fade-in">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-700">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="layout-grid" class="w-5 h-5 text-[#00E5B0]"></i>
+                    <span class="text-sm font-bold text-white uppercase tracking-wider">Menu do Sistema</span>
+                </div>
+                <button onclick="fecharMenuGeralMobile()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- Bloco Exclusivo Super Admin (No Topo do Menu) -->
+            <div id="mob-drawer-saas-group" class="hidden space-y-1.5 pb-2 border-b border-slate-700/80">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-[#00E5B0] px-1">Gestão Master</span>
+                <button onclick="navegarPara('saas-empresas'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-gradient-to-r from-blue-900/40 to-[#00E5B0]/10 hover:bg-blue-600/20 border border-[#00E5B0]/40 text-[#00E5B0] flex items-center gap-3 transition shadow-sm">
+                    <i data-lucide="building-2" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-bold">Empresas (SaaS)</span>
+                </button>
+            </div>
+
+            <!-- Bloco: Cadastros -->
+            <div id="drawer-group-cadastros" class="space-y-1.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Cadastros</span>
+                <button onclick="navegarPara('cad-manutentores'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="wrench" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Manutentores</span>
+                </button>
+                <button onclick="navegarPara('cad-lideranca'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="user-check" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Liderança</span>
+                </button>
+                <button onclick="navegarPara('cad-ativos'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Ativos (Máquinas)</span>
+                </button>
+            </div>
+
+            <!-- Bloco: Relatórios -->
+            <div id="drawer-group-relatorios" class="space-y-1.5 pt-1">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Relatórios Gerenciais</span>
+                <button onclick="navegarPara('centros-custo'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="wallet" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Centros de Custo</span>
+                </button>
+                <button onclick="navegarPara('relatorios-os'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Relatórios de O.S.</span>
+                </button>
+                <button onclick="navegarPara('relatorios-maquinas'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Relatório de Máquinas</span>
+                </button>
+                <button onclick="navegarPara('relatorios-manutentores'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="users" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Relatório de Manutentores</span>
+                </button>
+            </div>
+
+            <!-- Bloco: Sistema -->
+            <div class="space-y-1.5 pt-1">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Sistema</span>
+                <button onclick="navegarPara('configuracoes'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="settings" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Configurações</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GLOBAL: PRONTUÁRIO & AÇÕES RÁPIDAS VIA QR CODE DA MÁQUINA -->
+    <div id="modal-qr-maquina-global" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[70] flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] flex flex-col">
+            <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-[#00E5B0]/15 border border-[#00E5B0]/40 text-[#00E5B0] flex items-center justify-center shrink-0">
+                        <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span id="qr-glob-tag" class="hidden text-xs font-extrabold text-[#00E5B0] uppercase block"></span>
+                        <h3 id="qr-glob-nome" class="text-base font-bold text-white leading-tight">Carregando...</h3>
+                    </div>
+                </div>
+                <button onclick="fecharModalQRMaquinaGlobal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4 overflow-y-auto flex-1">
+                <input type="hidden" id="qr-glob-ativo-id" value="">
+
+                <!-- Ficha Técnica -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                    <div><span class="text-slate-400 block">Setor</span><strong id="qr-glob-setor" class="text-slate-800">-</strong></div>
+                    <div><span class="text-slate-400 block">Fabricante</span><strong id="qr-glob-fab" class="text-slate-800">-</strong></div>
+                    <div><span class="text-slate-400 block">Modelo</span><strong id="qr-glob-mod" class="text-slate-800">-</strong></div>
+                    <div><span class="text-slate-400 block">Status</span><strong id="qr-glob-status" class="text-slate-800">-</strong></div>
+                </div>
+
+                <!-- Botões de Ação Rápida -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <button type="button" onclick="acaoQR_NovaOrdemOuChamado()"
+                        class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-extrabold py-3 px-3.5 rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-xs">
+                        <i data-lucide="plus-circle" class="w-4 h-4 shrink-0"></i>
+                        <span id="qr-glob-btn-nova-os-texto">Nova Ordem (O.S.)</span>
+                    </button>
+
+                    <button type="button" id="qr-glob-btn-rel-maquina" onclick="acaoQR_GerarRelatorioMaquina()"
+                        class="bg-[#0B1120] hover:bg-slate-800 text-white font-bold py-3 px-3.5 rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-xs">
+                        <i data-lucide="file-text" class="w-4 h-4 text-[#00E5B0] shrink-0"></i>
+                        <span>Relatório Máquina</span>
+                    </button>
+
+                    <button type="button" id="qr-glob-btn-rel-cc" onclick="acaoQR_GerarRelatorioCentroCusto()"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-3.5 rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-xs">
+                        <i data-lucide="wallet" class="w-4 h-4 shrink-0"></i>
+                        <span>Relatório C. Custo</span>
+                    </button>
+                </div>
+
+                <!-- Histórico de O.S. da Máquina -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase text-slate-500 mb-2 flex items-center justify-between">
+                        <span>Histórico de Manutenções da Máquina</span>
+                        <span id="qr-glob-qtd-os" class="text-slate-700">0 O.S.</span>
+                    </h4>
+                    <div id="qr-glob-historico-os" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE PERÍODO RÁPIDO PARA RELATÓRIOS DO QR CODE -->
+    <div id="modal-qr-periodo-pdf" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[80] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+                <h3 id="qr-pdf-modal-titulo" class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="file-down" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span>Gerar Relatório PDF</span>
+                </h3>
+                <button onclick="fecharModalQRPeriodoPDF()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form onsubmit="executarPDFDoQRCode(event)" class="p-5 space-y-4">
+                <input type="hidden" id="qr-pdf-tipo" value="maquina">
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-600">Linha do Tempo / Período *</label>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <label class="cursor-pointer border border-slate-300 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-700 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                            <input type="radio" name="qr-pdf-modo" value="total" checked onchange="alternarPeriodoQRPDF()" class="accent-blue-600">
+                            <span>Total (Histórico Completo)</span>
+                        </label>
+                        <label class="cursor-pointer border border-slate-300 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-700 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                            <input type="radio" name="qr-pdf-modo" value="mensal" onchange="alternarPeriodoQRPDF()" class="accent-blue-600">
+                            <span>Mês e Ano Específico</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="box-mes-ano-qr-pdf" class="hidden grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Mês *</label>
+                        <select id="qr-pdf-mes" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold outline-none">
+                            <option value="01">Janeiro</option>
+                            <option value="02">Fevereiro</option>
+                            <option value="03">Março</option>
+                            <option value="04">Abril</option>
+                            <option value="05">Maio</option>
+                            <option value="06">Junho</option>
+                            <option value="07">Julho</option>
+                            <option value="08">Agosto</option>
+                            <option value="09">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Ano *</label>
+                        <select id="qr-pdf-ano" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold outline-none"></select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="fecharModalQRPeriodoPDF()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" id="btn-qr-baixar-pdf" class="px-5 py-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm flex items-center gap-1.5">
+                        <i data-lucide="file-down" class="w-4 h-4"></i>
+                        <span>Baixar Relatório PDF</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/firebase-config.js?v=15"></script>
+    <script src="js/notificacoes.js?v=1"></script>
+    <script src="js/ui-alerts.js?v=15"></script>
+    <script src="js/utils.js?v=15"></script>
+    <script src="js/data-store.js?v=15"></script>
+    <script src="js/image-utils.js?v=15"></script>
+    <script src="js/lgpd.js?v=15"></script>
+    <script src="js/auth.js?v=17"></script>
+    <script src="js/router.js?v=15"></script>
+    <script src="js/dashboard.js?v=15"></script>
+    <script src="js/configuracoes.js?v=15"></script>
+    <script src="js/cadastros.js?v=16"></script>
+    <script src="js/centros-custo.js?v=15"></script>
+    <script src="js/relatorios-os.js?v=15"></script>
+    <script src="js/relatorios-maquinas.js?v=15"></script>
+    <script src="js/relatorios-manutentores.js?v=15"></script>
+    <script src="js/solicitacoes.js?v=16"></script>
+    <script src="js/saas-master.js?v=15"></script>
+    <script src="js/os-kanban.js?v=16"></script>
+    <script src="js/os-execucao.js?v=16"></script>
+
+</body>
+</html>
