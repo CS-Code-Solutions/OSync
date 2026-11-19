@@ -194,6 +194,14 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
 auth.onAuthStateChanged(async (user) => {
     if (!user) {
         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
+        if (primeiraCarga) {
+            atualizarStatusNuvem(true);
+            document.body.classList.remove('auth-loading');
+
+            if (typeof inicializarNotificacoesOSync === 'function') {
+                inicializarNotificacoesOSync(usuarioAtual);
+            }
+
         if (!document.getElementById('modal-licenca-expirada')) {
             window.location.href = '/login';
         }
