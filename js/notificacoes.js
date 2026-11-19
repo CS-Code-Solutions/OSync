@@ -15,7 +15,7 @@ function tocarSomNotificacaoOSync() {
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, agora + i * 0.12);
             gain.gain.setValueAtTime(0.001, agora + i * 0.12);
-            gain.gain.exponentialRampToValueAtTime(0.18, agora + i * 0.12 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.22, agora + i * 0.12 + 0.02);
             gain.gain.exponentialRampToValueAtTime(0.0001, agora + i * 0.12 + 0.25);
             osc.connect(gain);
             gain.connect(ctx.destination);
@@ -87,7 +87,9 @@ async function inicializarNotificacoesOSync(userObj) {
         }
 
         if (Notification.permission === 'granted' && userObj?.id) {
-            await registrarTokenFCMUsuario(userObj.id);
+            await registrarTokenFCMUsuario(userObj.id).catch((e) => {
+                console.warn('Falha silenciosa ao renovar token FCM:', e.message);
+            });
         }
     } catch (err) {
         console.warn('Aviso FCM:', err.message);
@@ -101,7 +103,11 @@ async function registrarTokenFCMUsuario(uid) {
         serviceWorkerRegistration: reg
     });
 
-    if (token && uid) {
+    if (!token) {
+        throw new Error('O navegador não gerou o token FCM.');
+    }
+
+    if (uid) {
         await db.collection('usuarios').doc(uid).update({
             fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
         });
@@ -136,14 +142,19 @@ window.ativarNotificacoesPushOSync = async function () {
             }
         }
     } catch (err) {
-        alert('Não foi possível ativar as notificações: ' + err.message);
+        console.error('Erro detalhado push:', err);
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync('Erro ao salvar token: ' + err.message, 'erro');
+        } else {
+            alert('Não foi possível ativar as notificações: ' + err.message);
+        }
     }
 };
 
 window.dispararPushOSync = async function (dados) {
     try {
         const tokenAuth = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-        await fetch('/api/notificar', {
+        const resp = await fetch('/api/notificar', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -155,6 +166,13 @@ window.dispararPushOSync = async function (dados) {
                 ...dados
             })
         });
+
+        const resultado = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            console.error('Falha na API /api/notificar:', resp.status, resultado);
+        } else {
+            console.log('Retorno Push OSync:', resultado);
+        }
     } catch (err) {
         console.warn('Aviso envio push:', err.message);
     }
