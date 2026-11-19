@@ -1,706 +1,586 @@
-let anexosOSAtual = [];
+/**
+ * ============================================================================
+ * OSync — Execução de O.S., Apontamento de Horas, Checklist e Custos
+ * ============================================================================
+ */
+
+let osDetalhesAtual = null;
+let apontamentosOSAtual = [];
 let itensCustoOSAtual = [];
-let cacheCentrosCustoOS = [];
-let cacheManutentoresDetalhesOS = [];
-let manutentoresDetalhesOSAtual = [];
-let osAtualEhExterna = false;
-let osAtualTeveParada = false;
+let checklistOSAtual = [];
 
-function sanitizarURLImagem(url) {
-    const str = String(url || '').trim();
-    if (/^https?:\/\//i.test(str) || /^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(str)) {
-        return escaparHTML(str);
-    }
-    return '';
-}
-
-function obterColunaConclusaoOS() {
-    if (!Array.isArray(cacheColunasOS) || cacheColunasOS.length === 0) return null;
-    const ordenadas = [...cacheColunasOS].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-    return (
-        ordenadas.find(c => /conclu|finaliz|encerrad/i.test(c.titulo || '')) ||
-        ordenadas[ordenadas.length - 1]
-    );
-}
-
-function calcularMinutosParadaEntreDatas(inicioISO, terminoISO) {
-    if (!inicioISO || !terminoISO) return 0;
-    const d1 = new Date(inicioISO);
-    const d2 = new Date(terminoISO);
-    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
-    return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / 60000));
-}
-
-function recalcularTempoParadaEncerramento() {
-    const ini = document.getElementById('enc-inicio-parada')?.value || '';
-    const fim = document.getElementById('enc-termino-parada')?.value || '';
-    const badge = document.getElementById('enc-tempo-parada-calculado');
-    if (!badge) return;
-
-    const mins = calcularMinutosParadaEntreDatas(ini, fim);
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
-}
-
-function recalcularTempoTrabalhoEncerramento() {
-    const ini = document.getElementById('enc-inicio-trabalho')?.value || '';
-    const fim = document.getElementById('enc-data-hora')?.value || '';
-    const badge = document.getElementById('enc-tempo-trabalho-calculado');
-    if (!badge) return;
-
-    const mins = calcularMinutosParadaEntreDatas(ini, fim);
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    badge.textContent = `${h}h ${String(m).padStart(2, '0')}m`;
-}
-
-function resetarEstadoModalDetalhesOS() {
-    anexosOSAtual = [];
-    itensCustoOSAtual = [];
-    manutentoresDetalhesOSAtual = [];
-    osAtualEhExterna = false;
-    osAtualTeveParada = false;
-
-    const formEnc = document.getElementById('form-encerramento-os');
-    if (formEnc) {
-        formEnc.reset();
-        formEnc.classList.add('hidden');
-    }
-
-    const boxAbrir = document.getElementById('box-botao-abrir-encerramento');
-    if (boxAbrir) boxAbrir.classList.remove('hidden');
-
-    const camposTexto = [
-        'det-os-id',
-        'enc-servico-realizado',
-        'enc-observacoes',
-        'item-custo-desc',
-        'item-custo-valor',
-        'enc-inicio-trabalho',
-        'enc-data-hora',
-        'enc-inicio-parada',
-        'enc-termino-parada'
-    ];
-    camposTexto.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-
-    const inputFotos = document.getElementById('enc-input-fotos');
-    if (inputFotos) inputFotos.value = '';
-
-    const uploadStatus = document.getElementById('enc-upload-status');
-    if (uploadStatus) uploadStatus.classList.add('hidden');
-
-    const badgeTrab = document.getElementById('enc-tempo-trabalho-calculado');
-    if (badgeTrab) badgeTrab.textContent = '0h 00m';
-
-    const badgeParada = document.getElementById('enc-tempo-parada-calculado');
-    if (badgeParada) badgeParada.textContent = '0h 00m';
-
-    const listaAnexos = document.getElementById('enc-lista-anexos');
-    if (listaAnexos) listaAnexos.innerHTML = '<span class="text-[11px] text-slate-400">Nenhuma foto anexada.</span>';
-
-    const listaCustos = document.getElementById('enc-lista-custos');
-    if (listaCustos) listaCustos.innerHTML = '<p class="text-[11px] text-slate-400">Nenhum item de custo lançado.</p>';
-
-    const totalLabel = document.getElementById('enc-custo-total-label');
-    if (totalLabel) totalLabel.textContent = '0,00';
-}
-
-function renderizarManutentoresDetalhesOS() {
-    const selMan = document.getElementById('det-os-manutentor-select');
-    const chipsBox = document.getElementById('det-os-manutentores-chips');
-
-    if (selMan) {
-        const disponiveis = cacheManutentoresDetalhesOS.filter(m => !manutentoresDetalhesOSAtual.some(sel => sel.id === m.id));
-        const textoPadrao = manutentoresDetalhesOSAtual.length > 0
-            ? '+ Adicionar parceria / responsável...'
-            : 'Sem técnico — Toque para escolher';
-
-        selMan.innerHTML = `<option value="">${textoPadrao}</option>` +
-            disponiveis.map(m => {
-                const rotulo = m.perfil === 'Admin' ? `${m.nome} (Gestão)` : m.nome;
-                return `<option value="${escaparHTML(m.id)}">${escaparHTML(rotulo)}</option>`;
-            }).join('');
-        selMan.value = '';
-    }
-
-    if (chipsBox) {
-        if (manutentoresDetalhesOSAtual.length === 0) {
-            chipsBox.innerHTML = '';
-        } else {
-            chipsBox.innerHTML = manutentoresDetalhesOSAtual.map(m => `
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
-                    <span>${escaparHTML(m.nome)}</span>
-                    <button type="button" onclick="removerManutentorDetalhesOS('${escaparHTML(m.id)}')" class="text-blue-500 hover:text-rose-600 font-extrabold leading-none">×</button>
-                </span>
-            `).join('');
-        }
-    }
-}
-
-async function adicionarManutentorDetalhesOS() {
-    const selMan = document.getElementById('det-os-manutentor-select');
-    const manId = selMan?.value || '';
-    if (!manId) return;
-
-    const manObj = cacheManutentoresDetalhesOS.find(m => m.id === manId);
-    if (manObj && !manutentoresDetalhesOSAtual.some(s => s.id === manObj.id)) {
-        manutentoresDetalhesOSAtual.push({ id: manObj.id, nome: manObj.nome });
-    }
-    renderizarManutentoresDetalhesOS();
-    await atualizarManutentorRapidoOS();
-}
-
-async function removerManutentorDetalhesOS(manId) {
-    manutentoresDetalhesOSAtual = manutentoresDetalhesOSAtual.filter(m => m.id !== manId);
-    renderizarManutentoresDetalhesOS();
-    await atualizarManutentorRapidoOS();
-}
-
+/**
+ * Abre o Modal 2 com todos os detalhes, checklist, apontamentos e custos da O.S.
+ */
 async function abrirDetalhesOS(osId) {
-    const os = cacheOrdensServico.find(o => o.id === osId);
+    const os = listaOrdensServico.find(item => item.id === osId);
     if (!os) return;
 
-    resetarEstadoModalDetalhesOS();
-
-    const coluna = cacheColunasOS.find(c => c.id === os.colunaId) || { titulo: 'Aberta', corTopo: '#00E5B0' };
-    osAtualEhExterna = (os.tipoNome || '').trim().toLowerCase() === 'manutenção externa';
-    osAtualTeveParada = os.condicaoMaquina === 'Maquina parada' || os.maquinaParada === true || Boolean(os.inicioParada);
-
-    document.getElementById('det-os-id').value = os.id;
-    document.getElementById('det-os-numero').textContent = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
-
-    const badge = document.getElementById('det-os-status-badge');
-    badge.textContent = coluna.titulo;
-    badge.style.backgroundColor = sanitizarCorHex(coluna.corTopo, '#00E5B0');
-
-    const condBadge = document.getElementById('det-os-condicao-badge');
-    if (condBadge) {
-        if (osAtualTeveParada) {
-            condBadge.textContent = 'Máquina Parada';
-            condBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-600 text-white';
-            condBadge.classList.remove('hidden');
-        } else if (os.condicaoMaquina === 'Parcialmente funcional') {
-            condBadge.textContent = 'Parcialmente Funcional';
-            condBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500 text-white';
-            condBadge.classList.remove('hidden');
-        } else {
-            condBadge.classList.add('hidden');
-        }
-    }
-
-    const tituloMaquina = (os.ativoTag || '').trim() ? `${os.ativoTag} - ${os.ativoNome}` : (os.ativoNome || 'Equipamento');
-    document.getElementById('det-os-maquina').textContent = tituloMaquina;
-    document.getElementById('det-os-tipo').textContent = os.tipoNome || 'Manutenção';
-    document.getElementById('det-os-prioridade').textContent = `Prioridade: ${os.prioridade || 'Normal'}`;
-    document.getElementById('det-os-descricao').textContent = os.descricao;
-
-    const selCol = document.getElementById('det-os-coluna-select');
-    selCol.innerHTML = cacheColunasOS.map(c =>
-        `<option value="${escaparHTML(c.id)}" ${c.id === os.colunaId ? 'selected' : ''}>${escaparHTML(c.titulo)}</option>`
-    ).join('');
-
-    const [manutSnap, ativosSnap] = await Promise.all([
-        db.collection('usuarios')
-            .where('empresaId', '==', usuarioAtual.empresaId)
-            .where('perfil', 'in', ['Manutentor', 'Admin'])
-            .get(),
-        db.collection('ativos').where('empresaId', '==', usuarioAtual.empresaId).get()
-    ]);
-
-    cacheManutentoresDetalhesOS = manutSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(u => u.ativo !== false)
-        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-
-    const idsSelecionados = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
-        ? os.manutentoresIds
-        : (os.manutentorId ? [os.manutentorId] : []);
-
-    const nomesSelecionados = Array.isArray(os.manutentoresNomes) && os.manutentoresNomes.length > 0
-        ? os.manutentoresNomes
-        : (os.manutentorNome ? [os.manutentorNome] : []);
-
-    manutentoresDetalhesOSAtual = idsSelecionados.map((id, idx) => {
-        const encontrado = cacheManutentoresDetalhesOS.find(m => m.id === id);
-        return {
-            id,
-            nome: encontrado ? encontrado.nome : (nomesSelecionados[idx] || 'Técnico')
-        };
-    });
-
-    renderizarManutentoresDetalhesOS();
-
-    cacheCentrosCustoOS = ativosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const selCC = document.getElementById('item-custo-cc');
-    if (selCC) {
-        const labelPadraoOS = escaparHTML(tituloMaquina);
-        selCC.innerHTML = cacheCentrosCustoOS.map(a => {
-            const rotulo = (a.codigoTag || '').trim() ? `${a.codigoTag} - ${a.nome}` : a.nome;
-            const label = escaparHTML(rotulo);
-            const selecionado = a.id === os.ativoId ? 'selected' : '';
-            return `<option value="${label}" ${selecionado}>${label}</option>`;
-        }).join('') || `<option value="${labelPadraoOS}" selected>${labelPadraoOS}</option>`;
-    }
-
-    aplicarLayoutCustosPorTipo(osAtualEhExterna);
-
-    anexosOSAtual = Array.isArray(os.anexos) ? [...os.anexos] : [];
+    osDetalhesAtual = { ...os };
     itensCustoOSAtual = Array.isArray(os.itensCusto) ? [...os.itensCusto] : [];
+    checklistOSAtual = Array.isArray(os.checklistPlano)
+        ? os.checklistPlano.map(it => ({ ...it }))
+        : [];
 
-    document.getElementById('enc-servico-realizado').value = os.servicoRealizado || '';
-    document.getElementById('enc-observacoes').value = os.observacoes || '';
+    document.getElementById('det-os-numero').textContent = os.numeroOs || 'OS';
+    document.getElementById('det-os-titulo').textContent = os.titulo || 'Sem título';
+    document.getElementById('det-os-subtitulo').textContent =
+        `${os.ativoTag ? `${os.ativoTag} — ${os.ativoNome}` : (os.ativoNome || 'Ativo')} • ${os.tipo || 'Corretiva'}`;
+    document.getElementById('det-os-descricao').textContent = os.descricao || 'Sem descrição detalhada.';
+    document.getElementById('det-os-responsavel').textContent = os.responsavelNome || 'Não atribuído';
 
-    const agora = new Date();
-    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-    const agoraISO = agora.toISOString().slice(0, 16);
+    // Badges de Status e Prioridade
+    const badgeStatus = document.getElementById('det-os-status-badge');
+    const statusStyles = {
+        Aberta: 'bg-amber-100 text-amber-800',
+        'Em Execução': 'bg-blue-100 text-blue-800',
+        Encerrada: 'bg-emerald-100 text-emerald-800'
+    };
+    badgeStatus.className = `text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusStyles[os.status] || 'bg-slate-100 text-slate-700'}`;
+    badgeStatus.textContent = os.status;
 
-    let inicioPadraoOS = os.inicioExecucao || os.inicioParada || '';
-    if (!inicioPadraoOS && os.criadoEm?.toDate) {
-        const dCriado = os.criadoEm.toDate();
-        dCriado.setMinutes(dCriado.getMinutes() - dCriado.getTimezoneOffset());
-        inicioPadraoOS = dCriado.toISOString().slice(0, 16);
-    }
+    const badgePrio = document.getElementById('det-os-prioridade-badge');
+    badgePrio.className = 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700';
+    badgePrio.textContent = `Prioridade: ${os.prioridade || 'Média'}`;
 
-    const inpIniTrab = document.getElementById('enc-inicio-trabalho');
-    if (inpIniTrab) inpIniTrab.value = os.inicioExecucao || '';
+    // Preenche select de manutentores no formulário de apontamento
+    const selApont = document.getElementById('apont-manutentor');
+    if (selApont) {
+        selApont.innerHTML = `<option value="">Manutentor...</option>` +
+            cacheManutentoresOS.map(m =>
+                `<option value="${m.id}" data-nome="${escapeHTML(m.nome)}" data-valor="${Number(m.valorHora || 0)}">${escapeHTML(m.nome)}</option>`
+            ).join('');
 
-    const inpEncerramento = document.getElementById('enc-data-hora');
-    if (inpEncerramento) inpEncerramento.value = os.dataHoraEncerramento || '';
-
-    recalcularTempoTrabalhoEncerramento();
-
-    const blocoParada = document.getElementById('bloco-encerramento-parada');
-    const inpIniParada = document.getElementById('enc-inicio-parada');
-    const inpFimParada = document.getElementById('enc-termino-parada');
-    if (blocoParada && inpIniParada && inpFimParada) {
-        if (osAtualTeveParada) {
-            blocoParada.classList.remove('hidden');
-            inpIniParada.required = true;
-            inpFimParada.required = true;
-
-            inpIniParada.value = os.inicioParada || inicioPadraoOS || agoraISO;
-            inpFimParada.value = os.terminoParada || agoraISO;
-            recalcularTempoParadaEncerramento();
-        } else {
-            blocoParada.classList.add('hidden');
-            inpIniParada.required = false;
-            inpFimParada.required = false;
-            inpIniParada.value = '';
-            inpFimParada.value = '';
+        if (window.usuarioLogado?.perfil === 'Manutentor') {
+            selApont.value = window.usuarioLogado.uid;
         }
     }
 
-    renderizarAnexosOS();
-    renderizarItensCustoOS();
+    // Configura botões de transição de status e bloqueio de edição se Encerrada
+    const boxBotoes = document.getElementById('det-os-botoes-acao');
+    const formApont = document.getElementById('form-apontamento-horas');
+    const formCusto = document.getElementById('form-item-custo');
+    ocultarPainelEncerramento();
 
-    if (os.encerrada) {
-        mostrarFormularioEncerramento();
+    if (os.status === 'Encerrada') {
+        boxBotoes.innerHTML = `<span class="text-xs font-semibold text-emerald-700">O.S. Encerrada</span>`;
+        if (formApont) formApont.classList.add('hidden');
+        if (formCusto) formCusto.classList.add('hidden');
     } else {
-        document.getElementById('form-encerramento-os').classList.add('hidden');
-        document.getElementById('box-botao-abrir-encerramento').classList.remove('hidden');
+        if (formApont) formApont.classList.remove('hidden');
+        if (formCusto) formCusto.classList.remove('hidden');
+
+        let htmlBotoes = '';
+        if (os.status === 'Aberta') {
+            htmlBotoes += `
+                <button onclick="iniciarExecucaoOS()"
+                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                    Iniciar Execução
+                </button>
+            `;
+        }
+        htmlBotoes += `
+            <button onclick="exibirPainelEncerramento()"
+                class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                Encerrar O.S.
+            </button>
+        `;
+        boxBotoes.innerHTML = htmlBotoes;
     }
+
+    renderizarItensCustoOS();
+    renderizarChecklistPlanoExecucao(os);
+    await carregarApontamentosOS(os.id);
 
     document.getElementById('modal-detalhes-os').classList.remove('hidden');
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function aplicarLayoutCustosPorTipo(ehExterna) {
-    const tituloCustos = document.getElementById('label-titulo-custos');
-    const inputDesc = document.getElementById('item-custo-desc');
-    const selCC = document.getElementById('item-custo-cc');
-    const inputValor = document.getElementById('item-custo-valor');
-    const wrapperValor = inputValor?.parentElement;
-
-    if (!inputDesc || !selCC || !inputValor || !wrapperValor) return;
-
-    if (ehExterna) {
-        if (tituloCustos) {
-            tituloCustos.innerHTML = `<i data-lucide="briefcase" class="w-4 h-4 text-purple-600"></i><span>Serviço Terceirizado & Valor</span>`;
-        }
-        inputDesc.placeholder = 'Descrição do serviço externo / Fornecedor';
-        inputDesc.className = 'sm:col-span-7 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-purple-600';
-
-        selCC.classList.add('hidden');
-
-        wrapperValor.className = 'sm:col-span-5 flex gap-1.5';
-        inputValor.placeholder = 'Valor do Serviço (R$)';
-    } else {
-        if (tituloCustos) {
-            tituloCustos.innerHTML = `<i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-600"></i><span>Peças, Materiais & Custos</span>`;
-        }
-        inputDesc.placeholder = 'Item / Peça utilizada';
-        inputDesc.className = 'sm:col-span-5 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none';
-
-        selCC.classList.remove('hidden');
-        selCC.className = 'sm:col-span-4 px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none';
-
-        wrapperValor.className = 'sm:col-span-3 flex gap-1.5';
-        inputValor.placeholder = 'R$ 0,00';
-    }
+    if (window.lucide) lucide.createIcons();
 }
 
 function fecharModalDetalhesOS() {
-    resetarEstadoModalDetalhesOS();
     document.getElementById('modal-detalhes-os').classList.add('hidden');
+    osDetalhesAtual = null;
+    checklistOSAtual = [];
 }
 
-function mostrarFormularioEncerramento() {
-    document.getElementById('box-botao-abrir-encerramento').classList.add('hidden');
-    document.getElementById('form-encerramento-os').classList.remove('hidden');
-    recalcularTempoTrabalhoEncerramento();
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-}
+/* ============================================================================
+   CHECKLIST DO PLANO DE MANUTENÇÃO NA EXECUÇÃO (OK / NÃO OK + MOTIVO)
+   ============================================================================ */
 
-async function atualizarStatusRapidoOS() {
-    const osId = document.getElementById('det-os-id').value;
-    const novaColId = document.getElementById('det-os-coluna-select').value;
-    const os = cacheOrdensServico.find(o => o.id === osId);
+function renderizarChecklistPlanoExecucao(os = osDetalhesAtual) {
+    const box = document.getElementById('det-box-checklist-plano');
+    const elTitulo = document.getElementById('det-plano-titulo');
+    const elProg = document.getElementById('det-plano-progresso');
+    const elInst = document.getElementById('det-plano-instrucoes');
+    const lista = document.getElementById('det-lista-checklist-plano');
 
-    const colunaConclusao = obterColunaConclusaoOS();
-    const ehColunaFinal = colunaConclusao && colunaConclusao.id === novaColId;
+    if (!box || !lista) return;
 
-    if (ehColunaFinal && os && !os.encerrada) {
-        document.getElementById('det-os-coluna-select').value = os.colunaId;
-        mostrarFormularioEncerramento();
-        if (typeof mostrarNotificacaoOSync === 'function') {
-            mostrarNotificacaoOSync('Preencha os dados abaixo e clique em Confirmar Encerramento.', 'aviso');
-        }
+    if (!Array.isArray(checklistOSAtual) || checklistOSAtual.length === 0) {
+        box.classList.add('hidden');
         return;
     }
 
-    await db.collection('ordens_servico').doc(osId).update({
-        colunaId: novaColId,
-        encerrada: ehColunaFinal ? true : false
-    });
+    box.classList.remove('hidden');
+    if (elTitulo) elTitulo.textContent = os?.planoTitulo || 'Checklist de Verificação';
 
-    const col = cacheColunasOS.find(c => c.id === novaColId);
-    if (col) {
-        const badge = document.getElementById('det-os-status-badge');
-        badge.textContent = col.titulo;
-        badge.style.backgroundColor = sanitizarCorHex(col.corTopo, '#00E5B0');
-    }
-
-    if (os && col && typeof dispararPushOSync === 'function') {
-        const idsAlvo = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
-            ? os.manutentoresIds
-            : (os.manutentorId ? [os.manutentorId] : []);
-        const numFmt = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
-        dispararPushOSync({
-            tipo: 'status_os',
-            destinatariosIds: idsAlvo,
-            perfisAlvo: ['Admin'],
-            titulo: `Status Atualizado: ${numFmt}`,
-            corpo: `${os.ativoNome || 'Equipamento'} agora está em "${col.titulo}".`,
-            urlDestino: `/?os=${osId}`
-        });
-    }
-}
-
-async function atualizarManutentorRapidoOS() {
-    const osId = document.getElementById('det-os-id').value;
-    const manutentoresIds = manutentoresDetalhesOSAtual.map(m => m.id);
-    const manutentoresNomes = manutentoresDetalhesOSAtual.map(m => m.nome);
-
-    await db.collection('ordens_servico').doc(osId).update({
-        manutentorId: manutentoresIds[0] || '',
-        manutentorNome: manutentoresNomes.join(', '),
-        manutentoresIds,
-        manutentoresNomes
-    });
-}
-
-async function processarUploadFotosOS(event) {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    const osId = document.getElementById('det-os-id').value;
-    const statusEl = document.getElementById('enc-upload-status');
-    if (statusEl) statusEl.classList.remove('hidden');
-
-    try {
-        for (const file of files) {
-            const url = await compactarEEnviarImagemOS(file, usuarioAtual.empresaId, osId);
-            if (url) anexosOSAtual.push(url);
+    if (elInst) {
+        if (os?.planoInstrucoes) {
+            elInst.textContent = os.planoInstrucoes;
+            elInst.classList.remove('hidden');
+        } else {
+            elInst.classList.add('hidden');
         }
-        renderizarAnexosOS();
-    } catch (err) {
-        alert('Erro ao processar imagem: ' + err.message);
-    } finally {
-        if (statusEl) statusEl.classList.add('hidden');
-        event.target.value = '';
-    }
-}
-
-function renderizarAnexosOS() {
-    const container = document.getElementById('enc-lista-anexos');
-    if (!container) return;
-
-    if (anexosOSAtual.length === 0) {
-        container.innerHTML = '<span class="text-[11px] text-slate-400">Nenhuma foto anexada.</span>';
-        return;
     }
 
-    container.innerHTML = anexosOSAtual.map((url, idx) => {
-        const urlSegura = sanitizarURLImagem(url);
-        if (!urlSegura) return '';
+    const total = checklistOSAtual.length;
+    const respondidos = checklistOSAtual.filter(it => it.status === 'OK' || it.status === 'NAO_OK').length;
+    if (elProg) elProg.textContent = `${respondidos} / ${total} verificados`;
+
+    const encerrada = os?.status === 'Encerrada';
+
+    lista.innerHTML = checklistOSAtual.map((item, idx) => {
+        const isOk = item.status === 'OK';
+        const isNaoOk = item.status === 'NAO_OK';
+
+        const btnOkClass = isOk
+            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+            : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400 hover:text-emerald-700';
+
+        const btnNaoOkClass = isNaoOk
+            ? 'bg-red-600 text-white border-red-600 shadow-xs'
+            : 'bg-white text-slate-600 border-slate-200 hover:border-red-400 hover:text-red-700';
+
         return `
-        <div class="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-slate-300 bg-white">
-            <a href="${urlSegura}" target="_blank" rel="noopener noreferrer">
-                <img src="${urlSegura}" class="w-full h-full object-cover">
-            </a>
-            <button type="button" onclick="removerAnexoOS(${idx})"
-                class="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">×</button>
-        </div>`;
+            <div class="bg-white border ${isNaoOk ? 'border-red-200' : isOk ? 'border-emerald-200' : 'border-slate-200'} rounded-xl p-3 space-y-2.5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div class="text-xs font-medium text-slate-800">
+                        <span class="font-mono font-bold text-slate-400 mr-1.5">${idx + 1}.</span>
+                        <span>${escapeHTML(item.descricao || '')}</span>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" ${encerrada ? 'disabled' : ''} onclick="marcarItemChecklistOS(${idx}, 'OK')"
+                            class="px-3 py-1 rounded-lg border text-xs font-semibold transition-colors ${btnOkClass} ${encerrada ? 'opacity-75 cursor-not-allowed' : ''}">
+                            OK
+                        </button>
+                        <button type="button" ${encerrada ? 'disabled' : ''} onclick="marcarItemChecklistOS(${idx}, 'NAO_OK')"
+                            class="px-3 py-1 rounded-lg border text-xs font-semibold transition-colors ${btnNaoOkClass} ${encerrada ? 'opacity-75 cursor-not-allowed' : ''}">
+                            Não OK
+                        </button>
+                    </div>
+                </div>
+
+                ${isNaoOk ? `
+                    <div class="pt-1">
+                        <label class="block text-[11px] font-semibold text-red-700 mb-1">Motivo / Não conformidade encontrada *</label>
+                        <input type="text" ${encerrada ? 'disabled' : ''}
+                            value="${escapeHTML(item.motivo || '')}"
+                            oninput="atualizarMotivoChecklistOS(${idx}, this.value)"
+                            placeholder="Descreva o problema identificado neste item..."
+                            class="w-full px-3 py-1.5 bg-red-50/40 border border-red-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:border-red-500 focus:outline-none">
+                    </div>
+                ` : ''}
+            </div>
+        `;
     }).join('');
 }
 
-function removerAnexoOS(idx) {
-    anexosOSAtual.splice(idx, 1);
-    renderizarAnexosOS();
+async function marcarItemChecklistOS(index, status) {
+    if (!osDetalhesAtual || osDetalhesAtual.status === 'Encerrada') return;
+    if (!checklistOSAtual[index]) return;
+
+    checklistOSAtual[index].status = status;
+    if (status === 'OK') {
+        checklistOSAtual[index].motivo = '';
+    }
+
+    renderizarChecklistPlanoExecucao(osDetalhesAtual);
+
+    try {
+        await db.collection('ordens_servico').doc(osDetalhesAtual.id).update({
+            checklistPlano: checklistOSAtual
+        });
+        osDetalhesAtual.checklistPlano = checklistOSAtual.map(it => ({ ...it }));
+    } catch (erro) {
+        console.error('Erro ao salvar status do item de checklist:', erro);
+    }
 }
 
-function adicionarItemCustoOS() {
-    const osId = document.getElementById('det-os-id').value;
-    const os = cacheOrdensServico.find(o => o.id === osId);
-    const padraoMaquina = os
-        ? ((os.ativoTag || '').trim() ? `${os.ativoTag} - ${os.ativoNome}` : os.ativoNome)
-        : 'Máquina';
+let timerSalvarMotivoChecklist = null;
+function atualizarMotivoChecklistOS(index, valor) {
+    if (!osDetalhesAtual || osDetalhesAtual.status === 'Encerrada') return;
+    if (!checklistOSAtual[index]) return;
 
-    const descInput = document.getElementById('item-custo-desc');
-    const desc = descInput.value.trim() || (osAtualEhExterna ? 'Serviço de Manutenção Externa' : '');
-    const cc = osAtualEhExterna ? padraoMaquina : (document.getElementById('item-custo-cc')?.value || padraoMaquina);
-    const valor = parseFloat(document.getElementById('item-custo-valor').value) || 0;
+    checklistOSAtual[index].motivo = valor;
 
-    if (!desc) {
-        alert('Informe o nome do item ou peça.');
+    clearTimeout(timerSalvarMotivoChecklist);
+    timerSalvarMotivoChecklist = setTimeout(async () => {
+        if (!osDetalhesAtual) return;
+        try {
+            await db.collection('ordens_servico').doc(osDetalhesAtual.id).update({
+                checklistPlano: checklistOSAtual
+            });
+            osDetalhesAtual.checklistPlano = checklistOSAtual.map(it => ({ ...it }));
+        } catch (erro) {
+            console.error('Erro ao salvar motivo do checklist:', erro);
+        }
+    }, 500);
+}
+
+/**
+ * Muda status de Aberta -> Em Execução
+ */
+async function iniciarExecucaoOS() {
+    if (!osDetalhesAtual) return;
+    const u = window.usuarioLogado;
+
+    try {
+        const atualizacao = {
+            status: 'Em Execução',
+            iniciadaEm: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (!osDetalhesAtual.responsavelId && u.perfil === 'Manutentor') {
+            atualizacao.responsavelId = u.uid;
+            atualizacao.responsavelNome = u.nome;
+        }
+
+        await db.collection('ordens_servico').doc(osDetalhesAtual.id).update(atualizacao);
+        await carregarOrdensServico();
+        await abrirDetalhesOS(osDetalhesAtual.id);
+    } catch (erro) {
+        console.error('Erro ao iniciar execução:', erro);
+        alert('Erro ao iniciar O.S.: ' + erro.message);
+    }
+}
+
+/* ============================================================================
+   APONTAMENTO DE HORAS (SUBCOLEÇÃO apontamentos_horas)
+   ============================================================================ */
+
+async function carregarApontamentosOS(osId) {
+    const lista = document.getElementById('lista-apontamentos-os');
+    if (!lista) return;
+
+    try {
+        const snap = await db.collection('ordens_servico').doc(osId)
+            .collection('apontamentos_horas')
+            .get();
+
+        apontamentosOSAtual = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => {
+                const tA = a.criadoEm?.toMillis ? a.criadoEm.toMillis() : 0;
+                const tB = b.criadoEm?.toMillis ? b.criadoEm.toMillis() : 0;
+                return tB - tA;
+            });
+
+        renderizarApontamentosOS();
+        recalcularTotaisFinanceirosOS();
+    } catch (erro) {
+        console.error('Erro ao carregar apontamentos:', erro);
+    }
+}
+
+function renderizarApontamentosOS() {
+    const lista = document.getElementById('lista-apontamentos-os');
+    if (!lista) return;
+
+    if (apontamentosOSAtual.length === 0) {
+        lista.innerHTML = `<p class="p-4 text-xs text-slate-400 text-center">Nenhum apontamento de horas registrado.</p>`;
         return;
     }
 
-    if (valor <= 0 && osAtualEhExterna) {
-        alert('Informe o valor do serviço externo.');
-        return;
+    const encerrada = osDetalhesAtual?.status === 'Encerrada';
+
+    lista.innerHTML = apontamentosOSAtual.map(ap => {
+        const custo = Number(ap.custoCalculado || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        return `
+            <div class="p-3 flex items-center justify-between gap-3 text-xs">
+                <div class="min-w-0">
+                    <p class="font-semibold text-slate-800">${escapeHTML(ap.manutentorNome || 'Técnico')} <span class="text-blue-600 font-bold">(${Number(ap.horas || 0).toFixed(1)}h)</span></p>
+                    <p class="text-slate-500 truncate">${escapeHTML(ap.atividade || '-')}</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="font-bold text-slate-700">${custo}</span>
+                    ${!encerrada ? `
+                        <button onclick="removerApontamentoHoras('${ap.id}')" class="p-1 text-slate-400 hover:text-red-600 rounded">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+}
+
+async function registrarApontamentoHoras(e) {
+    e.preventDefault();
+    if (!osDetalhesAtual) return;
+
+    const sel = document.getElementById('apont-manutentor');
+    const option = sel.options[sel.selectedIndex];
+    const manutentorId = sel.value;
+    const manutentorNome = option?.dataset?.nome || '';
+    const valorHora = parseFloat(option?.dataset?.valor || '0') || 0;
+    const horas = parseFloat(document.getElementById('apont-horas').value) || 0;
+    const atividade = document.getElementById('apont-atividade').value.trim();
+
+    if (!manutentorId || horas <= 0) return;
+
+    const custoCalculado = Number((horas * valorHora).toFixed(2));
+    const btn = document.getElementById('btn-add-apontamento');
+
+    try {
+        if (btn) btn.disabled = true;
+
+        await db.collection('ordens_servico').doc(osDetalhesAtual.id)
+            .collection('apontamentos_horas')
+            .add({
+                empresaId: window.empresaAtual?.id,
+                manutentorId,
+                manutentorNome,
+                valorHora,
+                horas,
+                custoCalculado,
+                atividade,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+        document.getElementById('apont-horas').value = '';
+        document.getElementById('apont-atividade').value = '';
+
+        await carregarApontamentosOS(osDetalhesAtual.id);
+        await persistirTotaisNoDocumentoOS();
+    } catch (erro) {
+        console.error('Erro ao registrar apontamento:', erro);
+        alert('Erro ao lançar horas: ' + erro.message);
+    } finally {
+        if (btn) btn.disabled = false;
     }
-
-    itensCustoOSAtual.push({
-        descricao: desc,
-        centroCusto: cc,
-        valor,
-        tipoCusto: osAtualEhExterna ? 'Serviço Externo' : 'Peça/Material'
-    });
-
-    descInput.value = '';
-    document.getElementById('item-custo-valor').value = '';
-    renderizarItensCustoOS();
 }
 
-function removerItemCustoOS(idx) {
-    itensCustoOSAtual.splice(idx, 1);
-    renderizarItensCustoOS();
+async function removerApontamentoHoras(apontamentoId) {
+    if (!osDetalhesAtual || !confirm('Remover este apontamento de horas?')) return;
+    try {
+        await db.collection('ordens_servico').doc(osDetalhesAtual.id)
+            .collection('apontamentos_horas').doc(apontamentoId)
+            .delete();
+
+        await carregarApontamentosOS(osDetalhesAtual.id);
+        await persistirTotaisNoDocumentoOS();
+    } catch (erro) {
+        console.error('Erro ao remover apontamento:', erro);
+    }
 }
+
+/* ============================================================================
+   MATERIAIS, PEÇAS E SERVIÇOS TERCEIROS
+   ============================================================================ */
 
 function renderizarItensCustoOS() {
-    const lista = document.getElementById('enc-lista-custos');
-    const totalLabel = document.getElementById('enc-custo-total-label');
-
-    const total = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
-    if (totalLabel) totalLabel.textContent = total.toFixed(2).replace('.', ',');
-
+    const lista = document.getElementById('lista-itens-custo-os');
     if (!lista) return;
 
     if (itensCustoOSAtual.length === 0) {
-        lista.innerHTML = `<p class="text-[11px] text-slate-400">${osAtualEhExterna ? 'Nenhum valor de serviço lançado.' : 'Nenhum item de custo lançado.'}</p>`;
+        lista.innerHTML = `<p class="p-4 text-xs text-slate-400 text-center">Nenhum material ou serviço lançado.</p>`;
+        recalcularTotaisFinanceirosOS();
         return;
     }
 
-    lista.innerHTML = itensCustoOSAtual.map((item, idx) => `
-        <div class="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
-            <div class="min-w-0 pr-2">
-                <span class="font-bold text-slate-800">${escaparHTML(item.descricao)}</span>
-                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ml-1">${escaparHTML(item.centroCusto)}</span>
+    const encerrada = osDetalhesAtual?.status === 'Encerrada';
+
+    lista.innerHTML = itensCustoOSAtual.map((item, idx) => {
+        const subtotal = Number(item.subtotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        return `
+            <div class="p-3 flex items-center justify-between gap-3 text-xs">
+                <div class="min-w-0">
+                    <span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-semibold mr-1.5">${escapeHTML(item.categoria)}</span>
+                    <span class="font-semibold text-slate-800">${escapeHTML(item.descricao)}</span>
+                    <span class="text-slate-500 ml-1">(${item.quantidade}x R$ ${Number(item.valorUnitario).toFixed(2)})</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="font-bold text-slate-700">${subtotal}</span>
+                    ${!encerrada ? `
+                        <button onclick="removerItemCustoOS(${idx})" class="p-1 text-slate-400 hover:text-red-600 rounded">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    ` : ''}
+                </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <span class="font-bold text-emerald-700">R$ ${Number(item.valor).toFixed(2).replace('.', ',')}</span>
-                <button type="button" onclick="removerItemCustoOS(${idx})" class="text-rose-500 hover:text-rose-700 font-bold px-1">×</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+
+    recalcularTotaisFinanceirosOS();
+    if (window.lucide) lucide.createIcons();
+}
+
+async function adicionarItemCustoOS(e) {
+    e.preventDefault();
+    if (!osDetalhesAtual) return;
+
+    const categoria = document.getElementById('custo-categoria').value;
+    const descricao = document.getElementById('custo-descricao').value.trim();
+    const quantidade = parseFloat(document.getElementById('custo-qtd').value) || 1;
+    const valorUnitario = parseFloat(document.getElementById('custo-valor-unit').value) || 0;
+    const subtotal = Number((quantidade * valorUnitario).toFixed(2));
+
+    itensCustoOSAtual.push({
+        categoria,
+        descricao,
+        quantidade,
+        valorUnitario,
+        subtotal
+    });
+
+    document.getElementById('custo-descricao').value = '';
+    document.getElementById('custo-qtd').value = '1';
+    document.getElementById('custo-valor-unit').value = '';
+
+    renderizarItensCustoOS();
+    await persistirTotaisNoDocumentoOS();
+}
+
+async function removerItemCustoOS(index) {
+    if (!osDetalhesAtual) return;
+    itensCustoOSAtual.splice(index, 1);
+    renderizarItensCustoOS();
+    await persistirTotaisNoDocumentoOS();
+}
+
+function recalcularTotaisFinanceirosOS() {
+    const totalHoras = apontamentosOSAtual.reduce((acc, a) => acc + (Number(a.horas) || 0), 0);
+    const custoMaoDeObra = apontamentosOSAtual.reduce((acc, a) => acc + (Number(a.custoCalculado) || 0), 0);
+    const custoMateriais = itensCustoOSAtual.reduce((acc, i) => acc + (Number(i.subtotal) || 0), 0);
+    const custoTotal = Number((custoMaoDeObra + custoMateriais).toFixed(2));
+
+    const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const badgeHoras = document.getElementById('det-total-horas-badge');
+    const badgeMat = document.getElementById('det-total-materiais-badge');
+    const badgeGeral = document.getElementById('det-custo-total-geral');
+
+    if (badgeHoras) badgeHoras.textContent = `${totalHoras.toFixed(1)}h • ${fmt(custoMaoDeObra)}`;
+    if (badgeMat) badgeMat.textContent = fmt(custoMateriais);
+    if (badgeGeral) badgeGeral.textContent = fmt(custoTotal);
+
+    return { totalHoras, custoMaoDeObra, custoMateriais, custoTotal };
+}
+
+async function persistirTotaisNoDocumentoOS() {
+    if (!osDetalhesAtual) return;
+    const totais = recalcularTotaisFinanceirosOS();
+
+    try {
+        await db.collection('ordens_servico').doc(osDetalhesAtual.id).update({
+            itensCusto: itensCustoOSAtual,
+            totalHoras: Number(totais.totalHoras.toFixed(2)),
+            custoMaoDeObra: Number(totais.custoMaoDeObra.toFixed(2)),
+            custoMateriais: Number(totais.custoMateriais.toFixed(2)),
+            custoTotal: totais.custoTotal
+        });
+        await carregarOrdensServico();
+    } catch (erro) {
+        console.error('Erro ao atualizar totais da O.S.:', erro);
+    }
+}
+
+/* ============================================================================
+   ENCERRAMENTO TÉCNICO DA O.S.
+   ============================================================================ */
+
+function exibirPainelEncerramento() {
+    const painel = document.getElementById('painel-encerramento-os');
+    if (painel) painel.classList.remove('hidden');
+}
+
+function ocultarPainelEncerramento() {
+    const painel = document.getElementById('painel-encerramento-os');
+    if (painel) painel.classList.add('hidden');
 }
 
 async function confirmarEncerramentoOS(e) {
     e.preventDefault();
+    if (!osDetalhesAtual) return;
+
     const btn = document.getElementById('btn-confirmar-encerramento');
-    btn.disabled = true;
-    btn.textContent = 'Salvando...';
+    const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
+    const totais = recalcularTotaisFinanceirosOS();
+    const u = window.usuarioLogado;
 
-    try {
-        const osId = document.getElementById('det-os-id').value;
-        const os = cacheOrdensServico.find(o => o.id === osId);
-        const padraoMaquina = os
-            ? ((os.ativoTag || '').trim() ? `${os.ativoTag} - ${os.ativoNome}` : os.ativoNome)
-            : 'Máquina';
-
-        let inicioParada = '';
-        let terminoParada = '';
-        let tempoParadaMinutos = 0;
-
-        if (osAtualTeveParada) {
-            inicioParada = document.getElementById('enc-inicio-parada')?.value || '';
-            terminoParada = document.getElementById('enc-termino-parada')?.value || '';
-            if (!inicioParada || !terminoParada) {
-                alert('Informe a data/hora de início e término da parada da máquina.');
+    // Validação do Checklist do Plano de Manutenção (quando houver)
+    if (checklistOSAtual.length > 0) {
+        const pendente = checklistOSAtual.find(it => it.status !== 'OK' && it.status !== 'NAO_OK');
+        if (pendente) {
+            alert('Marque OK ou Não OK em todos os itens do checklist antes de encerrar a O.S.');
+            if (btn) {
                 btn.disabled = false;
                 btn.textContent = 'Confirmar Encerramento';
-                return;
             }
-            if (new Date(terminoParada) < new Date(inicioParada)) {
-                alert('O término da parada não pode ser anterior ao início da parada.');
-                btn.disabled = false;
-                btn.textContent = 'Confirmar Encerramento';
-                return;
-            }
-            tempoParadaMinutos = calcularMinutosParadaEntreDatas(inicioParada, terminoParada);
-        }
-
-        const inicioExecucao = document.getElementById('enc-inicio-trabalho')?.value || '';
-        const dataHoraEncerramento = document.getElementById('enc-data-hora')?.value || '';
-        if (inicioExecucao && dataHoraEncerramento && new Date(dataHoraEncerramento) < new Date(inicioExecucao)) {
-            alert('A data/hora do encerramento não pode ser anterior ao início do trabalho.');
-            btn.disabled = false;
-            btn.textContent = 'Confirmar Encerramento';
             return;
         }
-        const tempoTrabalhoMinutos = (inicioExecucao && dataHoraEncerramento)
-            ? calcularMinutosParadaEntreDatas(inicioExecucao, dataHoraEncerramento)
-            : 0;
 
-        const descPendente = document.getElementById('item-custo-desc')?.value.trim();
-        const valorPendente = parseFloat(document.getElementById('item-custo-valor')?.value) || 0;
-        if (valorPendente > 0) {
-            itensCustoOSAtual.push({
-                descricao: descPendente || (osAtualEhExterna ? 'Serviço de Manutenção Externa' : 'Material / Peça'),
-                centroCusto: osAtualEhExterna ? padraoMaquina : (document.getElementById('item-custo-cc')?.value || padraoMaquina),
-                valor: valorPendente,
-                tipoCusto: osAtualEhExterna ? 'Serviço Externo' : 'Peça/Material'
-            });
+        const semMotivo = checklistOSAtual.find(it => it.status === 'NAO_OK' && (!it.motivo || it.motivo.trim().length < 3));
+        if (semMotivo) {
+            alert('Informe o motivo em todos os itens marcados como "Não OK".');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Encerramento';
+            }
+            return;
+        }
+    }
+
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Encerrando...';
         }
 
-        const servicoRealizado = document.getElementById('enc-servico-realizado').value.trim();
-        const observacoes = document.getElementById('enc-observacoes').value.trim();
-        const custoTotal = itensCustoOSAtual.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
-
-        const manutentoresIds = manutentoresDetalhesOSAtual.map(m => m.id);
-        const manutentoresNomes = manutentoresDetalhesOSAtual.map(m => m.nome);
-
-        if (!Array.isArray(cacheColunasOS) || cacheColunasOS.length === 0) {
-            const colSnap = await db.collection('kanban_colunas')
-                .where('empresaId', '==', usuarioAtual.empresaId)
-                .get();
-            cacheColunasOS = colSnap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-        }
-
-        const colunaConclusao = obterColunaConclusaoOS();
+        const agoraISO = new Date().toISOString();
 
         const dadosAtualizacao = {
-            servicoRealizado,
-            anexos: anexosOSAtual,
-            itensCusto: itensCustoOSAtual,
-            custoTotal,
-            centroCustoId: os?.ativoId || '',
-            centroCustoNome: padraoMaquina,
-            inicioExecucao,
-            dataHoraEncerramento,
-            tempoTrabalhoMinutos,
-            manutentorId: manutentoresIds[0] || '',
-            manutentorNome: manutentoresNomes.join(', '),
-            manutentoresIds,
-            manutentoresNomes,
-            observacoes,
-            encerrada: true,
-            encerradoPor: usuarioAtual.nome,
-            encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        if (osAtualTeveParada) {
-            dadosAtualizacao.inicioParada = inicioParada;
-            dadosAtualizacao.terminoParada = terminoParada;
-            dadosAtualizacao.tempoParadaMinutos = tempoParadaMinutos;
-        }
-
-        if (colunaConclusao && colunaConclusao.id) {
-            dadosAtualizacao.colunaId = colunaConclusao.id;
-        }
-
-        await db.collection('ordens_servico').doc(osId).update(dadosAtualizacao);
-
-        if (os?.ativoId) {
-            await db.collection('ativos').doc(os.ativoId).update({ status: 'Operacional' }).catch(() => {});
-        }
-
-        const payloadSolicitacaoEncerrada = {
             status: 'Encerrada',
-            osId: osId,
-            numeroOs: os?.numeroOs || 0,
             servicoRealizado,
-            encerradoPor: usuarioAtual.nome,
-            dataHoraEncerramento,
+            checklistPlano: checklistOSAtual,
+            itensCusto: itensCustoOSAtual,
+            totalHoras: Number(totais.totalHoras.toFixed(2)),
+            custoMaoDeObra: Number(totais.custoMaoDeObra.toFixed(2)),
+            custoMateriais: Number(totais.custoMateriais.toFixed(2)),
+            custoTotal: totais.custoTotal,
+            encerradoPorId: u.uid,
+            encerradoPorNome: u.nome,
+            dataHoraEncerramento: agoraISO,
             encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        const idsSolicitacoesAtualizar = new Set();
-        if (os?.solicitacaoId) idsSolicitacoesAtualizar.add(os.solicitacaoId);
+        await db.collection('ordens_servico').doc(osDetalhesAtual.id).update(dadosAtualizacao);
 
-        try {
-            const solSnap = await db.collection('solicitacoes')
-                .where('empresaId', '==', usuarioAtual.empresaId)
-                .get();
-
-            solSnap.docs.forEach(docSol => {
-                const s = docSol.data();
-                if (
-                    s.osId === osId ||
-                    (os?.numeroOs && Number(s.numeroOs) === Number(os.numeroOs)) ||
-                    (s.status === 'Convertida em O.S.' && s.ativoId === os?.ativoId && (os?.descricao || '').includes(s.problema || '___'))
-                ) {
-                    idsSolicitacoesAtualizar.add(docSol.id);
-                }
-            });
-
-            for (const solIdVinc of idsSolicitacoesAtualizar) {
-                await db.collection('solicitacoes').doc(solIdVinc).update(payloadSolicitacaoEncerrada).catch(() => {});
-            }
-        } catch (errSol) {
-            console.warn('Solicitações vinculadas não atualizadas:', errSol.message);
-        }
-
-        if (os && typeof dispararPushOSync === 'function') {
-            const idsAlvo = Array.isArray(os.manutentoresIds) && os.manutentoresIds.length > 0
-                ? os.manutentoresIds
-                : (os.manutentorId ? [os.manutentorId] : []);
-            const numFmt = `#OS-${String(os.numeroOs || 0).padStart(4, '0')}`;
-            dispararPushOSync({
-                tipo: 'status_os',
-                destinatariosIds: idsAlvo,
-                perfisAlvo: ['Admin'],
-                titulo: `O.S. Concluída: ${numFmt}`,
-                corpo: `${os.ativoNome || 'Equipamento'} foi encerrada por ${usuarioAtual.nome}.`,
-                urlDestino: `/?os=${osId}`
+        // Se a O.S. veio de uma solicitação da liderança, encerra também a solicitação vinculada
+        if (osDetalhesAtual.solicitacaoId) {
+            await db.collection('solicitacoes').doc(osDetalhesAtual.solicitacaoId).update({
+                status: 'Encerrada',
+                osId: osDetalhesAtual.id,
+                numeroOs: osDetalhesAtual.numeroOs || '',
+                servicoRealizado,
+                encerradoPor: u.nome,
+                dataHoraEncerramento: agoraISO,
+                encerradaEm: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
 
         fecharModalDetalhesOS();
-        if (typeof mostrarNotificacaoOSync === 'function') {
-            mostrarNotificacaoOSync('O.S. encerrada com sucesso!', 'sucesso');
-        }
-    } catch (err) {
-        alert('Erro ao encerrar O.S.: ' + err.message);
+        await carregarOrdensServico();
+
+    } catch (erro) {
+        console.error('Erro ao encerrar O.S.:', erro);
+        alert('Erro ao encerrar Ordem de Serviço: ' + erro.message);
     } finally {
-        btn.disabled = false;
-        btn.textContent = 'Confirmar Encerramento';
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Confirmar Encerramento';
+        }
     }
 }
