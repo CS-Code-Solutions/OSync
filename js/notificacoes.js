@@ -2,7 +2,18 @@ const OSYNC_VAPID_KEY = 'BCwSWdvi1ygplErUgFDcqfFCK1gh6g-JSo2of6mU-HQxYX67SKiO8lc
 let messagingOSync = null;
 let listenerForegroundRegistrado = false;
 let unsubscribeNotificacoesRT = null;
-let idsNotificacoesJaVistas = new Set();
+let eventosNotificadosCache = new Set();
+
+function jaNotificouEventoOSync(chave) {
+    if (!chave) return false;
+    if (eventosNotificadosCache.has(chave)) return true;
+    eventosNotificadosCache.add(chave);
+    if (eventosNotificadosCache.size > 100) {
+        const primeiro = eventosNotificadosCache.values().next().value;
+        eventosNotificadosCache.delete(primeiro);
+    }
+    return false;
+}
 
 function tocarSomNotificacaoOSync() {
     try {
@@ -54,13 +65,17 @@ function atualizarBotaoNotificacoesUI() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-async function exibirAlertaLocalOSync(titulo, corpo, url = '/') {
+async function exibirAlertaLocalOSync(titulo, corpo, url = '/', eventoId = '') {
+    const chave = eventoId || `${titulo}|${corpo}`;
+    if (jaNotificouEventoOSync(chave)) return;
+
     tocarSomNotificacaoOSync();
     if (typeof mostrarNotificacaoOSync === 'function') {
         mostrarNotificacaoOSync(`${titulo}: ${corpo}`, 'aviso');
     }
 
-    if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+    // Com o app aberto/visível, o banner + som já avisam; só cria push do sistema se estiver minimizado
+    if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
         try {
             const reg = await navigator.serviceWorker.ready;
             await reg.showNotification(titulo, {
@@ -68,7 +83,7 @@ async function exibirAlertaLocalOSync(titulo, corpo, url = '/') {
                 icon: '/images/ico192.png',
                 badge: '/images/ico.png',
                 vibrate: [200, 100, 200],
-                tag: `osync-${Date.now()}`,
+                tag: `osync-${chave}`,
                 data: { url }
             });
         } catch (_) {}
@@ -86,9 +101,6 @@ function iniciarEscutaNotificacoesTempoReal(userObj) {
         .onSnapshot((snap) => {
             snap.docChanges().forEach((change) => {
                 if (change.type !== 'added') return;
-                const idDoc = change.doc.id;
-                if (idsNotificacoesJaVistas.has(idDoc)) return;
-                idsNotificacoesJaVistas.add(idDoc);
 
                 const n = change.doc.data();
                 if (!n || n.remetenteUid === userObj.id) return;
@@ -103,7 +115,7 @@ function iniciarEscutaNotificacoesTempoReal(userObj) {
                 const souPerfilAlvo = destIds.length === 0 && perfis.includes(userObj.perfil);
 
                 if (souDestinatarioDireto || souPerfilAlvo) {
-                    exibirAlertaLocalOSync(n.titulo || 'OSync', n.corpo || '', n.urlDestino || '/');
+                    exibirAlertaLocalOSync(n.titulo || 'OSync', n.corpo || '', n.urlDestino || '/', n.eventoId || change.doc.id);
                 }
             });
         }, (err) => {
@@ -128,7 +140,8 @@ async function inicializarNotificacoesOSync(userObj) {
                 const titulo = payload?.notification?.title || payload?.data?.title || 'OSync';
                 const corpo = payload?.notification?.body || payload?.data?.body || '';
                 const url = payload?.data?.url || '/';
-                await exibirAlertaLocalOSync(titulo, corpo, url);
+                const eventoId = payload?.data?.eventoId || '';
+                await exibirAlertaLocalOSync(titulo, corpo, url, eventoId);
             });
         }
 
@@ -153,10 +166,18 @@ async function registrarTokenFCMUsuario(uid) {
         throw new Error('O navegador não gerou o token FCM.');
     }
 
+    // Remove token anterior salvo neste navegador se tiver mudado
+    const tokenAnterior = localStorage.getItem('osync_fcm_token_local');
     if (uid) {
+        if (tokenAnterior && tokenAnterior !== token) {
+            await db.collection('usuarios').doc(uid).update({
+                fcmTokens: firebase.firestore.FieldValue.arrayRemove(tokenAnterior)
+            }).catch(() => {});
+        }
         await db.collection('usuarios').doc(uid).update({
             fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
         });
+        localStorage.setItem('osync_fcm_token_local', token);
     }
     return token;
 }
@@ -202,10 +223,13 @@ window.dispararPushOSync = async function (dados) {
     const remetenteUid = usuarioAtual?.id || auth.currentUser?.uid || '';
     if (!empresaId) return;
 
-    // 1. Grava evento em tempo real no Firestore (garante alerta imediato com app aberto)
+    const eventoId = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // 1. Grava evento em tempo real no Firestore (alerta instantâneo com app aberto)
     db.collection('notificacoes_realtime').add({
         empresaId,
         remetenteUid,
+        eventoId,
         tipo: dados.tipo || 'geral',
         destinatariosIds: Array.isArray(dados.destinatariosIds) ? dados.destinatariosIds : [],
         perfisAlvo: Array.isArray(dados.perfisAlvo) ? dados.perfisAlvo : [],
@@ -228,6 +252,7 @@ window.dispararPushOSync = async function (dados) {
             body: JSON.stringify({
                 empresaId,
                 remetenteUid,
+                eventoId,
                 ...dados
             })
         });
