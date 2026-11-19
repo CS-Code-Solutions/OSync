@@ -33,7 +33,6 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'Parâmetros obrigatórios ausentes.' });
         }
 
-        // Valida token de sessão quando não for auto-cadastro (novo_cadastro não tem sessão ativa após signOut)
         let uidAutenticado = remetenteUid || '';
         if (tipo !== 'novo_cadastro') {
             if (!idToken) return res.status(401).json({ error: 'Não autorizado.' });
@@ -105,7 +104,6 @@ module.exports = async (req, res) => {
             }
         });
 
-        // Remove tokens expirados/inválidos automaticamente
         const tokensInvalidos = [];
         response.responses.forEach((resp, idx) => {
             if (!resp.success) {
