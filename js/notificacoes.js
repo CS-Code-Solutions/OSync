@@ -1,6 +1,8 @@
 const OSYNC_VAPID_KEY = 'BCwSWdvi1ygplErUgFDcqfFCK1gh6g-JSo2of6mU-HQxYX67SKiO8lcHVU9Eg4s-GTfMFZZ9_DcLsoy8jUjYWLY';
 let messagingOSync = null;
 let listenerForegroundRegistrado = false;
+let unsubscribeNotificacoesRT = null;
+let idsNotificacoesJaVistas = new Set();
 
 function tocarSomNotificacaoOSync() {
     try {
@@ -15,7 +17,7 @@ function tocarSomNotificacaoOSync() {
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, agora + i * 0.12);
             gain.gain.setValueAtTime(0.001, agora + i * 0.12);
-            gain.gain.exponentialRampToValueAtTime(0.22, agora + i * 0.12 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.25, agora + i * 0.12 + 0.02);
             gain.gain.exponentialRampToValueAtTime(0.0001, agora + i * 0.12 + 0.25);
             osc.connect(gain);
             gain.connect(ctx.destination);
@@ -52,8 +54,67 @@ function atualizarBotaoNotificacoesUI() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+async function exibirAlertaLocalOSync(titulo, corpo, url = '/') {
+    tocarSomNotificacaoOSync();
+    if (typeof mostrarNotificacaoOSync === 'function') {
+        mostrarNotificacaoOSync(`${titulo}: ${corpo}`, 'aviso');
+    }
+
+    if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            await reg.showNotification(titulo, {
+                body: corpo,
+                icon: '/images/ico192.png',
+                badge: '/images/ico.png',
+                vibrate: [200, 100, 200],
+                tag: `osync-${Date.now()}`,
+                data: { url }
+            });
+        } catch (_) {}
+    }
+}
+
+function iniciarEscutaNotificacoesTempoReal(userObj) {
+    if (!userObj?.empresaId || !userObj?.id) return;
+    if (unsubscribeNotificacoesRT) unsubscribeNotificacoesRT();
+
+    const inicioSessaoMs = Date.now() - 5000;
+
+    unsubscribeNotificacoesRT = db.collection('notificacoes_realtime')
+        .where('empresaId', '==', userObj.empresaId)
+        .onSnapshot((snap) => {
+            snap.docChanges().forEach((change) => {
+                if (change.type !== 'added') return;
+                const idDoc = change.doc.id;
+                if (idsNotificacoesJaVistas.has(idDoc)) return;
+                idsNotificacoesJaVistas.add(idDoc);
+
+                const n = change.doc.data();
+                if (!n || n.remetenteUid === userObj.id) return;
+
+                const criadoMs = n.criadoEm?.toMillis ? n.criadoEm.toMillis() : (n.timestampMs || 0);
+                if (criadoMs < inicioSessaoMs) return;
+
+                const destIds = Array.isArray(n.destinatariosIds) ? n.destinatariosIds : [];
+                const perfis = Array.isArray(n.perfisAlvo) ? n.perfisAlvo : [];
+
+                const souDestinatarioDireto = destIds.includes(userObj.id);
+                const souPerfilAlvo = destIds.length === 0 && perfis.includes(userObj.perfil);
+
+                if (souDestinatarioDireto || souPerfilAlvo) {
+                    exibirAlertaLocalOSync(n.titulo || 'OSync', n.corpo || '', n.urlDestino || '/');
+                }
+            });
+        }, (err) => {
+            console.warn('Aviso escuta realtime:', err.message);
+        });
+}
+
 async function inicializarNotificacoesOSync(userObj) {
     atualizarBotaoNotificacoesUI();
+    iniciarEscutaNotificacoesTempoReal(userObj);
+
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !firebase.messaging) return;
 
     try {
@@ -67,28 +128,13 @@ async function inicializarNotificacoesOSync(userObj) {
                 const titulo = payload?.notification?.title || payload?.data?.title || 'OSync';
                 const corpo = payload?.notification?.body || payload?.data?.body || '';
                 const url = payload?.data?.url || '/';
-
-                tocarSomNotificacaoOSync();
-                if (typeof mostrarNotificacaoOSync === 'function') {
-                    mostrarNotificacaoOSync(`${titulo}: ${corpo}`, 'aviso');
-                }
-
-                if (Notification.permission === 'granted') {
-                    const reg = await navigator.serviceWorker.ready;
-                    reg.showNotification(titulo, {
-                        body: corpo,
-                        icon: '/images/ico192.png',
-                        badge: '/images/ico.png',
-                        vibrate: [200, 100, 200],
-                        data: { url }
-                    });
-                }
+                await exibirAlertaLocalOSync(titulo, corpo, url);
             });
         }
 
         if (Notification.permission === 'granted' && userObj?.id) {
             await registrarTokenFCMUsuario(userObj.id).catch((e) => {
-                console.warn('Falha silenciosa ao renovar token FCM:', e.message);
+                console.warn('Falha ao renovar token FCM:', e.message);
             });
         }
     } catch (err) {
@@ -152,6 +198,25 @@ window.ativarNotificacoesPushOSync = async function () {
 };
 
 window.dispararPushOSync = async function (dados) {
+    const empresaId = dados.empresaId || usuarioAtual?.empresaId;
+    const remetenteUid = usuarioAtual?.id || auth.currentUser?.uid || '';
+    if (!empresaId) return;
+
+    // 1. Grava evento em tempo real no Firestore (garante alerta imediato com app aberto)
+    db.collection('notificacoes_realtime').add({
+        empresaId,
+        remetenteUid,
+        tipo: dados.tipo || 'geral',
+        destinatariosIds: Array.isArray(dados.destinatariosIds) ? dados.destinatariosIds : [],
+        perfisAlvo: Array.isArray(dados.perfisAlvo) ? dados.perfisAlvo : [],
+        titulo: dados.titulo || 'OSync',
+        corpo: dados.corpo || '',
+        urlDestino: dados.urlDestino || '/',
+        timestampMs: Date.now(),
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
+
+    // 2. Dispara Push em segundo plano via Vercel (/api/notificar)
     try {
         const tokenAuth = auth.currentUser ? await auth.currentUser.getIdToken() : '';
         const resp = await fetch('/api/notificar', {
@@ -161,17 +226,15 @@ window.dispararPushOSync = async function (dados) {
                 ...(tokenAuth ? { 'Authorization': `Bearer ${tokenAuth}` } : {})
             },
             body: JSON.stringify({
-                empresaId: dados.empresaId || usuarioAtual?.empresaId,
-                remetenteUid: usuarioAtual?.id || auth.currentUser?.uid || '',
+                empresaId,
+                remetenteUid,
                 ...dados
             })
         });
 
         const resultado = await resp.json().catch(() => ({}));
         if (!resp.ok) {
-            console.error('Falha na API /api/notificar:', resp.status, resultado);
-        } else {
-            console.log('Retorno Push OSync:', resultado);
+            console.warn('Aviso API /api/notificar:', resp.status, resultado);
         }
     } catch (err) {
         console.warn('Aviso envio push:', err.message);
