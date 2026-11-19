@@ -1,5 +1,6 @@
 let anexosOSAtual = [];
 let itensCustoOSAtual = [];
+let checklistOSAtual = [];
 let cacheCentrosCustoOS = [];
 let cacheManutentoresDetalhesOS = [];
 let manutentoresDetalhesOSAtual = [];
@@ -12,6 +13,142 @@ function sanitizarURLImagem(url) {
         return escaparHTML(str);
     }
     return '';
+}
+
+function selecionarAbaDetalhesOS(aba) {
+    const painelDados = document.getElementById('painel-det-os-dados');
+    const painelChecklist = document.getElementById('painel-det-os-checklist');
+    const tabDados = document.getElementById('tab-det-os-dados');
+    const tabChecklist = document.getElementById('tab-det-os-checklist');
+
+    if (!painelDados || !painelChecklist) return;
+
+    const classeAtiva = 'px-4 py-2 text-xs font-bold rounded-t-xl border border-b-0 border-slate-300 bg-white text-blue-700 shadow-2xs -mb-px flex items-center gap-1.5 shrink-0 transition';
+    const classeInativa = 'px-4 py-2 text-xs font-semibold rounded-t-xl border border-b-0 border-transparent bg-slate-200/80 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 shrink-0 transition';
+
+    if (aba === 'checklist' && checklistOSAtual.length > 0) {
+        painelDados.classList.add('hidden');
+        painelChecklist.classList.remove('hidden');
+        if (tabDados) tabDados.className = classeInativa;
+        if (tabChecklist) tabChecklist.className = classeAtiva;
+    } else {
+        painelChecklist.classList.add('hidden');
+        painelDados.classList.remove('hidden');
+        if (tabDados) tabDados.className = classeAtiva;
+        if (tabChecklist) tabChecklist.className = classeInativa;
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function atualizarContadorChecklistPlano() {
+    const total = checklistOSAtual.length;
+    const respondidos = checklistOSAtual.filter(i => i.status === 'OK' || i.status === 'NAO_OK').length;
+    const texto = `${respondidos}/${total}`;
+
+    const badgeAba = document.getElementById('det-checklist-progresso');
+    const badgeInterno = document.getElementById('det-checklist-progresso-interno');
+
+    if (badgeAba) {
+        badgeAba.textContent = texto;
+        badgeAba.className = (total > 0 && respondidos === total)
+            ? 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700'
+            : 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-300/80 text-slate-700';
+    }
+
+    if (badgeInterno) {
+        badgeInterno.textContent = `${texto} verificados`;
+        badgeInterno.className = (total > 0 && respondidos === total)
+            ? 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700'
+            : 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800';
+    }
+}
+
+function renderizarChecklistPlanoOS() {
+    const container = document.getElementById('det-lista-checklist-plano');
+    if (!container) return;
+
+    atualizarContadorChecklistPlano();
+
+    if (checklistOSAtual.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = checklistOSAtual.map((item, idx) => {
+        const isOK = item.status === 'OK';
+        const isNaoOK = item.status === 'NAO_OK';
+
+        const bordaCard = isOK
+            ? 'border-emerald-300 bg-emerald-50/40'
+            : (isNaoOK ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-white');
+
+        return `
+        <div class="p-3 rounded-xl border ${bordaCard} space-y-2 transition">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="text-xs text-slate-800 font-semibold flex items-start gap-2">
+                    <span class="font-mono font-bold text-slate-400 shrink-0">${idx + 1}.</span>
+                    <span>${escaparHTML(item.descricao || '')}</span>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button type="button" onclick="marcarItemChecklistOS(${idx}, 'OK')"
+                        class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 border transition ${isOK ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-500 hover:text-emerald-700'}">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        <span>OK</span>
+                    </button>
+
+                    <button type="button" onclick="marcarItemChecklistOS(${idx}, 'NAO_OK')"
+                        class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 border transition ${isNaoOK ? 'bg-rose-600 text-white border-rose-600 shadow-2xs' : 'bg-white text-slate-600 border-slate-300 hover:border-rose-500 hover:text-rose-700'}">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        <span>Não OK</span>
+                    </button>
+                </div>
+            </div>
+
+            ${isNaoOK ? `
+            <div class="pt-1">
+                <label class="block text-[11px] font-bold text-rose-700 mb-1">Motivo da não conformidade *</label>
+                <input type="text" value="${escaparHTML(item.motivo || '')}"
+                    onchange="atualizarMotivoChecklistOS(${idx}, this.value)"
+                    placeholder="Descreva o problema encontrado neste item..."
+                    class="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs text-slate-800 outline-none focus:border-rose-600">
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function marcarItemChecklistOS(idx, novoStatus) {
+    if (!checklistOSAtual[idx]) return;
+
+    checklistOSAtual[idx].status = novoStatus;
+    if (novoStatus === 'OK') {
+        checklistOSAtual[idx].motivo = '';
+    }
+
+    renderizarChecklistPlanoOS();
+    await salvarChecklistPlanoNoFirestore();
+}
+
+async function atualizarMotivoChecklistOS(idx, valorMotivo) {
+    if (!checklistOSAtual[idx]) return;
+    checklistOSAtual[idx].motivo = String(valorMotivo || '').trim();
+    await salvarChecklistPlanoNoFirestore();
+}
+
+async function salvarChecklistPlanoNoFirestore() {
+    const osId = document.getElementById('det-os-id')?.value;
+    if (!osId) return;
+
+    try {
+        await db.collection('ordens_servico').doc(osId).update({
+            checklistPlano: checklistOSAtual
+        });
+    } catch (err) {
+        console.warn('Erro ao salvar progresso do checklist:', err);
+    }
 }
 
 function obterColunaConclusaoOS() {
@@ -58,9 +195,15 @@ function recalcularTempoTrabalhoEncerramento() {
 function resetarEstadoModalDetalhesOS() {
     anexosOSAtual = [];
     itensCustoOSAtual = [];
+    checklistOSAtual = [];
     manutentoresDetalhesOSAtual = [];
     osAtualEhExterna = false;
     osAtualTeveParada = false;
+
+    const barraAbas = document.getElementById('det-os-abas-excel');
+    if (barraAbas) barraAbas.classList.add('hidden');
+
+    selecionarAbaDetalhesOS('dados');
 
     const formEnc = document.getElementById('form-encerramento-os');
     if (formEnc) {
@@ -197,6 +340,32 @@ async function abrirDetalhesOS(osId) {
     document.getElementById('det-os-tipo').textContent = os.tipoNome || 'Manutenção';
     document.getElementById('det-os-prioridade').textContent = `Prioridade: ${os.prioridade || 'Normal'}`;
     document.getElementById('det-os-descricao').textContent = os.descricao;
+
+    // Carrega Checklist do Plano e controla Abas Estilo Excel
+    checklistOSAtual = Array.isArray(os.checklistPlano)
+        ? os.checklistPlano.map(it => ({ ...it }))
+        : [];
+
+    const barraAbas = document.getElementById('det-os-abas-excel');
+    if (checklistOSAtual.length > 0) {
+        if (barraAbas) barraAbas.classList.remove('hidden');
+        const tituloPlanoEl = document.getElementById('det-plano-titulo');
+        if (tituloPlanoEl) tituloPlanoEl.textContent = os.planoTitulo || 'Plano de Manutenção';
+
+        const instPlanoEl = document.getElementById('det-plano-instrucoes');
+        if (instPlanoEl) {
+            if ((os.planoInstrucoes || '').trim()) {
+                instPlanoEl.textContent = os.planoInstrucoes;
+                instPlanoEl.classList.remove('hidden');
+            } else {
+                instPlanoEl.classList.add('hidden');
+            }
+        }
+        renderizarChecklistPlanoOS();
+    } else {
+        if (barraAbas) barraAbas.classList.add('hidden');
+    }
+    selecionarAbaDetalhesOS('dados');
 
     const selCol = document.getElementById('det-os-coluna-select');
     selCol.innerHTML = cacheColunasOS.map(c =>
@@ -537,6 +706,27 @@ async function confirmarEncerramentoOS(e) {
     btn.textContent = 'Salvando...';
 
     try {
+        // Valida Checklist do Plano antes de encerrar
+        if (checklistOSAtual.length > 0) {
+            const pendentes = checklistOSAtual.filter(i => i.status !== 'OK' && i.status !== 'NAO_OK');
+            if (pendentes.length > 0) {
+                selecionarAbaDetalhesOS('checklist');
+                alert(`Responda todos os itens do Checklist do Plano (OK ou Não OK) antes de encerrar. Faltam ${pendentes.length} item(ns).`);
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Encerramento';
+                return;
+            }
+
+            const semMotivo = checklistOSAtual.filter(i => i.status === 'NAO_OK' && !(i.motivo || '').trim());
+            if (semMotivo.length > 0) {
+                selecionarAbaDetalhesOS('checklist');
+                alert('Informe o motivo em todos os itens do Checklist marcados como "Não OK".');
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Encerramento';
+                return;
+            }
+        }
+
         const osId = document.getElementById('det-os-id').value;
         const os = cacheOrdensServico.find(o => o.id === osId);
         const padraoMaquina = os
@@ -608,6 +798,7 @@ async function confirmarEncerramentoOS(e) {
 
         const dadosAtualizacao = {
             servicoRealizado,
+            checklistPlano: checklistOSAtual,
             anexos: anexosOSAtual,
             itensCusto: itensCustoOSAtual,
             custoTotal,
