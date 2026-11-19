@@ -17,7 +17,7 @@ async function navegarPara(pagina) {
         }
     }
 
-        // Proteção contra Path Traversal no nome da página
+    // Proteção contra Path Traversal no nome da página
     const paginaSegura = String(pagina || 'os').replace(/[^a-z0-9\-]/gi, '');
 
     // Libera largura total e reduz margens no Kanban (O.S.) mantendo padrão nas demais telas
@@ -31,8 +31,7 @@ async function navegarPara(pagina) {
 
     document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
 
-
-    if (paginaSegura.startsWith('cad-')) {
+    if (paginaSegura.startsWith('cad-') || paginaSegura === 'planos-manutencao') {
         document.getElementById('btn-menu-cadastros')?.classList.add('active');
         document.querySelector('.mobile-nav-btn[data-page="cadastros"]')?.classList.add('active');
     } else if (paginaSegura === 'centros-custo' || paginaSegura.startsWith('relatorios-')) {
@@ -59,6 +58,7 @@ async function navegarPara(pagina) {
         if (paginaSegura === 'relatorios-maquinas' && typeof initRelatoriosMaquinas === 'function') initRelatoriosMaquinas();
         if (paginaSegura === 'relatorios-manutentores' && typeof initRelatoriosManutentores === 'function') initRelatoriosManutentores();
         if (paginaSegura === 'cad-ativos' && typeof initAtivos === 'function') initAtivos();
+        if (paginaSegura === 'planos-manutencao' && typeof initPlanosManutencao === 'function') initPlanosManutencao();
         if (paginaSegura === 'cad-manutentores' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Manutentor');
         if (paginaSegura === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
 
