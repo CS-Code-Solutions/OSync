@@ -3,6 +3,7 @@ let cacheColunasOS = [];
 let cacheAtivosOS = [];
 let cacheTiposOS = [];
 let cacheManutentoresOS = [];
+let cachePlanosOS = [];
 let manutentoresNovaOSSelecionados = [];
 let osArrastadaId = null;
 let unsubscribeOrdensOS = null;
@@ -124,14 +125,15 @@ async function carregarDadosBaseOS() {
         btnLixeiraKanban.classList.toggle('md:flex', ehGestor);
     }
 
-    const [colSnap, ativoSnap, tipoSnap, manSnap] = await Promise.all([
+    const [colSnap, ativoSnap, tipoSnap, manSnap, planosSnap] = await Promise.all([
         db.collection('kanban_colunas').where('empresaId', '==', empId).get(),
         db.collection('ativos').where('empresaId', '==', empId).get(),
         db.collection('tipos_manutencao').where('empresaId', '==', empId).get(),
         db.collection('usuarios')
             .where('empresaId', '==', empId)
             .where('perfil', 'in', ['Manutentor', 'Admin'])
-            .get()
+            .get(),
+        db.collection('planos_manutencao').where('empresaId', '==', empId).get()
     ]);
 
     cacheColunasOS = colSnap.docs
@@ -150,6 +152,10 @@ async function carregarDadosBaseOS() {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => u.ativo !== false)
         .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+    cachePlanosOS = planosSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.titulo || '').localeCompare(b.titulo || ''));
 
     const selColFiltro = document.getElementById('filtro-os-coluna');
     if (selColFiltro) {
@@ -274,12 +280,17 @@ function renderizarMobileOS(ordens) {
             ? os.manutentoresNomes.join(', ')
             : (os.manutentorNome || 'Sem técnico');
 
+        const badgePlano = Array.isArray(os.checklistPlano) && os.checklistPlano.length > 0
+            ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">PLANO (${os.checklistPlano.filter(i => i.status).length}/${os.checklistPlano.length})</span>`
+            : '';
+
         return `
         <div onclick="abrirDetalhesOS('${osIdSeguro}')" class="osync-card p-4 active:scale-[0.99] transition cursor-pointer" style="border-left: 4px solid ${corCol}">
             <div class="flex items-center justify-between gap-2 mb-1.5">
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-xs font-extrabold text-slate-500">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
                     ${badgeCondicao[os.condicaoMaquina] || ''}
+                    ${badgePlano}
                 </div>
                 <div class="flex items-center gap-1.5">
                     <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${corPrioridade[os.prioridade] || 'bg-slate-100'}">${escaparHTML(os.prioridade)}</span>
@@ -335,6 +346,9 @@ function renderizarKanbanOS(ordens) {
                     const nomesEquipe = Array.isArray(os.manutentoresNomes) && os.manutentoresNomes.length > 0
                         ? os.manutentoresNomes.join(', ')
                         : (os.manutentorNome || 'Livre');
+                    const badgePlano = Array.isArray(os.checklistPlano) && os.checklistPlano.length > 0
+                        ? `<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">PLANO ${os.checklistPlano.filter(i => i.status).length}/${os.checklistPlano.length}</span>`
+                        : '';
                     return `
                     <div draggable="true" ondragstart="iniciarDragOS(event, '${osIdSeguro}')" ondragend="finalizarDragOS()" onclick="abrirDetalhesOS('${osIdSeguro}')"
                         class="bg-white p-3 rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-400 transition cursor-pointer space-y-1.5">
@@ -342,6 +356,7 @@ function renderizarKanbanOS(ordens) {
                             <div class="flex items-center gap-1 flex-wrap">
                                 <span class="text-[11px] font-extrabold text-slate-400">#OS-${String(os.numeroOs || 0).padStart(4, '0')}</span>
                                 ${badgeCondicao[os.condicaoMaquina] || ''}
+                                ${badgePlano}
                             </div>
                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${corPrioridade[os.prioridade] || 'bg-slate-100'}">${escaparHTML(os.prioridade)}</span>
                         </div>
@@ -519,7 +534,7 @@ async function confirmarExclusaoOSLixeira(e) {
 }
 
 // ==========================================
-// MODAL NOVA O.S. (BUSCA DE MÁQUINA + SELETOR MÚLTIPLO)
+// MODAL NOVA O.S. (BUSCA DE MÁQUINA + PLANO DE MANUTENÇÃO + SELETOR MÚLTIPLO)
 // ==========================================
 function filtrarSelectAtivosNovaOS(ativoIdForcado = '') {
     const selAtivo = document.getElementById('os-ativo');
@@ -544,6 +559,7 @@ function filtrarSelectAtivosNovaOS(ativoIdForcado = '') {
 
     if (filtrados.length === 0) {
         selAtivo.innerHTML = '<option value="">Nenhuma máquina encontrada...</option>';
+        atualizarSelectPlanosNovaOS();
         return;
     }
 
@@ -553,6 +569,79 @@ function filtrarSelectAtivosNovaOS(ativoIdForcado = '') {
 
     if (valorAtual && filtrados.some(a => a.id === valorAtual)) {
         selAtivo.value = valorAtual;
+    }
+
+    atualizarSelectPlanosNovaOS();
+}
+
+function atualizarSelectPlanosNovaOS() {
+    const selPlano = document.getElementById('os-plano-manutencao');
+    const resumoEl = document.getElementById('os-plano-resumo');
+    if (!selPlano) return;
+
+    const ativoId = document.getElementById('os-ativo')?.value || '';
+    const planoAnterior = selPlano.value;
+
+    const planosDaMaquina = cachePlanosOS.filter(p => p.ativoId && p.ativoId === ativoId);
+    const planosGerais = cachePlanosOS.filter(p => !p.ativoId);
+
+    let html = '<option value="">Nenhum plano vinculado (O.S. avulsa)</option>';
+
+    if (planosDaMaquina.length > 0) {
+        html += `<optgroup label="Planos desta Máquina">`;
+        html += planosDaMaquina.map(p => {
+            const qtd = Array.isArray(p.itens) ? p.itens.length : 0;
+            return `<option value="${escaparHTML(p.id)}">${escaparHTML(p.titulo)} (${escaparHTML(p.periodicidade || 'Sob Demanda')} • ${qtd} itens)</option>`;
+        }).join('');
+        html += `</optgroup>`;
+    }
+
+    if (planosGerais.length > 0) {
+        html += `<optgroup label="Planos Gerais">`;
+        html += planosGerais.map(p => {
+            const qtd = Array.isArray(p.itens) ? p.itens.length : 0;
+            return `<option value="${escaparHTML(p.id)}">${escaparHTML(p.titulo)} (${escaparHTML(p.periodicidade || 'Sob Demanda')} • ${qtd} itens)</option>`;
+        }).join('');
+        html += `</optgroup>`;
+    }
+
+    selPlano.innerHTML = html;
+
+    if (planoAnterior && [...planosDaMaquina, ...planosGerais].some(p => p.id === planoAnterior)) {
+        selPlano.value = planoAnterior;
+    } else {
+        selPlano.value = '';
+        if (resumoEl) resumoEl.classList.add('hidden');
+    }
+}
+
+function aplicarPlanoSelecionadoNovaOS() {
+    const planoId = document.getElementById('os-plano-manutencao')?.value || '';
+    const resumoEl = document.getElementById('os-plano-resumo');
+    const descEl = document.getElementById('os-descricao');
+    const selTipo = document.getElementById('os-tipo');
+
+    if (!planoId) {
+        if (resumoEl) resumoEl.classList.add('hidden');
+        return;
+    }
+
+    const plano = cachePlanosOS.find(p => p.id === planoId);
+    if (!plano) return;
+
+    const qtd = Array.isArray(plano.itens) ? plano.itens.length : 0;
+    if (resumoEl) {
+        resumoEl.textContent = `Checklist com ${qtd} ${qtd === 1 ? 'item' : 'itens'} será anexado à O.S.`;
+        resumoEl.classList.remove('hidden');
+    }
+
+    if (selTipo) {
+        const tipoPreventiva = cacheTiposOS.find(t => /preventiv/i.test(t.nome || ''));
+        if (tipoPreventiva) selTipo.value = tipoPreventiva.id;
+    }
+
+    if (descEl && !descEl.value.trim()) {
+        descEl.value = `Execução do Plano: ${plano.titulo} (${plano.periodicidade || 'Preventiva'}).`;
     }
 }
 
@@ -564,6 +653,9 @@ function resetarFormularioNovaOS() {
 
     const buscaAtivoEl = document.getElementById('os-ativo-busca');
     if (buscaAtivoEl) buscaAtivoEl.value = '';
+
+    const resumoPlanoEl = document.getElementById('os-plano-resumo');
+    if (resumoPlanoEl) resumoPlanoEl.classList.add('hidden');
 
     const descEl = document.getElementById('os-descricao');
     if (descEl) descEl.value = '';
@@ -637,6 +729,16 @@ async function abrirModalNovaOS() {
 
     if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0 || cacheManutentoresOS.length === 0) {
         await carregarDadosBaseOS();
+    } else {
+        // Recarrega planos mais recentes
+        try {
+            const planosSnap = await db.collection('planos_manutencao')
+                .where('empresaId', '==', usuarioAtual.empresaId)
+                .get();
+            cachePlanosOS = planosSnap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (a.titulo || '').localeCompare(b.titulo || ''));
+        } catch (err) {}
     }
 
     filtrarSelectAtivosNovaOS();
@@ -724,6 +826,17 @@ async function salvarNovaOS(e) {
         }
         const ativoObj = cacheAtivosOS.find(a => a.id === ativoId) || {};
 
+        const planoId = document.getElementById('os-plano-manutencao')?.value || '';
+        const planoObj = planoId ? cachePlanosOS.find(p => p.id === planoId) : null;
+        const checklistPlano = planoObj && Array.isArray(planoObj.itens)
+            ? planoObj.itens.map((it, idx) => ({
+                ordem: it.ordem || idx + 1,
+                descricao: it.descricao || '',
+                status: '',
+                motivo: ''
+            }))
+            : [];
+
         const tipoId = document.getElementById('os-tipo').value;
         const tipoObj = cacheTiposOS.find(t => t.id === tipoId) || {};
 
@@ -745,6 +858,10 @@ async function salvarNovaOS(e) {
             ativoId,
             ativoTag: ativoObj.codigoTag || '',
             ativoNome: ativoObj.nome || '',
+            planoId: planoObj ? planoObj.id : '',
+            planoTitulo: planoObj ? (planoObj.titulo || '') : '',
+            planoInstrucoes: planoObj ? (planoObj.instrucoes || '') : '',
+            checklistPlano,
             tipoId,
             tipoNome: tipoObj.nome || '',
             colunaId,
