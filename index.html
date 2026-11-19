@@ -79,7 +79,7 @@
                         <span>Cadastros</span>
                         <i data-lucide="chevron-down" class="w-3.5 h-3.5 opacity-70"></i>
                     </button>
-                    <div class="dropdown-menu hidden absolute left-0 mt-1 w-52 bg-[#131C31] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+                    <div class="dropdown-menu hidden absolute left-0 mt-1 w-56 bg-[#131C31] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
                         <button onclick="navegarPara('cad-manutentores')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
                             <i data-lucide="wrench" class="w-4 h-4 text-[#00E5B0]"></i>
                             <span>Manutentores</span>
@@ -91,6 +91,10 @@
                         <button onclick="navegarPara('cad-ativos')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
                             <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
                             <span>Ativos (Máquinas)</span>
+                        </button>
+                        <button onclick="navegarPara('planos-manutencao')" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-blue-600 hover:text-white flex items-center gap-2.5 transition">
+                            <i data-lucide="clipboard-check" class="w-4 h-4 text-[#00E5B0]"></i>
+                            <span>Planos de Manutenção</span>
                         </button>
                     </div>
                 </div>
@@ -261,6 +265,10 @@
                     <i data-lucide="cpu" class="w-4 h-4 text-[#00E5B0]"></i>
                     <span class="text-xs font-medium">Ativos (Máquinas)</span>
                 </button>
+                <button onclick="navegarPara('planos-manutencao'); fecharMenuGeralMobile();" class="w-full text-left p-3 rounded-xl bg-[#0B1120] hover:bg-blue-600/20 border border-slate-800 text-white flex items-center gap-3 transition">
+                    <i data-lucide="clipboard-check" class="w-4 h-4 text-[#00E5B0]"></i>
+                    <span class="text-xs font-medium">Planos de Manutenção</span>
+                </button>
             </div>
 
             <!-- Bloco: Relatórios -->
@@ -427,19 +435,20 @@
     <script src="js/data-store.js?v=15"></script>
     <script src="js/image-utils.js?v=15"></script>
     <script src="js/lgpd.js?v=15"></script>
-    <script src="js/auth.js?v=17"></script>
-    <script src="js/router.js?v=15"></script>
+    <script src="js/auth.js?v=18"></script>
+    <script src="js/router.js?v=16"></script>
     <script src="js/dashboard.js?v=15"></script>
     <script src="js/configuracoes.js?v=15"></script>
-    <script src="js/cadastros.js?v=16"></script>
+    <script src="js/cadastros.js?v=17"></script>
+    <script src="js/planos-manutencao.js?v=1"></script>
     <script src="js/centros-custo.js?v=15"></script>
     <script src="js/relatorios-os.js?v=15"></script>
     <script src="js/relatorios-maquinas.js?v=15"></script>
     <script src="js/relatorios-manutentores.js?v=15"></script>
     <script src="js/solicitacoes.js?v=16"></script>
     <script src="js/saas-master.js?v=15"></script>
-    <script src="js/os-kanban.js?v=16"></script>
-    <script src="js/os-execucao.js?v=16"></script>
+    <script src="js/os-kanban.js?v=17"></script>
+    <script src="js/os-execucao.js?v=17"></script>
 
 </body>
 </html>
