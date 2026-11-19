@@ -6,6 +6,7 @@ let perfilAtualCadastro = 'Manutentor';
 const ROTULOS_PAGINAS_PERFIL = {
     'os': 'O.S.',
     'solicitacoes': 'Solicitações',
+    'planos-manutencao': 'Planos Manut.',
     'dashboard': 'Dashboard',
     'cad-ativos': 'Máquinas',
     'relatorios-os': 'Rel. O.S.',
