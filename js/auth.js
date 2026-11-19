@@ -67,14 +67,21 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('nav-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
         document.getElementById('nav-os')?.classList.toggle('hidden', !permitidas.includes('os'));
         document.getElementById('nav-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
+        document.getElementById('nav-planos-manutencao')?.classList.toggle('hidden', !permitidas.includes('planos-manutencao'));
         document.getElementById('nav-configuracoes')?.classList.toggle('hidden', !permitidas.includes('configuracoes'));
 
         // Menu Mobile Inferior
         document.getElementById('mob-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
         document.getElementById('mob-os')?.classList.toggle('hidden', !permitidas.includes('os'));
         document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
+        document.getElementById('mob-planos-manutencao')?.classList.toggle('hidden', !permitidas.includes('planos-manutencao'));
 
-        // Oculta botão de Configurações dentro da gaveta mobile caso não tenha permissão
+        // Botões da Gaveta Mobile (Planos de Manutenção e Configurações)
+        const temPlanos = permitidas.includes('planos-manutencao');
+        document.querySelectorAll(`[onclick*="navegarPara('planos-manutencao')"]`).forEach(btn => {
+            btn.classList.toggle('hidden', !temPlanos);
+        });
+
         const temConfiguracoes = permitidas.includes('configuracoes');
         document.querySelectorAll(`[onclick*="navegarPara('configuracoes')"]`).forEach(btn => {
             btn.classList.toggle('hidden', !temConfiguracoes);
@@ -106,8 +113,8 @@ function aplicarPermissoesInterface(perfil) {
             });
         });
 
-        // Oculta o botão "Menu" mobile da Liderança (e de qualquer usuário sem itens na gaveta)
-        const temItensNaGaveta = exibirGrupoCadastros || temAlgumRelatorio || temConfiguracoes;
+        // Oculta o botão "Menu" mobile caso não haja nenhum item na gaveta
+        const temItensNaGaveta = exibirGrupoCadastros || temAlgumRelatorio || temPlanos || temConfiguracoes;
         document.getElementById('btn-menu-geral-mobile')?.classList.toggle('hidden', !temItensNaGaveta);
     } else {
         document.getElementById('btn-menu-geral-mobile')?.classList.remove('hidden');
