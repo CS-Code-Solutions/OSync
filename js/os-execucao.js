@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * OSync — Execução de O.S., Apontamento de Horas, Checklist e Custos
+ * OSync — Execução de O.S., Abas Planilha, Checklist, Horas e Custos
  * ============================================================================
  */
 
@@ -8,6 +8,37 @@ let osDetalhesAtual = null;
 let apontamentosOSAtual = [];
 let itensCustoOSAtual = [];
 let checklistOSAtual = [];
+let abaDetalhesOSAtual = 'dados';
+
+/**
+ * Alterna entre a aba 'dados' e a aba 'checklist' no Modal de Detalhes da O.S.
+ */
+function alternarAbaDetalhesOS(aba = 'dados') {
+    abaDetalhesOSAtual = aba;
+
+    const paneDados = document.getElementById('tab-pane-os-dados');
+    const paneChecklist = document.getElementById('tab-pane-os-checklist');
+    const btnDados = document.getElementById('tab-btn-os-dados');
+    const btnChecklist = document.getElementById('tab-btn-os-checklist');
+
+    if (!paneDados || !paneChecklist) return;
+
+    const classeAtiva = 'px-4 py-2 rounded-t-xl border border-b-0 border-slate-200 bg-white text-slate-900 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors shrink-0';
+    const classeInativa = 'px-4 py-2 rounded-t-xl border border-b-0 border-transparent bg-slate-200/70 text-slate-600 hover:bg-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors shrink-0';
+
+    if (aba === 'checklist' && checklistOSAtual.length > 0) {
+        paneDados.classList.add('hidden');
+        paneChecklist.classList.remove('hidden');
+        if (btnDados) btnDados.className = classeInativa;
+        if (btnChecklist) btnChecklist.className = classeAtiva;
+    } else {
+        abaDetalhesOSAtual = 'dados';
+        paneChecklist.classList.add('hidden');
+        paneDados.classList.remove('hidden');
+        if (btnDados) btnDados.className = classeAtiva;
+        if (btnChecklist) btnChecklist.className = classeInativa;
+    }
+}
 
 /**
  * Abre o Modal 2 com todos os detalhes, checklist, apontamentos e custos da O.S.
@@ -90,6 +121,7 @@ async function abrirDetalhesOS(osId) {
 
     renderizarItensCustoOS();
     renderizarChecklistPlanoExecucao(os);
+    alternarAbaDetalhesOS('dados');
     await carregarApontamentosOS(os.id);
 
     document.getElementById('modal-detalhes-os').classList.remove('hidden');
@@ -100,27 +132,31 @@ function fecharModalDetalhesOS() {
     document.getElementById('modal-detalhes-os').classList.add('hidden');
     osDetalhesAtual = null;
     checklistOSAtual = [];
+    abaDetalhesOSAtual = 'dados';
 }
 
 /* ============================================================================
-   CHECKLIST DO PLANO DE MANUTENÇÃO NA EXECUÇÃO (OK / NÃO OK + MOTIVO)
+   CHECKLIST DO PLANO DE MANUTENÇÃO NA ABA DEDICADA (OK / NÃO OK + MOTIVO)
    ============================================================================ */
 
 function renderizarChecklistPlanoExecucao(os = osDetalhesAtual) {
-    const box = document.getElementById('det-box-checklist-plano');
+    const tabsBar = document.getElementById('det-os-tabs-bar');
+    const tabBadge = document.getElementById('tab-badge-checklist-qtd');
     const elTitulo = document.getElementById('det-plano-titulo');
     const elProg = document.getElementById('det-plano-progresso');
     const elInst = document.getElementById('det-plano-instrucoes');
     const lista = document.getElementById('det-lista-checklist-plano');
 
-    if (!box || !lista) return;
+    if (!lista) return;
 
+    // Se a O.S. não tem plano vinculado, oculta a barra de abas e mantém o fluxo padrão
     if (!Array.isArray(checklistOSAtual) || checklistOSAtual.length === 0) {
-        box.classList.add('hidden');
+        if (tabsBar) tabsBar.classList.add('hidden');
         return;
     }
 
-    box.classList.remove('hidden');
+    // Exibe a barra de abas estilo planilha
+    if (tabsBar) tabsBar.classList.remove('hidden');
     if (elTitulo) elTitulo.textContent = os?.planoTitulo || 'Checklist de Verificação';
 
     if (elInst) {
@@ -134,7 +170,21 @@ function renderizarChecklistPlanoExecucao(os = osDetalhesAtual) {
 
     const total = checklistOSAtual.length;
     const respondidos = checklistOSAtual.filter(it => it.status === 'OK' || it.status === 'NAO_OK').length;
-    if (elProg) elProg.textContent = `${respondidos} / ${total} verificados`;
+    const concluido = respondidos === total && total > 0;
+
+    if (elProg) {
+        elProg.textContent = `${respondidos} / ${total} verificados`;
+        elProg.className = concluido
+            ? 'px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-bold text-emerald-700'
+            : 'px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-700';
+    }
+
+    if (tabBadge) {
+        tabBadge.textContent = `${respondidos}/${total}`;
+        tabBadge.className = concluido
+            ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700'
+            : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700';
+    }
 
     const encerrada = os?.status === 'Encerrada';
 
@@ -151,7 +201,7 @@ function renderizarChecklistPlanoExecucao(os = osDetalhesAtual) {
             : 'bg-white text-slate-600 border-slate-200 hover:border-red-400 hover:text-red-700';
 
         return `
-            <div class="bg-white border ${isNaoOk ? 'border-red-200' : isOk ? 'border-emerald-200' : 'border-slate-200'} rounded-xl p-3 space-y-2.5">
+            <div class="bg-white border ${isNaoOk ? 'border-red-200' : isOk ? 'border-emerald-200' : 'border-slate-200'} rounded-xl p-3.5 space-y-2.5 shadow-2xs">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div class="text-xs font-medium text-slate-800">
                         <span class="font-mono font-bold text-slate-400 mr-1.5">${idx + 1}.</span>
@@ -160,11 +210,11 @@ function renderizarChecklistPlanoExecucao(os = osDetalhesAtual) {
 
                     <div class="flex items-center gap-1.5 shrink-0">
                         <button type="button" ${encerrada ? 'disabled' : ''} onclick="marcarItemChecklistOS(${idx}, 'OK')"
-                            class="px-3 py-1 rounded-lg border text-xs font-semibold transition-colors ${btnOkClass} ${encerrada ? 'opacity-75 cursor-not-allowed' : ''}">
+                            class="px-3.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${btnOkClass} ${encerrada ? 'opacity-75 cursor-not-allowed' : ''}">
                             OK
                         </button>
                         <button type="button" ${encerrada ? 'disabled' : ''} onclick="marcarItemChecklistOS(${idx}, 'NAO_OK')"
-                            class="px-3 py-1 rounded-lg border text-xs font-semibold transition-colors ${btnNaoOkClass} ${encerrada ? 'opacity-75 cursor-not-allowed' : ''}">
+                            class="px-3.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${btnNaoOkClass} ${encerrada ? 'opacity-75 cursor-not-allowed' : ''}">
                             Não OK
                         </button>
                     </div>
@@ -514,6 +564,7 @@ async function confirmarEncerramentoOS(e) {
     if (checklistOSAtual.length > 0) {
         const pendente = checklistOSAtual.find(it => it.status !== 'OK' && it.status !== 'NAO_OK');
         if (pendente) {
+            alternarAbaDetalhesOS('checklist');
             alert('Marque OK ou Não OK em todos os itens do checklist antes de encerrar a O.S.');
             if (btn) {
                 btn.disabled = false;
@@ -524,6 +575,7 @@ async function confirmarEncerramentoOS(e) {
 
         const semMotivo = checklistOSAtual.find(it => it.status === 'NAO_OK' && (!it.motivo || it.motivo.trim().length < 3));
         if (semMotivo) {
+            alternarAbaDetalhesOS('checklist');
             alert('Informe o motivo em todos os itens marcados como "Não OK".');
             if (btn) {
                 btn.disabled = false;
