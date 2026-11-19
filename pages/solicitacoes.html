@@ -1,0 +1,117 @@
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Solicitações de Manutenção</h1>
+            <p class="text-sm text-slate-500">Chamados abertos pela liderança de produção para avaliação da manutenção.</p>
+        </div>
+        <button onclick="abrirModalNovaSolicitacao()" class="bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold px-5 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <span>+ Nova Solicitação</span>
+        </button>
+    </div>
+
+    <!-- Lista de Solicitações -->
+    <div id="lista-solicitacoes" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Preenchido via js/solicitacoes.js -->
+    </div>
+</div>
+
+<!-- MODAL: NOVA SOLICITAÇÃO (LIDERANÇA) -->
+<div id="modal-nova-solicitacao" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="bell-ring" class="w-5 h-5 text-[#00E5B0]"></i>
+                <span>Abrir Solicitação de Manutenção</span>
+            </h3>
+            <button onclick="fecharModalNovaSolicitacao()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-nova-solicitacao" class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Equipamento / Máquina *</label>
+                <div class="space-y-1.5">
+                    <div class="relative">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+                        <input type="text" id="sol-ativo-busca" oninput="filtrarSelectAtivosSolicitacao()" placeholder="Digite o nome, código ou setor da máquina..."
+                            class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs outline-none focus:border-blue-600">
+                    </div>
+                    <select id="sol-ativo" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Urgência *</label>
+                    <select id="sol-prioridade" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600">
+                        <option value="Normal">Normal</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Urgente">Urgente</option>
+                    </select>
+                </div>
+                <div class="flex items-end pb-2">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-rose-600">
+                        <input type="checkbox" id="sol-maquina-parada" class="w-4 h-4 accent-rose-600 rounded">
+                        <span>Máquina Parada!</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">O que está acontecendo? *</label>
+                <textarea id="sol-problema" rows="3" required placeholder="Descreva o sintoma, ruído ou falha observada..."
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-blue-600"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="fecharModalNovaSolicitacao()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" class="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">Enviar Chamado</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: CANCELAR CHAMADO COM MOTIVO (GESTOR) -->
+<div id="modal-cancelar-solicitacao" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-rose-500">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="x-circle" class="w-5 h-5 text-rose-400"></i>
+                <span>Cancelar Chamado</span>
+            </h3>
+            <button onclick="fecharModalCancelarSolicitacao()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-cancelar-solicitacao" onsubmit="confirmarCancelamentoSolicitacao(event)" class="p-6 space-y-4">
+            <input type="hidden" id="cancelar-sol-id">
+
+            <div id="cancelar-sol-resumo" class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700"></div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Atalhos de Motivo (opcional)</label>
+                <select id="cancelar-sol-atalho" onchange="selecionarAtalhoMotivoCancelamento(this.value)"
+                    class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-rose-500">
+                    <option value="">-- Selecione um motivo rápido ou digite abaixo --</option>
+                    <option value="Solicitação aberta em duplicidade.">Solicitação aberta em duplicidade</option>
+                    <option value="Equipamento verificado e operando normalmente.">Equipamento verificado e operando normalmente</option>
+                    <option value="Aguardando parada programada de produção.">Aguardando parada programada de produção</option>
+                    <option value="Serviço não pertence ao escopo da manutenção.">Serviço não pertence ao escopo da manutenção</option>
+                    <option value="Cancelado a pedido da liderança de produção.">Cancelado a pedido da liderança de produção</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Motivo do Cancelamento (visível ao solicitante) *</label>
+                <textarea id="cancelar-sol-motivo" rows="3" required placeholder="Descreva o motivo pelo qual este chamado está sendo cancelado..."
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:border-rose-500"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="fecharModalCancelarSolicitacao()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Voltar</button>
+                <button type="submit" id="btn-confirmar-cancelamento-sol" class="px-5 py-2 text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm">
+                    Confirmar Cancelamento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

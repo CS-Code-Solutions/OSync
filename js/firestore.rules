@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // FUNÇÕES AUXILIARES DE IDENTIDADE E TENANT
+    // ==========================================
+    function isAutenticado() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isAtivo() {
+      return isAutenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && getUserData().ativo == true;
+    }
+
+    function isSuperAdmin() {
+      return isAtivo() && getUserData().perfil == 'SuperAdmin';
+    }
+
+    function mesmaEmpresa(empresaId) {
+      return isSuperAdmin() || (isAtivo() && getUserData().empresaId == empresaId);
+    }
+
+    function isGestorDaEmpresa(empresaId) {
+      return isSuperAdmin() || (
+        isAtivo()
+        && getUserData().perfil == 'Admin'
+        && getUserData().empresaId == empresaId
+      );
+    }
+
+    // ==========================================
+    // EMPRESAS (MULTI-TENANT)
+    // ==========================================
+    match /empresas/{empresaId} {
+      // Leitura individual permitida para validar o código da empresa no cadastro
+      allow get: if true;
+      allow list, create, update, delete: if isSuperAdmin();
+    }
+
+    // ==========================================
+    // USUÁRIOS E CONTROLE DE ACESSO
+    // ==========================================
+    match /usuarios/{userId} {
+      // O próprio usuário pode ler seu perfil mesmo enquanto estiver pendente
+      allow get: if (isAutenticado() && request.auth.uid == userId)
+        || (resource != null && mesmaEmpresa(resource.data.empresaId));
+
+      allow list: if isAtivo() && (
+        isSuperAdmin() || resource.data.empresaId == getUserData().empresaId
+      );
+
+      // Auto-cadastro entra estritamente bloqueado e sem privilégios administrativos
+      allow create: if isAutenticado() && (
+        (
+          request.auth.uid == userId
+          && request.resource.data.ativo == false
+          && request.resource.data.statusAcesso == 'pendente'
+          && request.resource.data.perfil in ['Manutentor', 'Lideranca']
+          && request.resource.data.empresaId is string
+          && exists(/databases/$(database)/documents/empresas/$(request.resource.data.empresaId))
+        )
+        || (
+          isGestorDaEmpresa(request.resource.data.empresaId)
+          && (isSuperAdmin() || request.resource.data.perfil != 'SuperAdmin')
+        )
+      );
+
+      // Apenas Gestor da mesma empresa (ou SuperAdmin) altera/exclui, sem trocar empresaId
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId
+        && (isSuperAdmin() || request.resource.data.perfil != 'SuperAdmin');
+
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId)
+        && (isSuperAdmin() || resource.data.perfil != 'SuperAdmin');
+    }
+
+    // ==========================================
+    // ACEITE DA POLÍTICA DE PRIVACIDADE E LGPD
+    // ==========================================
+    match /termos_aceites/{userId} {
+      allow get, create, update: if isAutenticado() && request.auth.uid == userId;
+      allow list: if isAtivo() && (
+        isSuperAdmin()
+        || (getUserData().perfil == 'Admin' && resource.data.empresaId == getUserData().empresaId)
+      );
+      allow delete: if false;
+    }
+
+    // ==========================================
+    // PERSONALIZAÇÃO DO DASHBOARD POR EMPRESA
+    // ==========================================
+    match /dashboard_config/{empresaId} {
+      allow read: if mesmaEmpresa(empresaId);
+      allow create, update: if isGestorDaEmpresa(empresaId)
+        && request.resource.data.empresaId == empresaId
+        && request.resource.data.widgets is list;
+      allow delete: if isGestorDaEmpresa(empresaId);
+    }
+
+    // ==========================================
+    // CONFIGURAÇÕES ESTRUTURAIS DA EMPRESA
+    // ==========================================
+    match /kanban_colunas/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+        && request.resource.data.titulo is string
+        && request.resource.data.ordem is number;
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    match /tipos_manutencao/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+        && request.resource.data.nome is string;
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    match /setores_executantes/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+        && request.resource.data.nome is string;
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    match /centros_custo/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+        && request.resource.data.codigo is string
+        && request.resource.data.nome is string;
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    // ==========================================
+    // ATIVOS (MÁQUINAS)
+    // ==========================================
+    match /ativos/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+        && (request.resource.data.codigoTag is string || request.resource.data.tag is string)
+        && request.resource.data.nome is string;
+      allow update: if request.resource.data.empresaId == resource.data.empresaId && (
+        isGestorDaEmpresa(resource.data.empresaId)
+        || (
+          mesmaEmpresa(resource.data.empresaId)
+          && getUserData().perfil == 'Manutentor'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status in ['Operacional', 'Parada', 'Manutencao']
+        )
+      );
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    // ==========================================
+    // SOLICITAÇÕES (CHAMADOS)
+    // ==========================================
+    match /solicitacoes/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if mesmaEmpresa(request.resource.data.empresaId);
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    // ==========================================
+    // ORDENS DE SERVIÇO (O.S.)
+    // ==========================================
+    match /ordens_servico/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId) && getUserData().perfil != 'Lideranca';
+      allow create: if mesmaEmpresa(request.resource.data.empresaId) && getUserData().perfil != 'Lideranca';
+      allow update: if mesmaEmpresa(resource.data.empresaId)
+        && getUserData().perfil != 'Lideranca'
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+    // ==========================================
+    // BLOQUEIO PADRÃO PARA COLEÇÕES NÃO MAPEADAS
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,147 @@
+<div class="space-y-5">
+    <!-- Cabeçalho e Ação Geral -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Centros de Custo (Máquinas)</h1>
+            <p class="text-xs sm:text-sm text-slate-500">Acompanhe os investimentos de manutenção por equipamento e emita relatórios em PDF.</p>
+        </div>
+        <button onclick="abrirModalFiltroPDF('geral')" class="bg-[#0B1120] hover:bg-slate-800 text-[#00E5B0] border border-[#00E5B0]/40 font-bold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span>Relatório Geral (PDF)</span>
+        </button>
+    </div>
+
+    <!-- Resumo Geral do Topo -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="osync-card p-4 border-l-4 border-l-blue-600">
+            <span class="text-xs font-bold uppercase text-slate-400 block">Máquinas (Centros de Custo)</span>
+            <span id="cc-kpi-qtd-maquinas" class="text-2xl font-extrabold text-slate-900 mt-1 block">0</span>
+        </div>
+        <div class="osync-card p-4 border-l-4 border-l-amber-500">
+            <span class="text-xs font-bold uppercase text-slate-400 block">O.S. com Custo Lançado</span>
+            <span id="cc-kpi-qtd-os" class="text-2xl font-extrabold text-slate-900 mt-1 block">0</span>
+        </div>
+        <div class="osync-card p-4 border-l-4 border-l-emerald-500">
+            <span class="text-xs font-bold uppercase text-slate-400 block">Custo Total Acumulado</span>
+            <span id="cc-kpi-custo-total" class="text-2xl font-extrabold text-emerald-700 mt-1 block">R$ 0,00</span>
+        </div>
+    </div>
+
+    <!-- Barra de Busca -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+        <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" id="busca-centros-custo" oninput="filtrarCentrosCusto()"
+                placeholder="Buscar máquina por TAG, nome ou setor..."
+                class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-600">
+        </div>
+    </div>
+
+    <!-- Lista de Centros de Custo (Máquinas) -->
+    <div id="lista-centros-custo-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Preenchido via js/centros-custo.js -->
+    </div>
+</div>
+
+<!-- MODAL DE DETALHES / EXTRATO DO CENTRO DE CUSTO -->
+<div id="modal-detalhe-cc" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+        <div class="bg-[#0B1120] px-6 py-4 flex items-center justify-between border-b-2 border-[#00E5B0] shrink-0">
+            <div>
+                <span id="det-cc-tag" class="text-xs font-bold text-[#00E5B0] uppercase">TAG-00</span>
+                <h3 id="det-cc-nome" class="text-base font-bold text-white">Nome da Máquina</h3>
+            </div>
+            <button onclick="fecharModalDetalheCC()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <!-- Ficha do Ativo -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                <div><span class="text-slate-400 block">Setor</span><strong id="det-cc-setor" class="text-slate-800">-</strong></div>
+                <div><span class="text-slate-400 block">Fabricante</span><strong id="det-cc-fabricante" class="text-slate-800">-</strong></div>
+                <div><span class="text-slate-400 block">Modelo</span><strong id="det-cc-modelo" class="text-slate-800">-</strong></div>
+                <div><span class="text-slate-400 block">Status</span><strong id="det-cc-status" class="text-slate-800">-</strong></div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                <div>
+                    <span class="text-xs font-semibold text-emerald-800 block">Total Investido neste Equipamento</span>
+                    <span id="det-cc-total" class="text-xl font-extrabold text-emerald-700">R$ 0,00</span>
+                </div>
+                <button id="btn-pdf-individual-cc" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition">
+                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                    <span>Gerar Relatório (PDF)</span>
+                </button>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-bold uppercase text-slate-500 mb-2">Histórico de Custos por O.S.</h4>
+                <div id="det-cc-historico-itens" class="space-y-2.5"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE FILTRO DE PERÍODO PARA GERAÇÃO DO PDF -->
+<div id="modal-filtro-pdf-cc" class="hidden fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="bg-[#0B1120] px-5 py-4 flex items-center justify-between border-b-2 border-[#00E5B0]">
+            <h3 id="titulo-modal-filtro-pdf" class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="calendar-range" class="w-4 h-4 text-[#00E5B0]"></i>
+                <span>Período do Relatório PDF</span>
+            </h3>
+            <button onclick="fecharModalFiltroPDF()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="form-gerar-pdf-cc" onsubmit="executarGeracaoPDF(event)" class="p-5 space-y-4">
+            <input type="hidden" id="pdf-tipo-relatorio" value="geral">
+            <input type="hidden" id="pdf-ativo-id" value="">
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-600">Intervalo de Apuração *</label>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <label class="cursor-pointer border border-slate-300 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-700 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="pdf-modo-periodo" value="total" checked onchange="alternarCamposPeriodoPDF()" class="accent-blue-600">
+                        <span>Total (Histórico Completo)</span>
+                    </label>
+                    <label class="cursor-pointer border border-slate-300 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-700 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="pdf-modo-periodo" value="mensal" onchange="alternarCamposPeriodoPDF()" class="accent-blue-600">
+                        <span>Mês e Ano Específico</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="box-selecao-mes-ano" class="hidden grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Mês *</label>
+                    <select id="pdf-filtro-mes" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold outline-none">
+                        <option value="01">Janeiro</option>
+                        <option value="02">Fevereiro</option>
+                        <option value="03">Março</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Maio</option>
+                        <option value="06">Junho</option>
+                        <option value="07">Julho</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Ano *</label>
+                    <select id="pdf-filtro-ano" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold outline-none"></select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="fecharModalFiltroPDF()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" id="btn-confirmar-pdf" class="px-5 py-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm flex items-center gap-1.5">
+                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                    <span>Baixar Relatório PDF</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
