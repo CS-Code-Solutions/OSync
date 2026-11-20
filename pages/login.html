@@ -97,8 +97,9 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">Código da Empresa *</label>
-                    <input type="text" id="reg-empresa-id" required maxlength="60" placeholder="Cole o código fornecido pelo gestor"
-                        class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                    <input type="text" id="reg-empresa-id" required maxlength="60" autocomplete="off" autocapitalize="off" spellcheck="false"
+                        placeholder="Cole o código fornecido pelo gestor"
+                        class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm font-mono tracking-wide text-white focus:border-[#00E5B0] outline-none">
                 </div>
 
                 <div>
@@ -232,6 +233,19 @@
             document.getElementById('reg-error').classList.add('hidden');
         }
 
+        // Se abrir o link de convite com ?empresa=ID, já abre direto no formulário de cadastro preenchido
+        (function verificarConviteUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const empConvite = (params.get('empresa') || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+            if (empConvite) {
+                const inputEmp = document.getElementById('reg-empresa-id');
+                if (inputEmp) inputEmp.value = empConvite;
+                if (document.getElementById('register-form')?.classList.contains('hidden')) {
+                    alternarModoCadastro();
+                }
+            }
+        })();
+
         document.getElementById('-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-');
@@ -288,7 +302,10 @@
                     throw new Error('É obrigatório aceitar a Política de Privacidade (LGPD) para solicitar acesso.');
                 }
 
-                const empresaId = document.getElementById('reg-empresa-id').value.trim();
+                // Remove espaços e caracteres invisíveis de cópia do WhatsApp
+                const empresaId = document.getElementById('reg-empresa-id').value.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+                document.getElementById('reg-empresa-id').value = empresaId;
+
                 if (!/^[a-zA-Z0-9_-]{6,60}$/.test(empresaId)) {
                     throw new Error('Formato de Código da Empresa inválido.');
                 }
@@ -309,7 +326,7 @@
                 }
 
                 if (!empresaDoc.exists) {
-                    throw new Error('Código da Empresa não encontrado no banco. Confira o ID com o gestor.');
+                    throw new Error('Código da Empresa não encontrado. Verifique maiúsculas/minúsculas ou peça o link de convite ao gestor.');
                 }
 
                 // 2. Cria credencial no Auth
