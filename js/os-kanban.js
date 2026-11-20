@@ -8,6 +8,7 @@ let manutentoresNovaOSSelecionados = [];
 let osArrastadaId = null;
 let unsubscribeOrdensOS = null;
 let abaOSAtual = 'minhas'; // 'minhas' | 'todas' | 'solicitacoes'
+let salvandoNovaOS = false;
 
 function formatarRotuloAtivoOS(tag, nome) {
     const t = (tag || '').trim();
@@ -730,7 +731,6 @@ async function abrirModalNovaOS() {
     if (cacheAtivosOS.length === 0 || cacheColunasOS.length === 0 || cacheManutentoresOS.length === 0) {
         await carregarDadosBaseOS();
     } else {
-        // Recarrega planos mais recentes
         try {
             const planosSnap = await db.collection('planos_manutencao')
                 .where('empresaId', '==', usuarioAtual.empresaId)
@@ -803,12 +803,22 @@ function fecharModalNovaOS() {
 
 async function salvarNovaOS(e) {
     e.preventDefault();
+    if (salvandoNovaOS) return;
+
     const btn = document.getElementById('btn-criar-os');
-    btn.disabled = true;
+    salvandoNovaOS = true;
+    if (btn) btn.disabled = true;
 
     try {
         const empId = usuarioAtual.empresaId;
         const empRef = db.collection('empresas').doc(empId);
+
+        const ativoId = document.getElementById('os-ativo').value;
+        if (!ativoId) {
+            alert('Selecione uma máquina válida na lista.');
+            return;
+        }
+        const ativoObj = cacheAtivosOS.find(a => a.id === ativoId) || {};
 
         const numeroGerado = await db.runTransaction(async (tx) => {
             const doc = await tx.get(empRef);
@@ -817,14 +827,6 @@ async function salvarNovaOS(e) {
             tx.set(empRef, { contadorOs: proximo }, { merge: true });
             return proximo;
         });
-
-        const ativoId = document.getElementById('os-ativo').value;
-        if (!ativoId) {
-            alert('Selecione uma máquina válida na lista.');
-            btn.disabled = false;
-            return;
-        }
-        const ativoObj = cacheAtivosOS.find(a => a.id === ativoId) || {};
 
         const planoId = document.getElementById('os-plano-manutencao')?.value || '';
         const planoObj = planoId ? cachePlanosOS.find(p => p.id === planoId) : null;
@@ -906,7 +908,8 @@ async function salvarNovaOS(e) {
     } catch (err) {
         alert('Erro ao criar O.S.: ' + err.message);
     } finally {
-        btn.disabled = false;
+        salvandoNovaOS = false;
+        if (btn) btn.disabled = false;
     }
 }
 
