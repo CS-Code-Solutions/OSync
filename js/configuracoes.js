@@ -148,15 +148,28 @@ async function garantirTiposESetoresPadrao() {
 function copiarCodigoEmpresa() {
     const input = document.getElementById('config-codigo-empresa');
     if (!input) return;
+    const codigo = input.value.trim();
+    const linkConvite = `${window.location.origin}/pages/login.html?empresa=${encodeURIComponent(codigo)}`;
+
     input.select();
-    navigator.clipboard.writeText(input.value);
-    mostrarNotificacaoOSync('Código da empresa copiado!', 'sucesso');
+    navigator.clipboard.writeText(codigo);
+    mostrarNotificacaoOSync('Código copiado! Você também pode enviar o link direto de convite.', 'sucesso');
+    return linkConvite;
+}
+
+function copiarLinkConviteEmpresa() {
+    const codigo = (document.getElementById('config-codigo-empresa')?.value || usuarioAtual?.empresaId || '').trim();
+    if (!codigo) return;
+    const linkConvite = `${window.location.origin}/pages/login.html?empresa=${encodeURIComponent(codigo)}`;
+    navigator.clipboard.writeText(linkConvite);
+    mostrarNotificacaoOSync('Link de convite direto copiado! Basta enviar no WhatsApp.', 'sucesso');
 }
 
 async function carregarSolicitacoesAcesso() {
     const inputCodigo = document.getElementById('config-codigo-empresa');
     if (inputCodigo && usuarioAtual?.empresaId) {
         inputCodigo.value = usuarioAtual.empresaId;
+        inputCodigo.classList.add('font-mono', 'tracking-wide');
     }
 
     const lista = document.getElementById('lista-acessos-pendentes');
