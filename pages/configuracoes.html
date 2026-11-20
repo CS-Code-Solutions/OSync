@@ -11,15 +11,23 @@
             <div>
                 <span class="text-[11px] font-bold uppercase tracking-wider text-[#00E5B0]">Código da Empresa</span>
                 <h2 class="text-lg font-bold mt-1">Convite para Equipe</h2>
-                <p class="text-xs text-slate-400 mt-1">Envie este código para manutentores e líderes solicitarem cadastro na tela de login.</p>
+                <p class="text-xs text-slate-400 mt-1">Envie o link de convite direto ou o código para manutentores e líderes solicitarem cadastro.</p>
             </div>
 
-            <div class="mt-4 flex items-center gap-2">
-                <input type="text" id="config-codigo-empresa" readonly value="Carregando..."
-                    class="w-full px-3.5 py-2.5 bg-[#131C31] border border-slate-700 rounded-xl text-xs font-mono text-[#00E5B0] outline-none">
-                <button type="button" onclick="copiarCodigoEmpresa()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shrink-0 transition flex items-center gap-1.5">
-                    <i data-lucide="copy" class="w-4 h-4"></i>
-                    <span>Copiar</span>
+            <div class="mt-4 space-y-2.5">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="config-codigo-empresa" readonly value="Carregando..."
+                        class="w-full px-3.5 py-2.5 bg-[#131C31] border border-slate-700 rounded-xl text-xs font-mono tracking-wide text-[#00E5B0] outline-none">
+                    <button type="button" onclick="copiarCodigoEmpresa()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shrink-0 transition flex items-center gap-1.5">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                        <span>Copiar</span>
+                    </button>
+                </div>
+
+                <button type="button" onclick="copiarLinkConviteEmpresa()"
+                    class="w-full py-2.5 px-4 bg-[#00E5B0]/15 hover:bg-[#00E5B0]/25 text-[#00E5B0] border border-[#00E5B0]/40 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2">
+                    <i data-lucide="link" class="w-4 h-4"></i>
+                    <span>Copiar Link de Convite Direto (WhatsApp)</span>
                 </button>
             </div>
         </div>
