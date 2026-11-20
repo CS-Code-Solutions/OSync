@@ -1,6 +1,8 @@
 let unsubscribeSolicitacoes = null;
 let cacheListaSolicitacoes = [];
 let cacheAtivosSolicitacoes = [];
+let salvandoNovaSolicitacao = false;
+let convertendoSolicitacaoId = '';
 
 function initSolicitacoes() {
     iniciarListenerSolicitacoes();
@@ -199,119 +201,141 @@ function fecharModalNovaSolicitacao() {
 
 async function salvarNovaSolicitacao(e) {
     e.preventDefault();
+    if (salvandoNovaSolicitacao) return;
+
     const sel = document.getElementById('sol-ativo');
     if (!sel.value) {
         alert('Selecione uma máquina válida na lista.');
         return;
     }
-    const opt = sel.options[sel.selectedIndex];
-    const parada = document.getElementById('sol-maquina-parada').checked;
 
-    const agora = new Date();
-    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-    const agoraISO = agora.toISOString().slice(0, 16);
+    const btnSubmit = e.target.querySelector('button[type="submit"]');
+    salvandoNovaSolicitacao = true;
+    if (btnSubmit) btnSubmit.disabled = true;
 
-    await db.collection('solicitacoes').add({
-        empresaId: usuarioAtual.empresaId,
-        ativoId: sel.value,
-        ativoTag: opt?.getAttribute('data-tag') || '',
-        ativoNome: opt?.getAttribute('data-nome') || '',
-        solicitanteId: usuarioAtual.id,
-        solicitanteNome: usuarioAtual.nome,
-        setor: usuarioAtual.setor || '',
-        prioridade: document.getElementById('sol-prioridade').value,
-        maquinaParada: parada,
-        inicioParada: parada ? agoraISO : '',
-        problema: document.getElementById('sol-problema').value.trim(),
-        status: 'Pendente',
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    try {
+        const opt = sel.options[sel.selectedIndex];
+        const parada = document.getElementById('sol-maquina-parada').checked;
 
-    if (parada && sel.value) {
-        await db.collection('ativos').doc(sel.value).update({ status: 'Parada' });
-    }
+        const agora = new Date();
+        agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+        const agoraISO = agora.toISOString().slice(0, 16);
 
-    if (typeof dispararPushOSync === 'function') {
-        const tag = opt?.getAttribute('data-tag') || '';
-        const nomeMaq = opt?.getAttribute('data-nome') || 'Equipamento';
-        dispararPushOSync({
-            tipo: 'nova_solicitacao',
-            perfisAlvo: ['Admin', 'Manutentor'],
-            titulo: parada ? '🚨 Nova Solicitação (MÁQUINA PARADA)' : 'Nova Solicitação de Manutenção',
-            corpo: `${tag ? tag + ' - ' : ''}${nomeMaq} • Aberta por ${usuarioAtual.nome}`,
-            urlDestino: '/'
+        await db.collection('solicitacoes').add({
+            empresaId: usuarioAtual.empresaId,
+            ativoId: sel.value,
+            ativoTag: opt?.getAttribute('data-tag') || '',
+            ativoNome: opt?.getAttribute('data-nome') || '',
+            solicitanteId: usuarioAtual.id,
+            solicitanteNome: usuarioAtual.nome,
+            setor: usuarioAtual.setor || '',
+            prioridade: document.getElementById('sol-prioridade').value,
+            maquinaParada: parada,
+            inicioParada: parada ? agoraISO : '',
+            problema: document.getElementById('sol-problema').value.trim(),
+            status: 'Pendente',
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
-    }
 
-    fecharModalNovaSolicitacao();
-    e.target.reset();
+        if (parada && sel.value) {
+            await db.collection('ativos').doc(sel.value).update({ status: 'Parada' });
+        }
+
+        if (typeof dispararPushOSync === 'function') {
+            const tag = opt?.getAttribute('data-tag') || '';
+            const nomeMaq = opt?.getAttribute('data-nome') || 'Equipamento';
+            dispararPushOSync({
+                tipo: 'nova_solicitacao',
+                perfisAlvo: ['Admin', 'Manutentor'],
+                titulo: parada ? '🚨 Nova Solicitação (MÁQUINA PARADA)' : 'Nova Solicitação de Manutenção',
+                corpo: `${tag ? tag + ' - ' : ''}${nomeMaq} • Aberta por ${usuarioAtual.nome}`,
+                urlDestino: '/'
+            });
+        }
+
+        fecharModalNovaSolicitacao();
+        e.target.reset();
+    } catch (err) {
+        alert('Erro ao enviar solicitação: ' + err.message);
+    } finally {
+        salvandoNovaSolicitacao = false;
+        if (btnSubmit) btnSubmit.disabled = false;
+    }
 }
 
 async function aprovarEConverterEmOS(solId) {
-    const doc = await db.collection('solicitacoes').doc(solId).get();
-    if (!doc.exists) return;
-    const sol = doc.data();
+    if (!solId || convertendoSolicitacaoId === solId) return;
+    convertendoSolicitacaoId = solId;
 
-    const [colSnap, osSnap] = await Promise.all([
-        db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get(),
-        db.collection('ordens_servico').where('empresaId', '==', usuarioAtual.empresaId).get()
-    ]);
+    try {
+        const doc = await db.collection('solicitacoes').doc(solId).get();
+        if (!doc.exists) return;
+        const sol = doc.data();
+        if (sol.status !== 'Pendente') return;
 
-    const colunas = colSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.ordem - b.ordem);
-    if (colunas.length === 0) {
-        alert('Configure ao menos uma coluna no Kanban antes de converter.');
-        return;
-    }
+        const [colSnap, osSnap] = await Promise.all([
+            db.collection('kanban_colunas').where('empresaId', '==', usuarioAtual.empresaId).get(),
+            db.collection('ordens_servico').where('empresaId', '==', usuarioAtual.empresaId).get()
+        ]);
 
-    const maiorNum = osSnap.docs.reduce((max, d) => Math.max(max, d.data().numeroOs || 0), 0);
-    const novoNumeroOs = maiorNum + 1;
+        const colunas = colSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.ordem - b.ordem);
+        if (colunas.length === 0) {
+            alert('Configure ao menos uma coluna no Kanban antes de converter.');
+            return;
+        }
 
-    const agora = new Date();
-    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
-    const agoraISO = agora.toISOString().slice(0, 16);
+        const maiorNum = osSnap.docs.reduce((max, d) => Math.max(max, d.data().numeroOs || 0), 0);
+        const novoNumeroOs = maiorNum + 1;
 
-    const novaOSRef = await db.collection('ordens_servico').add({
-        empresaId: usuarioAtual.empresaId,
-        numeroOs: novoNumeroOs,
-        solicitacaoId: solId,
-        ativoId: sol.ativoId,
-        ativoTag: sol.ativoTag,
-        ativoNome: sol.ativoNome,
-        tipoNome: 'Corretiva',
-        tipoCor: sol.maquinaParada ? '#E11D48' : '#1D4ED8',
-        colunaId: colunas[0].id,
-        prioridade: sol.maquinaParada ? 'Urgente' : sol.prioridade,
-        condicaoMaquina: sol.maquinaParada ? 'Maquina parada' : 'Operacional',
-        maquinaParada: Boolean(sol.maquinaParada),
-        inicioParada: sol.maquinaParada ? (sol.inicioParada || agoraISO) : '',
-        terminoParada: '',
-        tempoParadaMinutos: 0,
-        descricao: `[Solicitação de ${sol.solicitanteNome}] ${sol.problema}`,
-        custoTotal: 0,
-        encerrada: false,
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    });
+        const agora = new Date();
+        agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+        const agoraISO = agora.toISOString().slice(0, 16);
 
-    await db.collection('solicitacoes').doc(solId).update({
-        status: 'Convertida em O.S.',
-        osId: novaOSRef.id,
-        numeroOs: novoNumeroOs
-    });
-
-    if (sol.solicitanteId && typeof dispararPushOSync === 'function') {
-        dispararPushOSync({
-            tipo: 'status_os',
-            destinatariosIds: [sol.solicitanteId],
-            titulo: `Solicitação Convertida em #OS-${String(novoNumeroOs).padStart(4, '0')}`,
-            corpo: `Seu chamado para ${sol.ativoNome || 'Equipamento'} entrou na fila de manutenção.`,
-            urlDestino: '/'
+        const novaOSRef = await db.collection('ordens_servico').add({
+            empresaId: usuarioAtual.empresaId,
+            numeroOs: novoNumeroOs,
+            solicitacaoId: solId,
+            ativoId: sol.ativoId,
+            ativoTag: sol.ativoTag,
+            ativoNome: sol.ativoNome,
+            tipoNome: 'Corretiva',
+            tipoCor: sol.maquinaParada ? '#E11D48' : '#1D4ED8',
+            colunaId: colunas[0].id,
+            prioridade: sol.maquinaParada ? 'Urgente' : sol.prioridade,
+            condicaoMaquina: sol.maquinaParada ? 'Maquina parada' : 'Operacional',
+            maquinaParada: Boolean(sol.maquinaParada),
+            inicioParada: sol.maquinaParada ? (sol.inicioParada || agoraISO) : '',
+            terminoParada: '',
+            tempoParadaMinutos: 0,
+            descricao: `[Solicitação de ${sol.solicitanteNome}] ${sol.problema}`,
+            custoTotal: 0,
+            encerrada: false,
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
-    }
 
-    if (typeof mostrarNotificacaoOSync === 'function') {
-        mostrarNotificacaoOSync(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`, 'sucesso');
-    } else {
-        alert(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`);
+        await db.collection('solicitacoes').doc(solId).update({
+            status: 'Convertida em O.S.',
+            osId: novaOSRef.id,
+            numeroOs: novoNumeroOs
+        });
+
+        if (sol.solicitanteId && typeof dispararPushOSync === 'function') {
+            dispararPushOSync({
+                tipo: 'status_os',
+                destinatariosIds: [sol.solicitanteId],
+                titulo: `Solicitação Convertida em #OS-${String(novoNumeroOs).padStart(4, '0')}`,
+                corpo: `Seu chamado para ${sol.ativoNome || 'Equipamento'} entrou na fila de manutenção.`,
+                urlDestino: '/'
+            });
+        }
+
+        if (typeof mostrarNotificacaoOSync === 'function') {
+            mostrarNotificacaoOSync(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`, 'sucesso');
+        } else {
+            alert(`O.S. #${String(novoNumeroOs).padStart(4, '0')} criada na coluna "${colunas[0].titulo}"!`);
+        }
+    } finally {
+        convertendoSolicitacaoId = '';
     }
 }
 
