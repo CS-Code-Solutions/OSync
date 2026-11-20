@@ -12,11 +12,18 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+function gerarTagUnicaNotificacao(titulo, corpo) {
+    return `osync-${String(titulo || '').trim()}-${String(corpo || '').trim()}`
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '_')
+        .slice(0, 80);
+}
+
 messaging.onBackgroundMessage((payload) => {
     const titulo = payload?.data?.title || payload?.notification?.title || 'OSync';
     const corpo = payload?.data?.body || payload?.notification?.body || '';
     const url = payload?.data?.url || '/';
-    const tag = payload?.data?.eventoId || `osync-${Date.now()}`;
+    const tag = gerarTagUnicaNotificacao(titulo, corpo);
 
     return self.registration.showNotification(titulo, {
         body: corpo,
@@ -48,7 +55,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = 'osync-pwa-v2.3.0';
+const CACHE_NAME = 'osync-pwa-v2.4.0';
 const ASSETS_ESSENCIAIS = [
     './',
     './index.html',
