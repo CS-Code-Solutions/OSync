@@ -2,14 +2,22 @@ const OSYNC_VAPID_KEY = 'BCwSWdvi1ygplErUgFDcqfFCK1gh6g-JSo2of6mU-HQxYX67SKiO8lc
 let messagingOSync = null;
 let listenerForegroundRegistrado = false;
 let unsubscribeNotificacoesRT = null;
-let eventosNotificadosCache = new Set();
+let eventosNotificadosCache = new Map();
+let ultimosDisparosPushCache = new Map();
+
+function gerarChaveConteudoNotificacaoOSync(titulo, corpo) {
+    return `${String(titulo || '').trim()}|${String(corpo || '').trim()}`;
+}
 
 function jaNotificouEventoOSync(chave) {
     if (!chave) return false;
-    if (eventosNotificadosCache.has(chave)) return true;
-    eventosNotificadosCache.add(chave);
+    const agora = Date.now();
+    const ultimo = eventosNotificadosCache.get(chave);
+    if (ultimo && (agora - ultimo) < 8000) return true;
+
+    eventosNotificadosCache.set(chave, agora);
     if (eventosNotificadosCache.size > 100) {
-        const primeiro = eventosNotificadosCache.values().next().value;
+        const primeiro = eventosNotificadosCache.keys().next().value;
         eventosNotificadosCache.delete(primeiro);
     }
     return false;
@@ -66,8 +74,9 @@ function atualizarBotaoNotificacoesUI() {
 }
 
 async function exibirAlertaLocalOSync(titulo, corpo, url = '/', eventoId = '') {
-    const chave = eventoId || `${titulo}|${corpo}`;
-    if (jaNotificouEventoOSync(chave)) return;
+    const chaveConteudo = gerarChaveConteudoNotificacaoOSync(titulo, corpo);
+    if (jaNotificouEventoOSync(chaveConteudo)) return;
+    if (eventoId && jaNotificouEventoOSync(eventoId)) return;
 
     tocarSomNotificacaoOSync();
     if (typeof mostrarNotificacaoOSync === 'function') {
@@ -78,12 +87,14 @@ async function exibirAlertaLocalOSync(titulo, corpo, url = '/', eventoId = '') {
     if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
         try {
             const reg = await navigator.serviceWorker.ready;
+            const tagUnica = `osync-${titulo}-${corpo}`.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 80);
             await reg.showNotification(titulo, {
                 body: corpo,
                 icon: '/images/ico192.png',
                 badge: '/images/ico.png',
                 vibrate: [200, 100, 200],
-                tag: `osync-${chave}`,
+                tag: tagUnica,
+                renotify: false,
                 data: { url }
             });
         } catch (_) {}
@@ -223,7 +234,19 @@ window.dispararPushOSync = async function (dados) {
     const remetenteUid = usuarioAtual?.id || auth.currentUser?.uid || '';
     if (!empresaId) return;
 
-    const eventoId = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    // Trava contra disparo duplo da mesma notificação em menos de 6 segundos
+    const chaveDisparo = `${empresaId}|${dados.titulo || ''}|${dados.corpo || ''}`;
+    const agora = Date.now();
+    if (ultimosDisparosPushCache.has(chaveDisparo) && (agora - ultimosDisparosPushCache.get(chaveDisparo)) < 6000) {
+        return;
+    }
+    ultimosDisparosPushCache.set(chaveDisparo, agora);
+    if (ultimosDisparosPushCache.size > 50) {
+        const primeiro = ultimosDisparosPushCache.keys().next().value;
+        ultimosDisparosPushCache.delete(primeiro);
+    }
+
+    const eventoId = `evt_${agora}_${Math.random().toString(36).slice(2, 7)}`;
 
     // 1. Grava evento em tempo real no Firestore (alerta instantâneo com app aberto)
     db.collection('notificacoes_realtime').add({
@@ -236,7 +259,7 @@ window.dispararPushOSync = async function (dados) {
         titulo: dados.titulo || 'OSync',
         corpo: dados.corpo || '',
         urlDestino: dados.urlDestino || '/',
-        timestampMs: Date.now(),
+        timestampMs: agora,
         criadoEm: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(() => {});
 
