@@ -171,6 +171,34 @@
     <script>
         lucide.createIcons();
 
+        function restaurarBotaoLogin() {
+            const btn = document.getElementById('btn-');
+            if (!btn) return;
+            btn.disabled = false;
+            btn.innerHTML = '<span>Acessar Sistema</span><i data-lucide="log-in" class="w-4 h-4"></i>';
+            lucide.createIcons();
+        }
+
+        // Evita botão travado em "Verificando..." se o usuário voltar pelo cache do navegador (bfcache)
+        window.addEventListener('pageshow', () => {
+            restaurarBotaoLogin();
+            if (auth && auth.currentUser) {
+                window.location.replace('/');
+            }
+        });
+
+        // Se já houver sessão ativa válida no Firebase, entra direto no sistema
+        let fazendoLoginManual = false;
+        auth.onAuthStateChanged(async (user) => {
+            if (!user || fazendoLoginManual) return;
+            try {
+                const doc = await db.collection('usuarios').doc(user.uid).get();
+                if (doc.exists && doc.data().ativo !== false && doc.data().statusAcesso !== 'pendente') {
+                    window.location.replace('/');
+                }
+            } catch (_) {}
+        });
+
         // Blindagem contra menu nativo de toque longo, cópia e arraste de imagens/textos
         (function ativarBlindagem() {
             const ehCampoEditavel = (el) => {
@@ -211,6 +239,7 @@
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
 
+            fazendoLoginManual = true;
             btn.disabled = true;
             btn.innerHTML = '<span>Verificando...</span>';
             errorBox.classList.add('hidden');
@@ -235,13 +264,12 @@
                     throw new Error('Seu acesso foi desativado pelo administrador.');
                 }
 
-                window.location.href = '/';
+                window.location.replace('/');
             } catch (err) {
+                fazendoLoginManual = false;
                 errorBox.textContent = err.message.includes('auth/') ? 'E-mail ou senha inválidos.' : err.message;
                 errorBox.classList.remove('hidden');
-                btn.disabled = false;
-                btn.innerHTML = '<span>Acessar Sistema</span><i data-lucide="log-in" class="w-4 h-4"></i>';
-                lucide.createIcons();
+                restaurarBotaoLogin();
             }
         });
 
