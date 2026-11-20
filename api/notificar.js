@@ -37,8 +37,7 @@ module.exports = async (req, res) => {
             titulo,
             corpo,
             urlDestino,
-            remetenteUid,
-            eventoId
+            remetenteUid
         } = req.body || {};
 
         if (!empresaId || !titulo || !corpo) {
@@ -88,7 +87,10 @@ module.exports = async (req, res) => {
             return res.status(200).json({ enviados: 0, motivo: 'Nenhum aparelho inscrito.' });
         }
 
-        const eventoTag = String(eventoId || `osync-${tipo || 'alerta'}-${Date.now()}`);
+        const eventoTag = `osync-${String(titulo).trim()}-${String(corpo).trim()}`
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, '_')
+            .slice(0, 80);
 
         const response = await fbAdmin.messaging().sendEachForMulticast({
             tokens,
