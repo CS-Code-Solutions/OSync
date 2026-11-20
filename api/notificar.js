@@ -51,6 +51,24 @@ module.exports = async (req, res) => {
             uidAutenticado = decoded.uid;
         }
 
+        // Para novos cadastros (onde o usuário ainda está pendente no cliente), grava o alerta realtime pelo Admin SDK
+        if (tipo === 'novo_cadastro') {
+            const agora = Date.now();
+            await db.collection('notificacoes_realtime').add({
+                empresaId: String(empresaId),
+                remetenteUid: String(uidAutenticado),
+                eventoId: `evt_cad_${agora}_${Math.random().toString(36).slice(2, 7)}`,
+                tipo: 'novo_cadastro',
+                destinatariosIds: [],
+                perfisAlvo: ['Admin'],
+                titulo: String(titulo),
+                corpo: String(corpo),
+                urlDestino: String(urlDestino || '/?page=configuracoes'),
+                timestampMs: agora,
+                criadoEm: fbAdmin.firestore.FieldValue.serverTimestamp()
+            }).catch(() => {});
+        }
+
         const tokensSet = new Set();
         const refsUsuarios = [];
 
