@@ -41,7 +41,14 @@ service cloud.firestore {
     match /empresas/{empresaId} {
       // Leitura individual permitida para validar o código da empresa no cadastro
       allow get: if true;
-      allow list, create, update, delete: if isSuperAdmin();
+      allow list, create, delete: if isSuperAdmin();
+      // Permite incrementar apenas o contadorOs ao abrir nova O.S. na própria empresa
+      allow update: if isSuperAdmin() || (
+        mesmaEmpresa(empresaId)
+        && getUserData().perfil != 'Lideranca'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contadorOs'])
+        && request.resource.data.contadorOs is number
+      );
     }
 
     // ==========================================
@@ -72,10 +79,17 @@ service cloud.firestore {
         )
       );
 
-      // Apenas Gestor da mesma empresa (ou SuperAdmin) altera/exclui, sem trocar empresaId
-      allow update: if isGestorDaEmpresa(resource.data.empresaId)
-        && request.resource.data.empresaId == resource.data.empresaId
-        && (isSuperAdmin() || request.resource.data.perfil != 'SuperAdmin');
+            // Gestor altera dados gerais OU o próprio usuário atualiza apenas seu token de notificação (fcmTokens)
+      allow update: if (
+                      isGestorDaEmpresa(resource.data.empresaId)
+                      && request.resource.data.empresaId == resource.data.empresaId
+                      && (isSuperAdmin() || request.resource.data.perfil != 'SuperAdmin')
+                    ) || (
+                      isAutenticado()
+                      && request.auth.uid == userId
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens'])
+                    );
+                    
 
       allow delete: if isGestorDaEmpresa(resource.data.empresaId)
         && (isSuperAdmin() || resource.data.perfil != 'SuperAdmin');
@@ -93,6 +107,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ==========================================
+    // NOTIFICAÇÕES EM TEMPO REAL
+    // ==========================================
+    match /notificacoes_realtime/{notifId} {
+      allow read: if isAtivo() && mesmaEmpresa(resource.data.empresaId);
+      allow create: if isAtivo() && mesmaEmpresa(request.resource.data.empresaId);
+      allow update, delete: if false;
+    }
+    
     // ==========================================
     // PERSONALIZAÇÃO DO DASHBOARD POR EMPRESA
     // ==========================================
@@ -126,6 +149,15 @@ service cloud.firestore {
       allow delete: if isGestorDaEmpresa(resource.data.empresaId);
     }
 
+    match /tipos_equipamento/{id} {
+      allow read: if mesmaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+        && request.resource.data.nome is string;
+      allow update: if isGestorDaEmpresa(resource.data.empresaId)
+        && request.resource.data.empresaId == resource.data.empresaId;
+      allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
     match /setores_executantes/{id} {
       allow read: if mesmaEmpresa(resource.data.empresaId);
       allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
@@ -151,8 +183,8 @@ service cloud.firestore {
     match /ativos/{id} {
       allow read: if mesmaEmpresa(resource.data.empresaId);
       allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
-        && (request.resource.data.codigoTag is string || request.resource.data.tag is string)
-        && request.resource.data.nome is string;
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0;
       allow update: if request.resource.data.empresaId == resource.data.empresaId && (
         isGestorDaEmpresa(resource.data.empresaId)
         || (
@@ -171,8 +203,23 @@ service cloud.firestore {
     match /solicitacoes/{id} {
       allow read: if mesmaEmpresa(resource.data.empresaId);
       allow create: if mesmaEmpresa(request.resource.data.empresaId);
-      allow update: if isGestorDaEmpresa(resource.data.empresaId)
-        && request.resource.data.empresaId == resource.data.empresaId;
+      allow update: if request.resource.data.empresaId == resource.data.empresaId && (
+        isGestorDaEmpresa(resource.data.empresaId)
+        || (
+          mesmaEmpresa(resource.data.empresaId)
+          && getUserData().perfil == 'Manutentor'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'osId',
+            'numeroOs',
+            'servicoRealizado',
+            'encerradoPor',
+            'dataHoraEncerramento',
+            'encerradaEm'
+          ])
+          && request.resource.data.status == 'Encerrada'
+        )
+      );
       allow delete: if isGestorDaEmpresa(resource.data.empresaId);
     }
 
@@ -186,6 +233,26 @@ service cloud.firestore {
         && getUserData().perfil != 'Lideranca'
         && request.resource.data.empresaId == resource.data.empresaId;
       allow delete: if isGestorDaEmpresa(resource.data.empresaId);
+    }
+
+        // ==========================================
+    // AUDITORIA DE EXCLUSÃO DE O.S.
+    // ==========================================
+    match /logs_exclusao_os/{id} {
+      allow read: if isGestorDaEmpresa(resource.data.empresaId);
+      allow create: if isGestorDaEmpresa(request.resource.data.empresaId)
+                    && request.resource.data.motivoExclusao is string;
+      allow update, delete: if false;
+    }
+
+    // ==========================================
+    // PLANOS DE MANUTENÇÃO E CHECKLISTS
+    // ==========================================
+    match /planos_manutencao/{planoId} {
+      allow read: if isAtivo() && mesmaEmpresa(resource.data.empresaId);
+      allow create, update, delete: if isGestorDaEmpresa(
+        request.method == 'delete' ? resource.data.empresaId : request.resource.data.empresaId
+      );
     }
 
     // ==========================================
