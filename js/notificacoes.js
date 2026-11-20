@@ -46,7 +46,18 @@ function tocarSomNotificacaoOSync() {
     } catch (_) {}
 }
 
-function atualizarBotaoNotificacoesUI() {
+function usuarioAtualPossuiAparelhoVinculado(userObj) {
+    const u = userObj || (typeof usuarioAtual !== 'undefined' ? usuarioAtual : null);
+    if (!u?.id) return false;
+
+    const uidVinculadoLocal = localStorage.getItem('osync_fcm_uid_vinculado');
+    const tokenLocal = localStorage.getItem('osync_fcm_token_local');
+    const tokensUsuario = Array.isArray(u.fcmTokens) ? u.fcmTokens : [];
+
+    return uidVinculadoLocal === u.id && Boolean(tokenLocal) && tokensUsuario.includes(tokenLocal);
+}
+
+function atualizarBotaoNotificacoesUI(userObj) {
     const btn = document.getElementById('btn-notificacoes-push');
     const icone = document.getElementById('icon-notificacoes-push');
     if (!btn) return;
@@ -57,7 +68,7 @@ function atualizarBotaoNotificacoesUI() {
     }
 
     btn.classList.remove('hidden');
-    if (Notification.permission === 'granted') {
+    if (Notification.permission === 'granted' && usuarioAtualPossuiAparelhoVinculado(userObj)) {
         btn.title = 'Notificações Ativas neste Aparelho';
         btn.className = 'p-2 rounded-lg text-[#00E5B0] hover:bg-emerald-500/10 transition relative';
         if (icone) icone.setAttribute('data-lucide', 'bell-ring');
@@ -135,7 +146,7 @@ function iniciarEscutaNotificacoesTempoReal(userObj) {
 }
 
 async function inicializarNotificacoesOSync(userObj) {
-    atualizarBotaoNotificacoesUI();
+    atualizarBotaoNotificacoesUI(userObj);
     iniciarEscutaNotificacoesTempoReal(userObj);
 
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !firebase.messaging) return;
@@ -156,10 +167,11 @@ async function inicializarNotificacoesOSync(userObj) {
             });
         }
 
-        if (Notification.permission === 'granted' && userObj?.id) {
+        if (Notification.permission === 'granted' && userObj?.id && usuarioAtualPossuiAparelhoVinculado(userObj)) {
             await registrarTokenFCMUsuario(userObj.id).catch((e) => {
                 console.warn('Falha ao renovar token FCM:', e.message);
             });
+            atualizarBotaoNotificacoesUI(userObj);
         }
     } catch (err) {
         console.warn('Aviso FCM:', err.message);
@@ -177,9 +189,16 @@ async function registrarTokenFCMUsuario(uid) {
         throw new Error('O navegador não gerou o token FCM.');
     }
 
-    // Remove token anterior salvo neste navegador se tiver mudado
+    // Remove token anterior salvo neste navegador se tiver mudado ou pertencia a outra conta
     const tokenAnterior = localStorage.getItem('osync_fcm_token_local');
+    const uidAnterior = localStorage.getItem('osync_fcm_uid_vinculado');
     if (uid) {
+        if (uidAnterior && uidAnterior !== uid) {
+            const tokensRemover = [token, tokenAnterior].filter(Boolean);
+            await db.collection('usuarios').doc(uidAnterior).update({
+                fcmTokens: firebase.firestore.FieldValue.arrayRemove(...tokensRemover)
+            }).catch(() => {});
+        }
         if (tokenAnterior && tokenAnterior !== token) {
             await db.collection('usuarios').doc(uid).update({
                 fcmTokens: firebase.firestore.FieldValue.arrayRemove(tokenAnterior)
@@ -189,6 +208,14 @@ async function registrarTokenFCMUsuario(uid) {
             fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
         });
         localStorage.setItem('osync_fcm_token_local', token);
+        localStorage.setItem('osync_fcm_uid_vinculado', uid);
+
+        if (typeof usuarioAtual !== 'undefined' && usuarioAtual && usuarioAtual.id === uid) {
+            const lista = Array.isArray(usuarioAtual.fcmTokens) ? usuarioAtual.fcmTokens : [];
+            if (!lista.includes(token)) {
+                usuarioAtual.fcmTokens = [...lista, token];
+            }
+        }
     }
     return token;
 }
@@ -206,7 +233,6 @@ window.ativarNotificacoesPushOSync = async function () {
 
     try {
         const perm = await Notification.requestPermission();
-        atualizarBotaoNotificacoesUI();
 
         if (perm === 'granted') {
             if (!messagingOSync && firebase.messaging) {
@@ -214,13 +240,17 @@ window.ativarNotificacoesPushOSync = async function () {
             }
             const uid = usuarioAtual?.id || auth.currentUser?.uid;
             await registrarTokenFCMUsuario(uid);
+            atualizarBotaoNotificacoesUI();
             tocarSomNotificacaoOSync();
             if (typeof mostrarNotificacaoOSync === 'function') {
                 mostrarNotificacaoOSync('Notificações e alerta sonoro ativados neste aparelho!', 'sucesso');
             }
+        } else {
+            atualizarBotaoNotificacoesUI();
         }
     } catch (err) {
         console.error('Erro detalhado push:', err);
+        atualizarBotaoNotificacoesUI();
         if (typeof mostrarNotificacaoOSync === 'function') {
             mostrarNotificacaoOSync('Erro ao salvar token: ' + err.message, 'erro');
         } else {
