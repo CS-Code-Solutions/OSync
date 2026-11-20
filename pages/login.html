@@ -42,120 +42,146 @@
                 background-image: linear-gradient(to bottom, rgba(11, 17, 32, 0.68), rgba(11, 17, 32, 0.82)), url('/images/loginpc.png');
             }
         }
+
+        /* Efeito LED suave na borda da caixa responsivo ao mouse e toque */
+        .osync-led-wrapper {
+            --led-x: 50%;
+            --led-y: 0%;
+            position: relative;
+            padding: 1.5px;
+            border-radius: 1rem;
+            background: radial-gradient(
+                280px circle at var(--led-x) var(--led-y),
+                rgba(0, 229, 176, 0.75),
+                rgba(59, 130, 246, 0.35) 45%,
+                rgba(51, 65, 85, 0.65) 80%
+            );
+            box-shadow: 0 0 28px -8px rgba(0, 229, 176, 0.22), 0 25px 50px -12px rgba(0, 0, 0, 0.65);
+            transition: box-shadow 0.35s ease;
+        }
+        .osync-led-wrapper:hover,
+        .osync-led-wrapper:focus-within {
+            box-shadow: 0 0 36px -6px rgba(0, 229, 176, 0.34), 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+        .osync-led-inner {
+            border-radius: calc(1rem - 1.5px);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between bg--responsivo text-white">
 
     <div class="flex-1 flex items-center justify-center p-4">
-        <div class="bg-[#131C31]/90 backdrop-blur-md w-full max-w-md rounded-2xl shadow-2xl border border-slate-700/80 p-8">
-            <!-- Logo OSync -->
-            <div class="flex flex-col items-center mb-8">
-                <img src="/images/log.png" alt="OSync" draggable="false" class="max-h-40 w-auto object-contain mb-2">
-            </div>
-
-            <!-- FORMULÁRIO DE LOGIN -->
-            <form id="-form" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">E-mail de Acesso</label>
-                    <div class="relative">
-                        <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
-                        <input type="email" id="email" required placeholder="usuario@empresa.com"
-                            class="w-full pl-10 pr-4 py-3 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:border-[#00E5B0] outline-none transition">
-                    </div>
+        <div id="osync-led-card" class="osync-led-wrapper w-full max-w-md">
+            <div class="osync-led-inner bg-[#131C31]/92 backdrop-blur-md w-full p-8">
+                <!-- Logo OSync -->
+                <div class="flex flex-col items-center mb-8">
+                    <img src="/images/log.png" alt="OSync" draggable="false" class="max-h-40 w-auto object-contain mb-2">
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Senha</label>
-                    <div class="relative">
-                        <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
-                        <input type="password" id="password" required placeholder="••••••••"
-                            class="w-full pl-10 pr-4 py-3 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:border-[#00E5B0] outline-none transition">
+                <!-- FORMULÁRIO DE LOGIN -->
+                <form id="-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">E-mail de Acesso</label>
+                        <div class="relative">
+                            <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+                            <input type="email" id="email" required placeholder="usuario@empresa.com"
+                                class="w-full pl-10 pr-4 py-3 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:border-[#00E5B0] outline-none transition">
+                        </div>
                     </div>
-                </div>
 
-                <div id="-error" class="hidden text-xs text-rose-400 bg-rose-950/80 border border-rose-800 p-3 rounded-lg"></div>
-                <div id="-success" class="hidden text-xs text-[#00E5B0] bg-emerald-950/80 border border-[#00E5B0]/40 p-3 rounded-lg"></div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Senha</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+                            <input type="password" id="password" required placeholder="••••••••"
+                                class="w-full pl-10 pr-4 py-3 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:border-[#00E5B0] outline-none transition">
+                        </div>
+                    </div>
 
-                <button type="submit" id="btn-"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/25 transition flex items-center justify-center gap-2 mt-2">
-                    <span>Acessar Sistema</span>
-                    <i data-lucide="log-in" class="w-4 h-4"></i>
-                </button>
+                    <div id="-error" class="hidden text-xs text-rose-400 bg-rose-950/80 border border-rose-800 p-3 rounded-lg"></div>
+                    <div id="-success" class="hidden text-xs text-[#00E5B0] bg-emerald-950/80 border border-[#00E5B0]/40 p-3 rounded-lg"></div>
 
-                <div class="text-center pt-2">
-                    <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-300 hover:text-[#00E5B0] transition">
-                        Não tem acesso? Solicitar cadastro ao Gestor
+                    <button type="submit" id="btn-"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/25 transition flex items-center justify-center gap-2 mt-2">
+                        <span>Acessar Sistema</span>
+                        <i data-lucide="log-in" class="w-4 h-4"></i>
                     </button>
-                </div>
-            </form>
 
-            <!-- FORMULÁRIO DE SOLICITAÇÃO DE ACESSO (AGUARDA LIBERAÇÃO DO GESTOR) -->
-            <form id="register-form" class="hidden space-y-3.5">
-                <div class="bg-[#0B1120]/90 border border-slate-700/80 p-3 rounded-xl text-xs text-slate-300">
-                    Preencha seus dados abaixo. Seu acesso ficará <strong>pendente</strong> até a aprovação do gestor da empresa.
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">Código da Empresa *</label>
-                    <input type="text" id="reg-empresa-id" required maxlength="60" autocomplete="off" autocapitalize="off" spellcheck="false"
-                        placeholder="Cole o código fornecido pelo gestor"
-                        class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm font-mono tracking-wide text-white focus:border-[#00E5B0] outline-none">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">Seu Nome Completo *</label>
-                    <input type="text" id="reg-nome" required maxlength="100" placeholder="Ex: João Silva"
-                        class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Função *</label>
-                        <select id="reg-perfil" class="w-full px-3 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
-                            <option value="Manutentor">Manutentor</option>
-                            <option value="Lideranca">Liderança</option>
-                        </select>
+                    <div class="text-center pt-2">
+                        <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-300 hover:text-[#00E5B0] transition">
+                            Não tem acesso? Solicitar cadastro ao Gestor
+                        </button>
                     </div>
+                </form>
+
+                <!-- FORMULÁRIO DE SOLICITAÇÃO DE ACESSO (AGUARDA LIBERAÇÃO DO GESTOR) -->
+                <form id="register-form" class="hidden space-y-3.5">
+                    <div class="bg-[#0B1120]/90 border border-slate-700/80 p-3 rounded-xl text-xs text-slate-300">
+                        Preencha seus dados abaixo. Seu acesso ficará <strong>pendente</strong> até a aprovação do gestor da empresa.
+                    </div>
+
                     <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Setor / Área *</label>
-                        <input type="text" id="reg-setor" required maxlength="80" placeholder="Ex: Mecânica"
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Código da Empresa *</label>
+                        <input type="text" id="reg-empresa-id" required maxlength="60" autocomplete="off" autocapitalize="off" spellcheck="false"
+                            placeholder="Cole o código fornecido pelo gestor"
+                            class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm font-mono tracking-wide text-white focus:border-[#00E5B0] outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Seu Nome Completo *</label>
+                        <input type="text" id="reg-nome" required maxlength="100" placeholder="Ex: João Silva"
                             class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
                     </div>
-                </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">Seu E-mail *</label>
-                    <input type="email" id="reg-email" required maxlength="120" placeholder="seu.email@empresa.com"
-                        class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
-                </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Função *</label>
+                            <select id="reg-perfil" class="w-full px-3 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                                <option value="Manutentor">Manutentor</option>
+                                <option value="Lideranca">Liderança</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Setor / Área *</label>
+                            <input type="text" id="reg-setor" required maxlength="80" placeholder="Ex: Mecânica"
+                                class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                        </div>
+                    </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">Crie uma Senha (mín. 6 dígitos) *</label>
-                    <input type="password" id="reg-senha" required minlength="6" maxlength="128" placeholder="••••••••"
-                        class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
-                </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Seu E-mail *</label>
+                        <input type="email" id="reg-email" required maxlength="120" placeholder="seu.email@empresa.com"
+                            class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                    </div>
 
-                <!-- ACEITE OBRIGATÓRIO LGPD (NUNCA PRÉ-MARCADO) -->
-                <label class="flex items-start gap-2.5 p-3 rounded-xl bg-[#0B1120]/80 border border-slate-700 cursor-pointer hover:border-[#00E5B0]/60 transition select-none">
-                    <input type="checkbox" id="reg-lgpd-aceite" required
-                        class="mt-0.5 w-4 h-4 accent-[#00E5B0] rounded cursor-pointer shrink-0">
-                    <span class="text-[11px] text-slate-300 leading-relaxed">
-                        Li e concordo com a <a href="/pages/privacidade.html" target="_blank" rel="noopener noreferrer" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
-                    </span>
-                </label>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Crie uma Senha (mín. 6 dígitos) *</label>
+                        <input type="password" id="reg-senha" required minlength="6" maxlength="128" placeholder="••••••••"
+                            class="w-full px-3.5 py-2.5 bg-[#0B1120]/90 border border-slate-700 rounded-xl text-sm text-white focus:border-[#00E5B0] outline-none">
+                    </div>
 
-                <div id="reg-error" class="hidden text-xs text-rose-400 bg-rose-950/80 border border-rose-800 p-3 rounded-lg"></div>
+                    <!-- ACEITE OBRIGATÓRIO LGPD (NUNCA PRÉ-MARCADO) -->
+                    <label class="flex items-start gap-2.5 p-3 rounded-xl bg-[#0B1120]/80 border border-slate-700 cursor-pointer hover:border-[#00E5B0]/60 transition select-none">
+                        <input type="checkbox" id="reg-lgpd-aceite" required
+                            class="mt-0.5 w-4 h-4 accent-[#00E5B0] rounded cursor-pointer shrink-0">
+                        <span class="text-[11px] text-slate-300 leading-relaxed">
+                            Li e concordo com a <a href="/pages/privacidade.html" target="_blank" rel="noopener noreferrer" class="text-[#00E5B0] font-bold underline hover:opacity-80">Política de Privacidade e Termos de Uso</a> e autorizo a coleta dos meus dados para gestão de manutenção (LGPD).
+                        </span>
+                    </label>
 
-                <button type="submit" id="btn-register"
-                    class="w-full bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold py-3 rounded-xl transition">
-                    Enviar Solicitação de Acesso
-                </button>
-                <div class="text-center pt-1">
-                    <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-300 hover:text-white">
-                        Voltar para o login
+                    <div id="reg-error" class="hidden text-xs text-rose-400 bg-rose-950/80 border border-rose-800 p-3 rounded-lg"></div>
+
+                    <button type="submit" id="btn-register"
+                        class="w-full bg-[#00E5B0] hover:bg-[#00c99b] text-[#0B1120] font-bold py-3 rounded-xl transition">
+                        Enviar Solicitação de Acesso
                     </button>
-                </div>
-            </form>
+                    <div class="text-center pt-1">
+                        <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-300 hover:text-white">
+                            Voltar para o login
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -171,6 +197,48 @@
     <script src="/js/firebase-config.js"></script>
     <script>
         lucide.createIcons();
+
+        // Rastreamento leve do LED na borda da caixa (mouse e dedo)
+        (function iniciarEfeitoLedCaixa() {
+            const card = document.getElementById('osync-led-card');
+            if (!card) return;
+
+            let rafPendente = false;
+            let ultimoX = 0;
+            let ultimoY = 0;
+
+            const atualizarPosicao = () => {
+                rafPendente = false;
+                const rect = card.getBoundingClientRect();
+                card.style.setProperty('--led-x', `${ultimoX - rect.left}px`);
+                card.style.setProperty('--led-y', `${ultimoY - rect.top}px`);
+            };
+
+            const agendarAtualizacao = (clientX, clientY) => {
+                ultimoX = clientX;
+                ultimoY = clientY;
+                if (!rafPendente) {
+                    rafPendente = true;
+                    requestAnimationFrame(atualizarPosicao);
+                }
+            };
+
+            window.addEventListener('pointermove', (e) => {
+                agendarAtualizacao(e.clientX, e.clientY);
+            }, { passive: true });
+
+            window.addEventListener('touchmove', (e) => {
+                if (e.touches && e.touches[0]) {
+                    agendarAtualizacao(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+
+            window.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches[0]) {
+                    agendarAtualizacao(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+        })();
 
         function restaurarBotaoLogin() {
             const btn = document.getElementById('btn-');
