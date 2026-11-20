@@ -1,6 +1,143 @@
 let streamCameraQR = null;
 let scannerIntervalQR = null;
 
+// ==========================================
+// CONTROLADOR GLOBAL DO BOTÃO VOLTAR NATIVO (MODAIS E GAVETAS)
+// ==========================================
+const pilhaModaisAbertos = [];
+let ignorarProximoPopState = false;
+
+function ehOverlayFlutuanteOSync(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.id === 'modal-licenca-expirada') return false;
+    const cls = typeof el.className === 'string' ? el.className : '';
+    return cls.includes('fixed') && cls.includes('inset-0');
+}
+
+function registrarAberturaOverlay(el) {
+    if (!el || pilhaModaisAbertos.includes(el)) return;
+    pilhaModaisAbertos.push(el);
+    try {
+        history.pushState({ osyncModal: true, modalId: el.id || '' }, '');
+    } catch (_) {}
+}
+
+function registrarFechamentoOverlayManual(el) {
+    const idx = pilhaModaisAbertos.indexOf(el);
+    if (idx === -1) return;
+    pilhaModaisAbertos.splice(idx, 1);
+
+    // Consome a entrada de histórico correspondente se o fechamento foi pelo "X" ou "Cancelar"
+    if (history.state && history.state.osyncModal) {
+        ignorarProximoPopState = true;
+        history.back();
+    }
+}
+
+function fecharOverlayPeloBotaoVoltar(el) {
+    if (!el) return;
+
+    if (el.id === 'modal-scanner-qr' && typeof pararEfecharLeitorQR === 'function') {
+        pararEfecharLeitorQR();
+        return;
+    }
+
+    // Tenta acionar o botão de fechar interno do modal para executar limpezas específicas
+    const btnFechar = el.querySelector(
+        'button[onclick*="fechar"], button[onclick*="Fechar"], button[onclick*="cancelar"], button[onclick*="Cancelar"]'
+    );
+    if (btnFechar) {
+        btnFechar.click();
+    }
+
+    if (!el.classList.contains('hidden')) {
+        el.classList.add('hidden');
+    }
+}
+
+(function iniciarInterceptadorGlobalVoltar() {
+    if (window.__osyncBackGuardAtivo) return;
+    window.__osyncBackGuardAtivo = true;
+
+    // Âncora base para impedir retorno acidental à página de login
+    try {
+        if (!history.state || !history.state.osyncBase) {
+            history.replaceState({ osyncBase: true }, '');
+            history.pushState({ osyncGuard: true }, '');
+        }
+    } catch (_) {}
+
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((m) => {
+            if (m.type === 'attributes' && m.attributeName === 'class') {
+                const el = m.target;
+                if (!ehOverlayFlutuanteOSync(el)) return;
+
+                const estaOculto = el.classList.contains('hidden');
+                if (!estaOculto) {
+                    registrarAberturaOverlay(el);
+                } else {
+                    registrarFechamentoOverlayManual(el);
+                }
+            } else if (m.type === 'childList') {
+                m.addedNodes.forEach((node) => {
+                    if (ehOverlayFlutuanteOSync(node) && !node.classList.contains('hidden')) {
+                        registrarAberturaOverlay(node);
+                    }
+                });
+                m.removedNodes.forEach((node) => {
+                    if (ehOverlayFlutuanteOSync(node)) {
+                        registrarFechamentoOverlayManual(node);
+                    }
+                });
+            }
+        });
+    });
+
+    const ativarObserver = () => {
+        if (document.body) {
+            observer.observe(document.body, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+    };
+
+    if (document.body) ativarObserver();
+    else window.addEventListener('DOMContentLoaded', ativarObserver);
+
+    window.addEventListener('popstate', () => {
+        if (ignorarProximoPopState) {
+            ignorarProximoPopState = false;
+            return;
+        }
+
+        // Remove da pilha modais que já não estejam mais visíveis
+        while (pilhaModaisAbertos.length > 0) {
+            const topo = pilhaModaisAbertos[pilhaModaisAbertos.length - 1];
+            if (!document.body.contains(topo) || topo.classList.contains('hidden')) {
+                pilhaModaisAbertos.pop();
+            } else {
+                break;
+            }
+        }
+
+        // Se existir alguma tela flutuante ou gaveta aberta, fecha apenas ela
+        if (pilhaModaisAbertos.length > 0) {
+            const modalTopo = pilhaModaisAbertos.pop();
+            fecharOverlayPeloBotaoVoltar(modalTopo);
+            return;
+        }
+
+        // Sem modal aberto: impede que o botão voltar regresse para pages/login
+        try {
+            history.pushState({ osyncGuard: true }, '');
+        } catch (_) {}
+    });
+})();
+
 async function navegarPara(pagina) {
     const container = document.getElementById('app-content');
     const perfil = usuarioAtual?.perfil;
