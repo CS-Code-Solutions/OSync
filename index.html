@@ -138,12 +138,16 @@
             </nav>
         </div>
 
-        <!-- Direita: Status Nuvem + Notificações + Usuário + Sair -->
-        <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <!-- Direita: Status Nuvem + Biometria + Notificações + Usuário + Sair -->
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
             <div id="cloud-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-[#00E5B0] border border-[#00E5B0]/30">
                 <span id="cloud-dot" class="w-2 h-2 rounded-full bg-[#00E5B0] animate-pulse"></span>
                 <span id="cloud-label">Online</span>
             </div>
+
+            <button id="btn-biometria-passkey" onclick="gerenciarBiometriaOSync()" title="Ativar Login com Digital / Face ID neste dispositivo" class="hidden p-2 rounded-lg text-slate-300 hover:bg-slate-800 transition relative">
+                <i data-lucide="fingerprint" class="w-5 h-5"></i>
+            </button>
 
             <button id="btn-notificacoes-push" onclick="ativarNotificacoesPushOSync()" title="Ativar Notificações no Celular" class="p-2 rounded-lg text-amber-400 hover:bg-amber-500/10 transition relative">
                 <i id="icon-notificacoes-push" data-lucide="bell" class="w-5 h-5"></i>
@@ -430,6 +434,7 @@
 
     <script src="js/firebase-config.js?v=15"></script>
     <script src="js/notificacoes.js?v=1"></script>
+    <script src="js/biometria.js?v=1"></script>
     <script src="js/ui-alerts.js?v=15"></script>
     <script src="js/utils.js?v=15"></script>
     <script src="js/data-store.js?v=15"></script>
