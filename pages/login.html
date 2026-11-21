@@ -96,6 +96,15 @@
                 <i data-lucide="log-in" class="w-4 h-4"></i>
             </button>
 
+            <!-- BOTÃO DE LOGIN BIOMÉTRICO (PASSKEY / DIGITAL / FACE ID) -->
+            <div id="box-btn-biometria" class="hidden pt-1">
+                <button type="button" id="btn-login-biometria" onclick="entrarComBiometria()"
+                    class="w-full bg-[#0B1120]/90 hover:bg-[#00F5D4]/15 text-[#00F5D4] border border-[#00F5D4]/60 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs shadow-sm">
+                    <i data-lucide="fingerprint" class="w-4 h-4 shrink-0"></i>
+                    <span id="texto-btn-biometria">Entrar com Digital / Face ID</span>
+                </button>
+            </div>
+
             <div class="text-center pt-1.5">
                 <button type="button" onclick="alternarModoCadastro()" class="text-xs text-slate-300 hover:text-[#00E5B0] transition">
                     Não tem acesso? Solicitar cadastro ao Gestor
@@ -179,6 +188,133 @@
     <script src="/js/firebase-config.js"></script>
     <script>
         lucide.createIcons();
+
+        function bufferParaBase64UrlLogin(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binario = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binario += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binario).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        }
+
+        function base64UrlParaUint8ArrayLogin(base64url) {
+            const base64 = String(base64url || '').replace(/-/g, '+').replace(/_/g, '/');
+            const pad = base64.length % 4 ? '='.repeat(4 - (base64.length % 4)) : '';
+            const binario = atob(base64 + pad);
+            const bytes = new Uint8Array(binario.length);
+            for (let i = 0; i < binario.length; i++) {
+                bytes[i] = binario.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        function obterPasskeyLocalLogin() {
+            try {
+                const bruto = localStorage.getItem('osync_passkey_meta');
+                return bruto ? JSON.parse(bruto) : null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        // Exibe botão de biometria se o dispositivo suportar WebAuthn
+        (function inicializarBotaoBiometriaLogin() {
+            if (!window.PublicKeyCredential) return;
+            const box = document.getElementById('box-btn-biometria');
+            const texto = document.getElementById('texto-btn-biometria');
+            if (!box) return;
+
+            box.classList.remove('hidden');
+            const meta = obterPasskeyLocalLogin();
+            if (meta && meta.nome && texto) {
+                const primeiroNome = String(meta.nome).trim().split(' ')[0];
+                texto.textContent = `Entrar com Digital (${primeiroNome})`;
+            }
+        })();
+
+        async function entrarComBiometria() {
+            const btnBio = document.getElementById('btn-login-biometria');
+            const errorBox = document.getElementById('-error');
+            if (!btnBio) return;
+
+            btnBio.disabled = true;
+            const htmlOriginal = btnBio.innerHTML;
+            btnBio.innerHTML = '<span>Aguardando biometria...</span>';
+            errorBox.classList.add('hidden');
+            fazendoLoginManual = true;
+
+            try {
+                // 1. Solicita desafio criptográfico ao servidor
+                const respChallenge = await fetch('/api/passkey', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'challenge' })
+                });
+                const dadosChallenge = await respChallenge.json();
+                if (!respChallenge.ok) throw new Error(dadosChallenge.error || 'Erro ao iniciar verificação biométrica.');
+
+                const meta = obterPasskeyLocalLogin();
+                const publicKeyOptions = {
+                    challenge: base64UrlParaUint8ArrayLogin(dadosChallenge.challenge),
+                    rpId: dadosChallenge.rpId,
+                    userVerification: 'required',
+                    timeout: 60000
+                };
+
+                if (meta && meta.credentialId) {
+                    publicKeyOptions.allowCredentials = [{
+                        type: 'public-key',
+                        id: base64UrlParaUint8ArrayLogin(meta.credentialId)
+                    }];
+                }
+
+                // 2. Solicita leitura da digital / Face ID no aparelho
+                const assertion = await navigator.credentials.get({ publicKey: publicKeyOptions });
+                if (!assertion) throw new Error('Leitura biométrica cancelada.');
+
+                const credentialId = bufferParaBase64UrlLogin(assertion.rawId);
+                const clientDataJSON = bufferParaBase64UrlLogin(assertion.response.clientDataJSON);
+                const authenticatorData = bufferParaBase64UrlLogin(assertion.response.authenticatorData);
+                const signature = bufferParaBase64UrlLogin(assertion.response.signature);
+
+                // 3. Valida assinatura na Vercel e obtém Firebase Custom Token
+                const respAuth = await fetch('/api/passkey', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'authenticate',
+                        credentialId,
+                        clientDataJSON,
+                        authenticatorData,
+                        signature
+                    })
+                });
+
+                const dadosAuth = await respAuth.json();
+                if (!respAuth.ok) {
+                    if (respAuth.status === 404) {
+                        localStorage.removeItem('osync_passkey_meta');
+                    }
+                    throw new Error(dadosAuth.error || 'Falha na validação biométrica.');
+                }
+
+                // 4. Autentica no Firebase Auth com o Custom Token oficial
+                await auth.signInWithCustomToken(dadosAuth.customToken);
+                window.location.replace('/');
+            } catch (err) {
+                fazendoLoginManual = false;
+                if (err.name === 'NotAllowedError') {
+                    errorBox.textContent = 'Leitura biométrica cancelada ou nenhuma chave encontrada neste aparelho.';
+                } else {
+                    errorBox.textContent = err.message;
+                }
+                errorBox.classList.remove('hidden');
+                btnBio.disabled = false;
+                btnBio.innerHTML = htmlOriginal;
+                lucide.createIcons();
+            }
+        }
 
         function restaurarBotaoLogin() {
             const btn = document.getElementById('btn-');
