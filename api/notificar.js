@@ -1,5 +1,11 @@
 const admin = require('firebase-admin');
 
+const ORIGENS_PERMITIDAS = [
+    'https://osync.vercel.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500'
+];
+
 function getFirebaseAdmin() {
     if (!admin.apps.length) {
         const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -18,6 +24,21 @@ function getFirebaseAdmin() {
 }
 
 module.exports = async (req, res) => {
+    const origin = req.headers.origin || '';
+    if (origin && !ORIGENS_PERMITIDAS.includes(origin)) {
+        return res.status(403).json({ error: 'Origem não autorizada.' });
+    }
+    if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
     }
@@ -44,53 +65,77 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'Parâmetros obrigatórios ausentes.' });
         }
 
-        let uidAutenticado = remetenteUid || '';
-        if (tipo !== 'novo_cadastro') {
-            if (!idToken) return res.status(401).json({ error: 'Não autorizado.' });
-            const decoded = await fbAdmin.auth().verifyIdToken(idToken);
-            uidAutenticado = decoded.uid;
-        }
+        let uidAutenticado = String(remetenteUid || '').trim();
 
-        // Para novos cadastros (onde o usuário ainda está pendente no cliente), grava o alerta realtime pelo Admin SDK
         if (tipo === 'novo_cadastro') {
+            // Valida se o solicitante realmente existe no Firestore como pendente daquela empresa (bloqueia spam externo)
+            if (!uidAutenticado) {
+                return res.status(401).json({ error: 'Identificador do solicitante ausente.' });
+            }
+            const novoUserDoc = await db.collection('usuarios').doc(uidAutenticado).get();
+            if (
+                !novoUserDoc.exists ||
+                novoUserDoc.data().empresaId !== String(empresaId) ||
+                novoUserDoc.data().statusAcesso !== 'pendente'
+            ) {
+                return res.status(403).json({ error: 'Solicitação de cadastro inválida ou já processada.' });
+            }
+
             const agora = Date.now();
             await db.collection('notificacoes_realtime').add({
                 empresaId: String(empresaId),
-                remetenteUid: String(uidAutenticado),
+                remetenteUid: uidAutenticado,
                 eventoId: `evt_cad_${agora}_${Math.random().toString(36).slice(2, 7)}`,
                 tipo: 'novo_cadastro',
                 destinatariosIds: [],
                 perfisAlvo: ['Admin'],
-                titulo: String(titulo),
-                corpo: String(corpo),
-                urlDestino: String(urlDestino || '/?page=configuracoes'),
+                titulo: String(titulo).slice(0, 120),
+                corpo: String(corpo).slice(0, 300),
+                urlDestino: String(urlDestino || '/?page=configuracoes').slice(0, 200),
                 timestampMs: agora,
                 criadoEm: fbAdmin.firestore.FieldValue.serverTimestamp()
             }).catch(() => {});
+        } else {
+            if (!idToken) return res.status(401).json({ error: 'Não autorizado.' });
+            const decoded = await fbAdmin.auth().verifyIdToken(idToken);
+            uidAutenticado = decoded.uid;
+
+            // Garante isolamento multi-tenant: remetente precisa pertencer à empresaId (ou ser SuperAdmin)
+            const remetenteDoc = await db.collection('usuarios').doc(uidAutenticado).get();
+            if (!remetenteDoc.exists || remetenteDoc.data().ativo === false) {
+                return res.status(403).json({ error: 'Usuário inativo ou não encontrado.' });
+            }
+            const dadosRemetente = remetenteDoc.data();
+            if (dadosRemetente.perfil !== 'SuperAdmin' && dadosRemetente.empresaId !== String(empresaId)) {
+                return res.status(403).json({ error: 'Acesso negado para esta empresa.' });
+            }
         }
 
         const tokensSet = new Set();
         const refsUsuarios = [];
 
         if (Array.isArray(destinatariosIds) && destinatariosIds.length > 0) {
-            const unicos = [...new Set(destinatariosIds)].filter(uid => uid && uid !== uidAutenticado);
+            const unicos = [...new Set(destinatariosIds)].filter(uid => uid && uid !== uidAutenticado).slice(0, 100);
             for (const uid of unicos) {
-                const doc = await db.collection('usuarios').doc(uid).get();
-                if (doc.exists && doc.data().empresaId === empresaId && doc.data().ativo !== false) {
+                const doc = await db.collection('usuarios').doc(String(uid)).get();
+                if (doc.exists && doc.data().empresaId === String(empresaId) && doc.data().ativo !== false) {
                     refsUsuarios.push(doc);
                 }
             }
         } else if (Array.isArray(perfisAlvo) && perfisAlvo.length > 0) {
-            const snap = await db.collection('usuarios')
-                .where('empresaId', '==', empresaId)
-                .where('perfil', 'in', perfisAlvo)
-                .get();
+            const perfisValidos = perfisAlvo.filter(p => typeof p === 'string').slice(0, 10);
+            if (perfisValidos.length > 0) {
+                const snap = await db.collection('usuarios')
+                    .where('empresaId', '==', String(empresaId))
+                    .where('perfil', 'in', perfisValidos)
+                    .get();
 
-            snap.docs.forEach(doc => {
-                if (doc.id !== uidAutenticado && doc.data().ativo !== false) {
-                    refsUsuarios.push(doc);
-                }
-            });
+                snap.docs.forEach(doc => {
+                    if (doc.id !== uidAutenticado && doc.data().ativo !== false) {
+                        refsUsuarios.push(doc);
+                    }
+                });
+            }
         }
 
         refsUsuarios.forEach(doc => {
@@ -113,16 +158,16 @@ module.exports = async (req, res) => {
         const response = await fbAdmin.messaging().sendEachForMulticast({
             tokens,
             data: {
-                url: String(urlDestino || '/'),
-                tipo: String(tipo || 'geral'),
-                title: String(titulo),
-                body: String(corpo),
+                url: String(urlDestino || '/').slice(0, 200),
+                tipo: String(tipo || 'geral').slice(0, 50),
+                title: String(titulo).slice(0, 120),
+                body: String(corpo).slice(0, 300),
                 eventoId: eventoTag
             },
             webpush: {
                 headers: { Urgency: 'high' },
                 fcmOptions: {
-                    link: String(urlDestino || '/')
+                    link: String(urlDestino || '/').slice(0, 200)
                 }
             }
         });
