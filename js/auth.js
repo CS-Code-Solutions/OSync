@@ -38,6 +38,12 @@ let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
 let bloqueadoPorLicencaExpirada = false;
 
+function obterFimDoDiaVencimento(dataVencimento) {
+    const base = new Date(dataVencimento);
+    if (Number.isNaN(base.getTime())) return null;
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999);
+}
+
 function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
     if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
@@ -132,10 +138,11 @@ function aplicarPermissoesInterface(perfil) {
 
 function verificarAvisosAutomaticosLicenca(emp) {
     if (!emp || !emp.dataVencimento || emp.ativa === false) return;
-    const venc = new Date(emp.dataVencimento);
-    if (Number.isNaN(venc.getTime())) return;
+    const venc = obterFimDoDiaVencimento(emp.dataVencimento);
+    if (!venc) return;
 
-    const diffDias = Math.ceil((venc - new Date()) / (1000 * 60 * 60 * 24));
+    const agora = new Date();
+    const diffDias = Math.ceil((venc - agora) / (1000 * 60 * 60 * 24));
     if (diffDias < 0) return;
 
     // Dispara aviso automático na faixa de 3 dias ou 7 dias antes do vencimento
@@ -283,7 +290,8 @@ auth.onAuthStateChanged(async (user) => {
                 const empDoc = await db.collection('empresas').doc(usuarioAtual.empresaId).get();
                 if (empDoc.exists) {
                     const emp = { id: empDoc.id, ...empDoc.data() };
-                    const vencida = emp.dataVencimento && new Date(emp.dataVencimento) < new Date();
+                    const fimDoDiaVenc = emp.dataVencimento ? obterFimDoDiaVencimento(emp.dataVencimento) : null;
+                    const vencida = Boolean(fimDoDiaVenc && fimDoDiaVenc < new Date());
                     if (emp.ativa === false || vencida) {
                         bloqueadoPorLicencaExpirada = true;
                         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
