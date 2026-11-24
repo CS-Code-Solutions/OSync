@@ -36,6 +36,7 @@ if ('serviceWorker' in navigator) {
 
 let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
+let bloqueadoPorLicencaExpirada = false;
 
 function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
@@ -129,6 +130,15 @@ function aplicarPermissoesInterface(perfil) {
     }
 }
 
+window.fecharModalLicencaExpirada = async function () {
+    document.getElementById('modal-licenca-expirada')?.remove();
+    bloqueadoPorLicencaExpirada = false;
+    try {
+        await auth.signOut();
+    } catch (_) {}
+    window.location.replace('pages/login');
+};
+
 function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
     document.getElementById('modal-licenca-expirada')?.remove();
 
@@ -184,9 +194,9 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
                     <span>Entrar em contato</span>
                 </a>
 
-                <button type="button" onclick="window.location.replace('pages/login')"
-                    class="w-full py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition">
-                    Voltar para a tela de login
+                <button type="button" onclick="fecharModalLicencaExpirada()"
+                    class="w-full py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-xl transition">
+                    Fechar
                 </button>
             </div>
         </div>
@@ -199,6 +209,10 @@ function exibirModalLicencaExpirada(nomeEmpresa, tipoContrato, dataVencimento) {
 }
 
 auth.onAuthStateChanged(async (user) => {
+    if (bloqueadoPorLicencaExpirada) {
+        return;
+    }
+
     if (!user) {
         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
         if (!document.getElementById('modal-licenca-expirada')) {
@@ -228,8 +242,8 @@ auth.onAuthStateChanged(async (user) => {
                     const emp = empDoc.data();
                     const vencida = emp.dataVencimento && new Date(emp.dataVencimento) < new Date();
                     if (emp.ativa === false || vencida) {
+                        bloqueadoPorLicencaExpirada = true;
                         if (unsubscribePerfilAtual) unsubscribePerfilAtual();
-                        await auth.signOut();
                         exibirModalLicencaExpirada(
                             emp.nome || 'Empresa não identificada',
                             emp.tipoContrato || 'anual_1a',
