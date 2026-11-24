@@ -130,6 +130,49 @@ function aplicarPermissoesInterface(perfil) {
     }
 }
 
+function verificarAvisosAutomaticosLicenca(emp) {
+    if (!emp || !emp.dataVencimento || emp.ativa === false) return;
+    const venc = new Date(emp.dataVencimento);
+    if (Number.isNaN(venc.getTime())) return;
+
+    const diffDias = Math.ceil((venc - new Date()) / (1000 * 60 * 60 * 24));
+    if (diffDias < 0) return;
+
+    // Dispara aviso automático na faixa de 3 dias ou 7 dias antes do vencimento
+    let faixaAviso = null;
+    if (diffDias <= 3) {
+        faixaAviso = 3;
+    } else if (diffDias <= 7) {
+        faixaAviso = 7;
+    }
+
+    if (!faixaAviso) return;
+
+    const chaveDia = `${emp.id || ''}_${faixaAviso}_${venc.toISOString().slice(0, 10)}`;
+    const storageKey = `osync_aviso_licenca_${chaveDia}`;
+    if (sessionStorage.getItem(storageKey)) return;
+    sessionStorage.setItem(storageKey, '1');
+
+    const dataBR = venc.toLocaleDateString('pt-BR');
+    const textoPrazo = diffDias === 0 ? 'hoje' : `em ${diffDias} dia(s)`;
+    const mensagem = `Atenção: a licença da empresa ${emp.nome || ''} vence ${textoPrazo} (${dataBR}).`;
+
+    if (typeof mostrarNotificacaoOSync === 'function') {
+        mostrarNotificacaoOSync(mensagem, 'aviso');
+    }
+
+    if (typeof dispararPushOSync === 'function' && emp.id) {
+        dispararPushOSync({
+            empresaId: emp.id,
+            tipo: 'licenca_vencendo',
+            perfisAlvo: ['Admin'],
+            titulo: `Licença vence em até ${faixaAviso} dias`,
+            corpo: mensagem,
+            urlDestino: '/'
+        }).catch(() => {});
+    }
+}
+
 window.fecharModalLicencaExpirada = async function () {
     document.getElementById('modal-licenca-expirada')?.remove();
     bloqueadoPorLicencaExpirada = false;
@@ -239,7 +282,7 @@ auth.onAuthStateChanged(async (user) => {
             try {
                 const empDoc = await db.collection('empresas').doc(usuarioAtual.empresaId).get();
                 if (empDoc.exists) {
-                    const emp = empDoc.data();
+                    const emp = { id: empDoc.id, ...empDoc.data() };
                     const vencida = emp.dataVencimento && new Date(emp.dataVencimento) < new Date();
                     if (emp.ativa === false || vencida) {
                         bloqueadoPorLicencaExpirada = true;
@@ -250,6 +293,10 @@ auth.onAuthStateChanged(async (user) => {
                             emp.dataVencimento || ''
                         );
                         return;
+                    }
+
+                    if (usuarioAtual.perfil === 'Admin') {
+                        verificarAvisosAutomaticosLicenca(emp);
                     }
                 }
             } catch (errEmp) {
