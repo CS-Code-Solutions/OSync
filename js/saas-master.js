@@ -79,9 +79,16 @@ function renderizarCardsEmpresasSaaS(empresas, gestores) {
                 : `Vence em ${dataBR} (${diffDias}d restantes)`;
         }
 
+        const tarjaVencidaHTML = expirado ? `
+            <div class="tarja-vencida-piscante text-white text-[11px] font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-lg text-center mb-2">
+                VENCIDA
+            </div>
+        ` : '';
+
         return `
         <div class="osync-card p-5 flex flex-col justify-between gap-4" style="border-left-color: ${ativa && !expirado ? '#00E5B0' : '#F43F5E'}">
             <div>
+                ${tarjaVencidaHTML}
                 <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${ativa && !expirado ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
                         ${!ativa ? 'Suspensa' : (expirado ? 'Contrato Vencido' : 'Ativa')} • ${escaparHTML(emp.plano || 'Pro')}
