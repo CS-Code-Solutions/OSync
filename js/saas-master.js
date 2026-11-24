@@ -1,5 +1,11 @@
 let unsubscribeSaaSEmpresas = null;
 
+function obterFimDoDiaVencimentoSaaS(dataVencimento) {
+    const base = new Date(dataVencimento);
+    if (Number.isNaN(base.getTime())) return null;
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999);
+}
+
 async function initSaaSEmpresas() {
     if (usuarioAtual?.perfil !== 'SuperAdmin') {
         navegarPara('os');
@@ -70,13 +76,16 @@ function renderizarCardsEmpresasSaaS(empresas, gestores) {
         let expirado = false;
 
         if (emp.dataVencimento) {
-            const venc = new Date(emp.dataVencimento);
-            const diffDias = Math.ceil((venc - new Date()) / (1000 * 60 * 60 * 24));
-            const dataBR = venc.toLocaleDateString('pt-BR');
-            expirado = diffDias < 0;
-            infoVencimento = expirado
-                ? `Vencido em ${dataBR} (${Math.abs(diffDias)}d atrás)`
-                : `Vence em ${dataBR} (${diffDias}d restantes)`;
+            const venc = obterFimDoDiaVencimentoSaaS(emp.dataVencimento);
+            const agora = new Date();
+            if (venc) {
+                const diffDias = Math.ceil((venc - agora) / (1000 * 60 * 60 * 24));
+                const dataBR = venc.toLocaleDateString('pt-BR');
+                expirado = venc < agora;
+                infoVencimento = expirado
+                    ? `Vencido em ${dataBR} (${Math.abs(diffDias)}d atrás)`
+                    : `Vence em ${dataBR} (${diffDias}d restantes)`;
+            }
         }
 
         const tarjaVencidaHTML = expirado ? `
