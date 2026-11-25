@@ -202,6 +202,16 @@ async function navegarPara(pagina) {
     // Proteção contra Path Traversal no nome da página
     const paginaSegura = String(pagina || 'os').replace(/[^a-z0-9\-]/gi, '');
 
+    if (paginaSegura === 'solicitacoes' && perfil !== 'SuperAdmin') {
+        const planoEfetivo = typeof planoEmpresaAtual !== 'undefined' && planoEmpresaAtual
+            ? planoEmpresaAtual
+            : (typeof lerPlanoCacheEmpresa === 'function' ? lerPlanoCacheEmpresa(usuarioAtual?.empresaId) : null);
+        if (planoEfetivo === 'Starter') {
+            renderizarErro403(container, paginaSegura);
+            return;
+        }
+    }
+
     // Libera largura total e reduz margens no Kanban (O.S.) mantendo padrão nas demais telas
     if (container) {
         if (paginaSegura === 'os') {
