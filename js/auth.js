@@ -59,6 +59,10 @@ function empresaPossuiLideresAtivos(plano) {
     return (plano || 'Pro') !== 'Starter';
 }
 
+function empresaPossuiSolicitacoesAtivas(plano) {
+    return (plano || 'Pro') !== 'Starter';
+}
+
 function obterFimDoDiaVencimento(dataVencimento) {
     const base = new Date(dataVencimento);
     if (Number.isNaN(base.getTime())) return null;
@@ -67,24 +71,30 @@ function obterFimDoDiaVencimento(dataVencimento) {
 
 function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
-    const permiteLider = empresaPossuiLideresAtivos(planoEmpresaAtual || lerPlanoCacheEmpresa(userObj?.empresaId));
+    const planoEfetivo = planoEmpresaAtual || lerPlanoCacheEmpresa(userObj?.empresaId);
+    const permiteLider = empresaPossuiLideresAtivos(planoEfetivo);
+    const permiteSolicitacoes = empresaPossuiSolicitacoesAtivas(planoEfetivo);
 
-    if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
+    if (cargo === 'SuperAdmin') return null; // Acesso total
+
+    if (cargo === 'Admin') {
+        return permiteSolicitacoes ? null : ['dashboard', 'os', 'cad-manutentores', 'cad-ativos', 'planos-manutencao', 'centros-custo', 'relatorios-os', 'relatorios-maquinas', 'relatorios-manutentores', 'configuracoes'];
+    }
 
     // Líder: respeita as telas marcadas no cadastro (padrão: Solicitações)
     if (cargo === 'Lideranca') {
-        if (!permiteLider) return ['solicitacoes'];
+        if (!permiteLider || !permiteSolicitacoes) return [];
         if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
-            return userObj.paginasPermitidas;
+            return userObj.paginasPermitidas.filter(p => p !== 'solicitacoes' || permiteSolicitacoes);
         }
         return ['solicitacoes'];
     }
 
     // Manutentor: respeita as telas marcadas no cadastro (padrão: O.S. e Solicitações)
-    if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
-        return userObj.paginasPermitidas;
-    }
-    return ['os', 'solicitacoes'];
+    const basePaginas = Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0
+        ? userObj.paginasPermitidas
+        : ['os', 'solicitacoes'];
+    return basePaginas.filter(p => p !== 'solicitacoes' || permiteSolicitacoes);
 }
 
 function aplicarPermissoesInterface(perfil) {
@@ -92,6 +102,7 @@ function aplicarPermissoesInterface(perfil) {
     const isGestor = cargo === 'Admin' || cargo === 'SuperAdmin';
     const planoEfetivo = planoEmpresaAtual || lerPlanoCacheEmpresa(usuarioAtual?.empresaId);
     const permiteLider = cargo === 'SuperAdmin' ? true : empresaPossuiLideresAtivos(planoEfetivo);
+    const permiteSolicitacoes = cargo === 'SuperAdmin' ? true : empresaPossuiSolicitacoesAtivas(planoEfetivo);
 
     if (!isGestor) {
         const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || [];
@@ -99,14 +110,14 @@ function aplicarPermissoesInterface(perfil) {
         // Menu Desktop Principal
         document.getElementById('nav-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
         document.getElementById('nav-os')?.classList.toggle('hidden', !permitidas.includes('os'));
-        document.getElementById('nav-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
+        document.getElementById('nav-solicitacoes')?.classList.toggle('hidden', !permiteSolicitacoes || !permitidas.includes('solicitacoes'));
         document.getElementById('nav-planos-manutencao')?.classList.toggle('hidden', !permitidas.includes('planos-manutencao'));
         document.getElementById('nav-configuracoes')?.classList.toggle('hidden', !permitidas.includes('configuracoes'));
 
         // Menu Mobile Inferior
         document.getElementById('mob-dashboard')?.classList.toggle('hidden', !permitidas.includes('dashboard'));
         document.getElementById('mob-os')?.classList.toggle('hidden', !permitidas.includes('os'));
-        document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permitidas.includes('solicitacoes'));
+        document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permiteSolicitacoes || !permitidas.includes('solicitacoes'));
         document.getElementById('mob-planos-manutencao')?.classList.toggle('hidden', !permitidas.includes('planos-manutencao'));
 
         // Botões da Gaveta Mobile (Planos de Manutenção e Configurações)
@@ -151,6 +162,8 @@ function aplicarPermissoesInterface(perfil) {
         const temItensNaGaveta = exibirGrupoCadastros || temAlgumRelatorio || temPlanos || temConfiguracoes;
         document.getElementById('btn-menu-geral-mobile')?.classList.toggle('hidden', !temItensNaGaveta);
     } else {
+        document.getElementById('nav-solicitacoes')?.classList.toggle('hidden', !permiteSolicitacoes);
+        document.getElementById('mob-solicitacoes')?.classList.toggle('hidden', !permiteSolicitacoes);
         document.getElementById('btn-menu-geral-mobile')?.classList.remove('hidden');
         document.querySelectorAll(`[onclick*="navegarPara('cad-lideranca')"]`).forEach(btn => {
             btn.classList.toggle('hidden', !permiteLider);
@@ -368,8 +381,8 @@ auth.onAuthStateChanged(async (user) => {
             }
 
             if (usuarioAtual.perfil === 'Lideranca') {
-                const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || ['solicitacoes'];
-                const paginaInicial = permitidas.includes('solicitacoes') ? 'solicitacoes' : permitidas[0];
+                const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || [];
+                const paginaInicial = permitidas.includes('solicitacoes') ? 'solicitacoes' : (permitidas[0] || 'os');
                 await navegarPara(paginaInicial);
             } else if (usuarioAtual.perfil === 'SuperAdmin') {
                 await navegarPara('saas-empresas');
@@ -377,7 +390,7 @@ auth.onAuthStateChanged(async (user) => {
                 await navegarPara('dashboard');
             } else {
                 const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || ['os'];
-                const paginaInicial = permitidas.includes('os') ? 'os' : permitidas[0];
+                const paginaInicial = permitidas.includes('os') ? 'os' : (permitidas[0] || 'os');
                 await navegarPara(paginaInicial);
             }
 
