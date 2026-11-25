@@ -21,6 +21,31 @@ function formatarRotuloAtivo(ativo) {
     return tag ? `${tag} - ${nome}` : nome;
 }
 
+function starterOcultaSolicitacoesCadastro() {
+    if (typeof usuarioAtual !== 'undefined' && usuarioAtual?.perfil === 'SuperAdmin') {
+        return false;
+    }
+    const planoEfetivo = (typeof planoEmpresaAtual !== 'undefined' && planoEmpresaAtual)
+        ? planoEmpresaAtual
+        : (typeof lerPlanoCacheEmpresa === 'function' ? lerPlanoCacheEmpresa(usuarioAtual?.empresaId) : null);
+
+    if (typeof empresaPossuiSolicitacoesAtivas === 'function') {
+        return !empresaPossuiSolicitacoesAtivas(planoEfetivo);
+    }
+    return planoEfetivo === 'Starter';
+}
+
+function aplicarVisibilidadePermissaoSolicitacoesUsuario() {
+    const ocultar = starterOcultaSolicitacoesCadastro();
+    document.querySelectorAll('[data-perm-solicitacoes="true"]').forEach(el => {
+        el.classList.toggle('hidden', ocultar);
+        const chk = el.querySelector('input[type="checkbox"]');
+        if (ocultar && chk) {
+            chk.checked = false;
+        }
+    });
+}
+
 // ==========================================
 // MÓDULO 1: ATIVOS (MÁQUINAS) E QR CODE
 // ==========================================
@@ -775,6 +800,7 @@ async function executarPDFDoQRCode(e) {
 // ==========================================
 async function initUsuariosCadastro(perfil) {
     perfilAtualCadastro = perfil;
+    aplicarVisibilidadePermissaoSolicitacoesUsuario();
     await carregarUsuariosPorPerfil(perfil);
     const form = document.getElementById('form-novo-usuario');
     if (form && !form.dataset.bound) {
@@ -801,7 +827,15 @@ function verificarOutraEspecialidade() {
 }
 
 function alternarTodasPermissoesManutentor() {
-    const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]'));
+    aplicarVisibilidadePermissaoSolicitacoesUsuario();
+    const ocultarSol = starterOcultaSolicitacoesCadastro();
+    const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]')).filter(cb => {
+        if (ocultarSol && cb.value === 'solicitacoes') {
+            cb.checked = false;
+            return false;
+        }
+        return true;
+    });
     if (checkboxes.length === 0) return;
 
     const todasMarcadas = checkboxes.every(cb => cb.checked);
@@ -811,35 +845,45 @@ function alternarTodasPermissoesManutentor() {
 }
 
 function obterPermissoesSelecionadasFormulario() {
-    const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]:checked'));
-    return checkboxes.map(cb => cb.value);
+    const ocultarSol = starterOcultaSolicitacoesCadastro();
+    return Array.from(document.querySelectorAll('input[name="user-perm-pagina"]:checked'))
+        .map(cb => cb.value)
+        .filter(val => !(ocultarSol && val === 'solicitacoes'));
 }
 
 function preencherPermissoesFormulario(permissoesSalvas, perfil = 'Manutentor') {
+    const ocultarSol = starterOcultaSolicitacoesCadastro();
     const checkboxes = Array.from(document.querySelectorAll('input[name="user-perm-pagina"]'));
     if (checkboxes.length === 0) return;
 
     if (perfil === 'Admin' && (!Array.isArray(permissoesSalvas) || permissoesSalvas.length === 0)) {
         checkboxes.forEach(cb => {
-            cb.checked = true;
+            cb.checked = !(ocultarSol && cb.value === 'solicitacoes');
         });
+        aplicarVisibilidadePermissaoSolicitacoesUsuario();
         return;
     }
 
-    const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
-    const lista = Array.isArray(permissoesSalvas) && permissoesSalvas.length > 0
+    const padraoPerfil = perfil === 'Lideranca'
+        ? (ocultarSol ? ['os'] : ['solicitacoes'])
+        : (ocultarSol ? ['os'] : ['os', 'solicitacoes']);
+
+    const lista = (Array.isArray(permissoesSalvas) && permissoesSalvas.length > 0
         ? permissoesSalvas
-        : padraoPerfil;
+        : padraoPerfil).filter(p => !(ocultarSol && p === 'solicitacoes'));
 
     checkboxes.forEach(cb => {
-        cb.checked = lista.includes(cb.value);
+        cb.checked = !(ocultarSol && cb.value === 'solicitacoes') && lista.includes(cb.value);
     });
+
+    aplicarVisibilidadePermissaoSolicitacoesUsuario();
 }
 
 async function carregarUsuariosPorPerfil(perfil) {
     const grid = document.getElementById('lista-usuarios-perfil');
     if (!grid) return;
 
+    const ocultarSol = starterOcultaSolicitacoesCadastro();
     let query = db.collection('usuarios').where('empresaId', '==', usuarioAtual.empresaId);
 
     // Na aba de Equipe de Manutenção, inclui tanto Manutentores quanto Gestão (Admin)
@@ -865,10 +909,13 @@ async function carregarUsuariosPorPerfil(perfil) {
         const uIdSeguro = escaparHTML(u.id);
         const uNomeSeguro = escaparHTML(u.nome);
         const ehGestao = u.perfil === 'Admin';
-        const padraoPerfil = u.perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
-        const paginasPermitidas = Array.isArray(u.paginasPermitidas) && u.paginasPermitidas.length > 0
+        const padraoPerfil = u.perfil === 'Lideranca'
+            ? (ocultarSol ? ['os'] : ['solicitacoes'])
+            : (ocultarSol ? ['os'] : ['os', 'solicitacoes']);
+
+        const paginasPermitidas = (Array.isArray(u.paginasPermitidas) && u.paginasPermitidas.length > 0
             ? u.paginasPermitidas
-            : padraoPerfil;
+            : padraoPerfil).filter(p => !(ocultarSol && p === 'solicitacoes'));
 
         const badgesPaginas = ehGestao && (!Array.isArray(u.paginasPermitidas) || u.paginasPermitidas.length === 0)
             ? `<div class="flex flex-wrap gap-1 mt-2">
@@ -931,7 +978,11 @@ function abrirModalNovoUsuario(perfil) {
     if (document.getElementById('user-email')) document.getElementById('user-email').required = true;
     if (document.getElementById('user-senha')) document.getElementById('user-senha').required = true;
 
-    const padraoPerfil = perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes'];
+    const ocultarSol = starterOcultaSolicitacoesCadastro();
+    const padraoPerfil = perfil === 'Lideranca'
+        ? (ocultarSol ? ['os'] : ['solicitacoes'])
+        : (ocultarSol ? ['os'] : ['os', 'solicitacoes']);
+
     preencherPermissoesFormulario(padraoPerfil, perfil);
     verificarOutraEspecialidade();
     document.getElementById('modal-novo-usuario')?.classList.remove('hidden');
