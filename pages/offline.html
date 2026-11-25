@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sem Conexão • OSync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="bg-[#F1F5F9] min-h-screen flex flex-col justify-between text-slate-800">
+    <header class="osync-navbar px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+            <img src="../images/ico192.png" alt="OSync" class="w-8 h-8 rounded-lg logo-protegida">
+            <span class="text-white font-extrabold tracking-tight text-base">OSync</span>
+        </div>
+        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/30">
+            Modo Offline
+        </span>
+    </header>
+
+    <main class="flex-1 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-lg border border-slate-200 overflow-hidden text-center">
+            <div class="bg-[#0B1120] px-6 py-6 border-b-2 border-[#00E5B0]">
+                <div class="w-14 h-14 rounded-2xl bg-[#00E5B0]/15 border border-[#00E5B0]/40 text-[#00E5B0] flex items-center justify-center mx-auto mb-3 font-extrabold text-xl">
+                    !
+                </div>
+                <h1 class="text-xl font-extrabold text-white">Você está sem conexão</h1>
+                <p class="text-xs text-slate-400 mt-1">Não foi possível carregar os dados atualizados no momento.</p>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Verifique sua rede Wi-Fi ou dados móveis e tente novamente. Os arquivos essenciais do aplicativo continuam salvos no dispositivo.
+                </p>
+
+                <button type="button" onclick="window.location.reload()"
+                    class="w-full bg-[#1D4ED8] hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition text-sm">
+                    Tentar novamente
+                </button>
+
+                <a href="/"
+                    class="block w-full py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-xl transition">
+                    Voltar ao início
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <footer class="py-3 px-4 text-center text-[11px] text-slate-500">
+        © 2026 | <a href="https://www.instagram.com/cs_code_solutions?exln=Ym1mNDMzYTYxa3d6" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:underline">Powered by CS Code Solutions</a>
+    </footer>
+</body>
+</html>
