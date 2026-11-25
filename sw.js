@@ -55,12 +55,15 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = 'osync-pwa-v2.4.0';
+const CACHE_NAME = 'osync-pwa-v2.5.0';
+const OFFLINE_URL = './pages/offline.html';
 const ASSETS_ESSENCIAIS = [
     './',
     './index.html',
     './manifest.json',
     './css/style.css',
+    './pages/offline.html',
+    './pages/403.html',
     './images/ico.png',
     './images/ico192.png',
     './images/ico512.png',
@@ -92,10 +95,20 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                const clone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                if (response && response.ok) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                }
                 return response;
             })
-            .catch(() => caches.match(event.request))
+            .catch(async () => {
+                const cached = await caches.match(event.request);
+                if (cached) return cached;
+
+                if (event.request.mode === 'navigate') {
+                    return (await caches.match(OFFLINE_URL)) || (await caches.match('./index.html'));
+                }
+                return Response.error();
+            })
     );
 });
