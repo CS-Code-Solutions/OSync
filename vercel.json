@@ -3,7 +3,9 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/login", "destination": "/pages/login.html" },
-    { "source": "/privacidade", "destination": "/pages/privacidade.html" }
+    { "source": "/privacidade", "destination": "/pages/privacidade.html" },
+    { "source": "/offline", "destination": "/pages/offline.html" },
+    { "source": "/403", "destination": "/pages/403.html" }
   ],
   "headers": [
     {
