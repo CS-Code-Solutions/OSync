@@ -37,6 +37,27 @@ if ('serviceWorker' in navigator) {
 let usuarioAtual = null;
 let unsubscribePerfilAtual = null;
 let bloqueadoPorLicencaExpirada = false;
+let planoEmpresaAtual = null;
+
+function lerPlanoCacheEmpresa(empresaId) {
+    if (!empresaId) return null;
+    try {
+        return sessionStorage.getItem(`osync_plano_empresa_${empresaId}`) || null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function salvarPlanoCacheEmpresa(empresaId, plano) {
+    if (!empresaId || !plano) return;
+    try {
+        sessionStorage.setItem(`osync_plano_empresa_${empresaId}`, plano);
+    } catch (_) {}
+}
+
+function empresaPossuiLideresAtivos(plano) {
+    return (plano || 'Pro') !== 'Starter';
+}
 
 function obterFimDoDiaVencimento(dataVencimento) {
     const base = new Date(dataVencimento);
@@ -46,10 +67,13 @@ function obterFimDoDiaVencimento(dataVencimento) {
 
 function obterPaginasPermitidasUsuario(userObj) {
     const cargo = (userObj?.perfil || '').trim();
+    const permiteLider = empresaPossuiLideresAtivos(planoEmpresaAtual || lerPlanoCacheEmpresa(userObj?.empresaId));
+
     if (cargo === 'Admin' || cargo === 'SuperAdmin') return null; // Acesso total
-    
+
     // Líder: respeita as telas marcadas no cadastro (padrão: Solicitações)
     if (cargo === 'Lideranca') {
+        if (!permiteLider) return ['solicitacoes'];
         if (Array.isArray(userObj?.paginasPermitidas) && userObj.paginasPermitidas.length > 0) {
             return userObj.paginasPermitidas;
         }
@@ -66,6 +90,8 @@ function obterPaginasPermitidasUsuario(userObj) {
 function aplicarPermissoesInterface(perfil) {
     const cargo = (perfil || '').trim();
     const isGestor = cargo === 'Admin' || cargo === 'SuperAdmin';
+    const planoEfetivo = planoEmpresaAtual || lerPlanoCacheEmpresa(usuarioAtual?.empresaId);
+    const permiteLider = cargo === 'SuperAdmin' ? true : empresaPossuiLideresAtivos(planoEfetivo);
 
     if (!isGestor) {
         const permitidas = obterPaginasPermitidasUsuario(usuarioAtual) || [];
@@ -95,13 +121,14 @@ function aplicarPermissoesInterface(perfil) {
         });
 
         // Submenus de Cadastros (Desktop e Gaveta Mobile)
-        const rotasCadastros = ['cad-manutentores', 'cad-lideranca', 'cad-ativos'];
+        const rotasCadastros = ['cad-manutentores', 'cad-lideranca', 'cad-ativos']
+            .filter(r => r !== 'cad-lideranca' || permiteLider);
         const exibirGrupoCadastros = rotasCadastros.some(r => permitidas.includes(r));
         document.getElementById('nav-cadastros-group')?.classList.toggle('hidden', !exibirGrupoCadastros);
         document.getElementById('drawer-group-cadastros')?.classList.toggle('hidden', !exibirGrupoCadastros);
 
-        rotasCadastros.forEach(rota => {
-            const liberado = permitidas.includes(rota);
+        ['cad-manutentores', 'cad-lideranca', 'cad-ativos'].forEach(rota => {
+            const liberado = (rota !== 'cad-lideranca' || permiteLider) && permitidas.includes(rota);
             document.querySelectorAll(`[onclick*="navegarPara('${rota}')"]`).forEach(btn => {
                 btn.classList.toggle('hidden', !liberado);
             });
@@ -125,6 +152,9 @@ function aplicarPermissoesInterface(perfil) {
         document.getElementById('btn-menu-geral-mobile')?.classList.toggle('hidden', !temItensNaGaveta);
     } else {
         document.getElementById('btn-menu-geral-mobile')?.classList.remove('hidden');
+        document.querySelectorAll(`[onclick*="navegarPara('cad-lideranca')"]`).forEach(btn => {
+            btn.classList.toggle('hidden', !permiteLider);
+        });
     }
 
     if (cargo === 'SuperAdmin') {
@@ -286,10 +316,19 @@ auth.onAuthStateChanged(async (user) => {
         usuarioAtual.perfil = (usuarioAtual.perfil || '').trim();
 
         if (usuarioAtual.perfil !== 'SuperAdmin' && usuarioAtual.empresaId) {
+            const planoCache = lerPlanoCacheEmpresa(usuarioAtual.empresaId);
+            if (planoCache) {
+                planoEmpresaAtual = planoCache;
+            }
+            aplicarPermissoesInterface(usuarioAtual.perfil);
+
             try {
                 const empDoc = await db.collection('empresas').doc(usuarioAtual.empresaId).get();
                 if (empDoc.exists) {
                     const emp = { id: empDoc.id, ...empDoc.data() };
+                    planoEmpresaAtual = emp.plano || 'Pro';
+                    salvarPlanoCacheEmpresa(emp.id, planoEmpresaAtual);
+
                     const fimDoDiaVenc = emp.dataVencimento ? obterFimDoDiaVencimento(emp.dataVencimento) : null;
                     const vencida = Boolean(fimDoDiaVenc && fimDoDiaVenc < new Date());
                     if (emp.ativa === false || vencida) {
@@ -310,6 +349,8 @@ auth.onAuthStateChanged(async (user) => {
             } catch (errEmp) {
                 console.warn('Aviso ao validar vigência da empresa:', errEmp.message);
             }
+        } else {
+            planoEmpresaAtual = null;
         }
 
         document.getElementById('header-user-name').textContent = usuarioAtual.nome;
