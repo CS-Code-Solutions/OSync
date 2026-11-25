@@ -14,9 +14,41 @@ function obterLabelContratoSaaS(tipoContrato) {
 }
 
 function obterLimiteBasePlanoSaaS(plano) {
-    if (plano === 'Starter') return 3;
-    if (plano === 'Pro') return 10;
+    if (plano === 'Starter') return 6;
+    if (plano === 'Pro') return 15;
     return null; // Enterprise: ilimitado
+}
+
+function planoPermiteLideresSaaS(plano) {
+    return (plano || 'Pro') !== 'Starter';
+}
+
+function sincronizarOpcoesPerfilUsuarioSaaS(empId) {
+    const selectPerfil = document.getElementById('saas-user-perfil');
+    if (!selectPerfil) return;
+
+    const emp = cacheEmpresasSaaS.find(item => item.id === empId);
+    const permiteLider = planoPermiteLideresSaaS(emp?.plano);
+    const valorAnterior = selectPerfil.value;
+
+    selectPerfil.innerHTML = permiteLider
+        ? `
+            <option value="Admin">Gestor (Admin)</option>
+            <option value="Manutentor">Manutentor</option>
+            <option value="Lideranca">Liderança</option>
+          `
+        : `
+            <option value="Admin">Gestor (Admin)</option>
+            <option value="Manutentor">Manutentor</option>
+          `;
+
+    if (permiteLider && valorAnterior === 'Lideranca') {
+        selectPerfil.value = 'Lideranca';
+    } else if (valorAnterior === 'Manutentor') {
+        selectPerfil.value = 'Manutentor';
+    } else {
+        selectPerfil.value = 'Admin';
+    }
 }
 
 function alternarCampoUsuariosExtrasSaaS(modo) {
@@ -35,8 +67,9 @@ function alternarCampoUsuariosExtrasSaaS(modo) {
         inputEl.value = 0;
     } else {
         boxEl.classList.remove('hidden');
+        const infoLider = plano === 'Starter' ? ' Líderes desativados neste plano.' : ' Líderes ativos.';
         if (hintEl) {
-            hintEl.textContent = `Plano ${plano} inclui até ${limiteBase} usuários. Informe quantas vagas avulsas extras foram contratadas.`;
+            hintEl.textContent = `Plano ${plano} inclui até ${limiteBase} usuários.${infoLider} Informe quantas vagas avulsas extras foram contratadas.`;
         }
     }
 }
@@ -367,6 +400,7 @@ async function renovarContratoEmpresa(empId, nome) {
 function abrirModalUsuarioEmpresaSaaS(empId, empNome) {
     document.getElementById('saas-user-emp-id').value = empId;
     document.getElementById('saas-user-emp-nome').textContent = empNome;
+    sincronizarOpcoesPerfilUsuarioSaaS(empId);
     document.getElementById('modal-usuario-empresa-saas').classList.remove('hidden');
 }
 
@@ -386,6 +420,14 @@ async function salvarUsuarioEmpresaSaaS(e) {
     const setor = document.getElementById('saas-user-setor').value.trim();
     const email = document.getElementById('saas-user-email').value.trim();
     const senha = document.getElementById('saas-user-senha').value;
+
+    const emp = cacheEmpresasSaaS.find(item => item.id === empresaId);
+    if (perfil === 'Lideranca' && !planoPermiteLideresSaaS(emp?.plano)) {
+        mostrarNotificacaoOSync('O plano Starter não permite cadastrar usuários de Liderança.', 'erro');
+        btn.disabled = false;
+        btn.textContent = 'Criar Acesso';
+        return;
+    }
 
     const appSecundario = firebase.apps.find(a => a.name === 'SecondaryApp') || firebase.initializeApp(firebaseConfig, 'SecondaryApp');
 
