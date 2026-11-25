@@ -4,7 +4,23 @@ let cacheAtivosSolicitacoes = [];
 let salvandoNovaSolicitacao = false;
 let convertendoSolicitacaoId = '';
 
+function starterBloqueiaSolicitacoes() {
+    if (usuarioAtual?.perfil === 'SuperAdmin') return false;
+    const planoEfetivo = typeof planoEmpresaAtual !== 'undefined' && planoEmpresaAtual
+        ? planoEmpresaAtual
+        : (typeof lerPlanoCacheEmpresa === 'function' ? lerPlanoCacheEmpresa(usuarioAtual?.empresaId) : null);
+    return planoEfetivo === 'Starter';
+}
+
 function initSolicitacoes() {
+    if (starterBloqueiaSolicitacoes()) {
+        const container = document.getElementById('app-content');
+        if (container && typeof renderizarErro403 === 'function') {
+            renderizarErro403(container, 'solicitacoes');
+        }
+        return;
+    }
+
     iniciarListenerSolicitacoes();
     const formSol = document.getElementById('form-nova-solicitacao');
     if (formSol && !formSol.dataset.bound) {
@@ -14,6 +30,7 @@ function initSolicitacoes() {
 }
 
 function iniciarListenerSolicitacoes() {
+    if (starterBloqueiaSolicitacoes()) return;
     if (unsubscribeSolicitacoes) unsubscribeSolicitacoes();
 
     let query = db.collection('solicitacoes').where('empresaId', '==', usuarioAtual.empresaId);
@@ -172,6 +189,8 @@ function filtrarSelectAtivosSolicitacao(ativoIdForcado = '') {
 }
 
 async function abrirModalNovaSolicitacao() {
+    if (starterBloqueiaSolicitacoes()) return;
+
     const form = document.getElementById('form-nova-solicitacao');
     if (form) form.reset();
 
@@ -185,7 +204,7 @@ async function abrirModalNovaSolicitacao() {
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => {
             const rotA = (a.codigoTag || '').trim() ? `${a.codigoTag} - ${a.nome}` : (a.nome || '');
-            const rotB = (b.codigoTag || '').trim() ? `${b.codigoTag} - ${b.nome}` : (b.nome || '');
+            const rotB = (b.codigoTag || '').trim() ? `${b.codigoTag} - ${a.nome}` : (b.nome || '');
             return rotA.localeCompare(rotB);
         });
 
@@ -201,6 +220,7 @@ function fecharModalNovaSolicitacao() {
 
 async function salvarNovaSolicitacao(e) {
     e.preventDefault();
+    if (starterBloqueiaSolicitacoes()) return;
     if (salvandoNovaSolicitacao) return;
 
     const sel = document.getElementById('sol-ativo');
@@ -264,6 +284,7 @@ async function salvarNovaSolicitacao(e) {
 }
 
 async function aprovarEConverterEmOS(solId) {
+    if (starterBloqueiaSolicitacoes()) return;
     if (!solId || convertendoSolicitacaoId === solId) return;
     convertendoSolicitacaoId = solId;
 
@@ -343,6 +364,7 @@ async function aprovarEConverterEmOS(solId) {
 // CANCELAMENTO DE CHAMADO COM MOTIVO (GESTOR)
 // ==========================================
 function abrirModalCancelarSolicitacao(solId) {
+    if (starterBloqueiaSolicitacoes()) return;
     const sol = cacheListaSolicitacoes.find(s => s.id === solId);
     if (!sol) return;
 
@@ -370,6 +392,7 @@ function selecionarAtalhoMotivoCancelamento(valor) {
 
 async function confirmarCancelamentoSolicitacao(e) {
     e.preventDefault();
+    if (starterBloqueiaSolicitacoes()) return;
     const solId = document.getElementById('cancelar-sol-id').value;
     const motivo = document.getElementById('cancelar-sol-motivo').value.trim();
     if (!solId || !motivo) return;
