@@ -41,45 +41,17 @@ function alternarCampoUsuariosExtrasSaaS(modo) {
     }
 }
 
-function confirmarAcaoSaaS({ titulo, mensagem, textoConfirmar = 'Confirmar', corBotao = 'bg-blue-600 hover:bg-blue-700' }) {
-    return new Promise((resolve) => {
-        document.getElementById('modal-confirmacao-saas')?.remove();
-
-        const modalHTML = `
-        <div id="modal-confirmacao-saas" class="fixed inset-0 bg-[#0B1120]/80 backdrop-blur-xs z-[9999] flex items-center justify-center p-4">
-            <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-                <div class="bg-[#0B1120] px-5 py-4 border-b-2 border-[#00E5B0] flex items-center gap-2.5">
-                    <i data-lucide="alert-triangle" class="w-5 h-5 text-[#00E5B0] shrink-0"></i>
-                    <h3 class="text-sm font-extrabold text-white">${escaparHTML(titulo)}</h3>
-                </div>
-                <div class="p-5 space-y-4">
-                    <p class="text-xs text-slate-600 leading-relaxed">${escaparHTML(mensagem)}</p>
-                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                        <button type="button" id="btn-saas-confirm-cancel"
-                            class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200">
-                            Cancelar
-                        </button>
-                        <button type="button" id="btn-saas-confirm-ok"
-                            class="px-4 py-2 text-xs font-bold text-white rounded-xl shadow-sm ${corBotao}">
-                            ${escaparHTML(textoConfirmar)}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        const fechar = (resposta) => {
-            document.getElementById('modal-confirmacao-saas')?.remove();
-            resolve(resposta);
-        };
-
-        document.getElementById('btn-saas-confirm-cancel')?.addEventListener('click', () => fechar(false));
-        document.getElementById('btn-saas-confirm-ok')?.addEventListener('click', () => fechar(true));
-    });
+async function confirmarAcaoPadraoSaaS({ titulo, mensagem, textoConfirmar = 'Confirmar', perigo = false }) {
+    if (typeof confirmarAcaoOSync === 'function') {
+        const msgSegura = typeof escaparHTML === 'function' ? escaparHTML(mensagem) : String(mensagem || '');
+        return confirmarAcaoOSync(msgSegura, {
+            titulo,
+            textoConfirmar,
+            textoCancelar: 'Cancelar',
+            perigo
+        });
+    }
+    return false;
 }
 
 async function initSaaSEmpresas() {
@@ -375,11 +347,11 @@ async function salvarEdicaoEmpresaSaaS(e) {
 }
 
 async function renovarContratoEmpresa(empId, nome) {
-    const confirmado = await confirmarAcaoSaaS({
+    const confirmado = await confirmarAcaoPadraoSaaS({
         titulo: 'Renovar Contrato Anual',
         mensagem: `Confirmar renovação de 1 ano (365 dias) para "${nome}"?`,
         textoConfirmar: 'Renovar 1 Ano',
-        corBotao: 'bg-emerald-600 hover:bg-emerald-700'
+        perigo: false
     });
     if (!confirmado) return;
 
@@ -446,11 +418,11 @@ async function salvarUsuarioEmpresaSaaS(e) {
 
 async function alternarStatusEmpresa(empId, statusAtual) {
     const acao = statusAtual ? 'suspender' : 'reativar';
-    const confirmado = await confirmarAcaoSaaS({
+    const confirmado = await confirmarAcaoPadraoSaaS({
         titulo: statusAtual ? 'Suspender Empresa' : 'Reativar Empresa',
         mensagem: `Deseja realmente ${acao} o acesso desta empresa?`,
         textoConfirmar: statusAtual ? 'Suspender' : 'Reativar',
-        corBotao: statusAtual ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'
+        perigo: Boolean(statusAtual)
     });
     if (!confirmado) return;
 
