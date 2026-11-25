@@ -138,21 +138,66 @@ function fecharOverlayPeloBotaoVoltar(el) {
     });
 })();
 
+function renderizarErro403(container, paginaSolicitada) {
+    if (!container) return;
+    const rotaSegura = escaparHTML(paginaSolicitada || '');
+    container.innerHTML = `
+        <div class="max-w-md mx-auto my-8 bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden text-center">
+            <div class="bg-[#0B1120] px-6 py-5 border-b-2 border-rose-500">
+                <span class="inline-block px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-400 font-extrabold text-xs mb-2">
+                    ERRO 403
+                </span>
+                <h2 class="text-lg font-extrabold text-white">Acesso Negado</h2>
+                <p class="text-xs text-slate-400 mt-1">Sem permissão para acessar <b>${rotaSegura || 'esta página'}</b>.</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Seu perfil atual não possui autorização para esta tela. Fale com o administrador do sistema caso precise de acesso.
+                </p>
+                <a href="/403" target="_blank" rel="noopener noreferrer"
+                    class="inline-block text-xs font-semibold text-blue-600 hover:underline">
+                    Abrir página dedicada 403
+                </a>
+                <button type="button" onclick="navegarPara('os')"
+                    class="w-full bg-[#1D4ED8] hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl transition text-sm">
+                    Voltar para O.S.
+                </button>
+            </div>
+        </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function renderizarErroOffline(container, paginaSolicitada) {
+    if (!container) return;
+    const rotaSegura = escaparHTML(paginaSolicitada || 'os');
+    container.innerHTML = `
+        <div class="max-w-md mx-auto my-8 bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden text-center">
+            <div class="bg-[#0B1120] px-6 py-5 border-b-2 border-[#00E5B0]">
+                <span class="inline-block px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 font-extrabold text-xs mb-2">
+                    SEM CONEXÃO
+                </span>
+                <h2 class="text-lg font-extrabold text-white">Você está offline</h2>
+                <p class="text-xs text-slate-400 mt-1">Não foi possível carregar <b>${rotaSegura}</b> sem internet.</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Confira sua conexão de rede e tente carregar a tela novamente.
+                </p>
+                <button type="button" onclick="navegarPara('${rotaSegura}')"
+                    class="w-full bg-[#1D4ED8] hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl transition text-sm">
+                    Tentar novamente
+                </button>
+            </div>
+        </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
 async function navegarPara(pagina) {
     const container = document.getElementById('app-content');
     const perfil = usuarioAtual?.perfil;
     const isGestor = perfil === 'Admin' || perfil === 'SuperAdmin';
-
-    // Verifica permissão de acesso à rota para perfis não-gestores
-    if (!isGestor) {
-        const permitidas = typeof obterPaginasPermitidasUsuario === 'function'
-            ? (obterPaginasPermitidasUsuario(usuarioAtual) || [])
-            : (perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes']);
-
-        if (!permitidas.includes(pagina)) {
-            pagina = permitidas[0] || (perfil === 'Lideranca' ? 'solicitacoes' : 'os');
-        }
-    }
 
     // Proteção contra Path Traversal no nome da página
     const paginaSegura = String(pagina || 'os').replace(/[^a-z0-9\-]/gi, '');
@@ -164,6 +209,28 @@ async function navegarPara(pagina) {
         } else {
             container.className = 'flex-1 max-w-7xl w-full mx-auto p-4 md:p-6';
         }
+    }
+
+    // Bloqueio explícito de acesso não autorizado (403)
+    if (paginaSegura === 'saas-empresas' && perfil !== 'SuperAdmin') {
+        renderizarErro403(container, paginaSegura);
+        return;
+    }
+
+    if (!isGestor && usuarioAtual) {
+        const permitidas = typeof obterPaginasPermitidasUsuario === 'function'
+            ? (obterPaginasPermitidasUsuario(usuarioAtual) || [])
+            : (perfil === 'Lideranca' ? ['solicitacoes'] : ['os', 'solicitacoes']);
+
+        if (!permitidas.includes(paginaSegura)) {
+            renderizarErro403(container, paginaSegura);
+            return;
+        }
+    }
+
+    if (navigator.onLine === false) {
+        renderizarErroOffline(container, paginaSegura);
+        return;
     }
 
     document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -200,7 +267,11 @@ async function navegarPara(pagina) {
         if (paginaSegura === 'cad-lideranca' && typeof initUsuariosCadastro === 'function') initUsuariosCadastro('Lideranca');
 
     } catch (err) {
-        container.innerHTML = `<div class="p-8 text-center text-slate-500">Tela <b>${escaparHTML(paginaSegura)}.html</b> não encontrada.</div>`;
+        if (navigator.onLine === false) {
+            renderizarErroOffline(container, paginaSegura);
+        } else {
+            container.innerHTML = `<div class="p-8 text-center text-slate-500">Tela <b>${escaparHTML(paginaSegura)}.html</b> não encontrada.</div>`;
+        }
     }
 }
 
