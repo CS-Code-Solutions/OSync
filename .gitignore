@@ -1,0 +1,41 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editores e ambientes locais (manter apenas configs compartilhadas se necessário)
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos temporários, logs e backups
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Variáveis de ambiente e segredos locais
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+serviceAccountKey*.json
+
+# Planilhas de importação e rascunhos locais
+*.xlsx
+*.xls
+*.csv
+!exemplo-*.csv
+!modelo-*.xlsx
+
+# Pastas de dependências ou build caso existam localmente
+node_modules/
+dist/
+build/
+coverage/
